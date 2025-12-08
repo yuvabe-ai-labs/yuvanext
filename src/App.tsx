@@ -38,6 +38,7 @@ import ResetPassword from "./pages/ResetPassword";
 import CandidateTasks from "./pages/CandidateTasks";
 import MyTasks from "./pages/MyTasks";
 import UnitCandidateTasks from "./pages/UnitCandidateTasks";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -286,6 +287,15 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <UnitCandidateTasks />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
                 </ProtectedRoute>
               }
             />

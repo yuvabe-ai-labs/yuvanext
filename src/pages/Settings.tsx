@@ -1,11 +1,3 @@
-// export default function Settings() {
-//   return (
-//     <>
-//       <h1>Settings</h1>
-//     </>
-//   );
-// }
-
 import Navbar from "@/components/Navbar";
 import React, { useState } from "react";
 import Sidebar from "@/components/candidateSettings/Sidebar";
@@ -38,13 +30,13 @@ export default function Settings() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden md:flex">
-          <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r">
+      <main className="max-w-7xl px-[7.5rem] mx-auto">
+        <div className="bg-white rounded-lg min-h-screen shadow-sm overflow-hidden md:flex">
+          <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r-2 md:border-gray-200 ">
             <Sidebar active={activeSection} onChange={setActiveSection} />
           </aside>
 
-          <section className="flex-1 p-6">{renderContent()}</section>
+          <section className="flex-1 p-10">{renderContent()}</section>
         </div>
       </main>
     </div>

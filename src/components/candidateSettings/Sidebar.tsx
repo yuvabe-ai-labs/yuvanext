@@ -9,18 +9,18 @@ const items = [
 
 export default function Sidebar({ active, onChange }) {
   return (
-    <nav aria-label="Settings navigation" className="p-4">
-      <h2 className="text-2xl font-semibold mb-4">Settings</h2>
-      <ul className="space-y-1">
+    <nav aria-label="Settings navigation">
+      <h2 className="text-xl font-medium text-gray-600 p-5">Settings</h2>
+      <ul>
         {items.map((it) => (
           <li key={it.id}>
             <button
               onClick={() => onChange(it.id)}
-              className={`w-full text-left px-3 py-2 rounded-md transition-colors duration-150
+              className={`w-full text-left font-medium px-7 border-b border-gray-200 py-5 transition-colors duration-150
                 ${
                   active === it.id
-                    ? "bg-gray-100 text-blue-600 font-medium"
-                    : "hover:bg-gray-50"
+                    ? "bg-gray-100 text-blue-500 font-medium"
+                    : "hover:bg-gray-50 text-gray-600"
                 }`}
               aria-current={active === it.id ? "true" : undefined}
             >

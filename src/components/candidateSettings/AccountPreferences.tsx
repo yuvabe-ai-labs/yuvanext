@@ -3,6 +3,7 @@ import PreferenceItem from "./PreferenceItem";
 import DemographicForm from "./DemographicForm";
 import VerificationUpload from "./VerificationUpload";
 import SkeletonBox from "./SkeletonBox";
+import { ChevronRight } from "lucide-react";
 
 /**
  * AccountPreferences implements an internal "activeSubView" state:
@@ -59,52 +60,67 @@ export default function AccountPreferences() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">Personal Information</h2>
+      <h2 className="text-xl text-gray-800 font-medium">
+        Personal Information
+      </h2>
 
-      <div className="space-y-2 border rounded-md overflow-hidden">
+      <div className="rounded-md overflow-hidden">
         <PreferenceItem
-          title="Name, skills, and interests"
-          description="Update your visible profile information"
+          title="Name, Skills and Interests"
           onClick={openProfile}
         />
 
         <PreferenceItem
-          title="Personal Demographic information"
-          description="Provide voluntary demographic details to help us report aggregated insights"
+          title="Personal Demographic Information"
           onClick={() => openSubViewWithLoad("demographic")}
         />
 
         <PreferenceItem
           title="Verifications"
-          description="Upload government ID to verify your identity"
           onClick={() => openSubViewWithLoad("verification")}
         />
       </div>
 
-      <section className="mt-10">
-        <h3 className="text-lg font-semibold mb-3">General Preferences</h3>
-        <div className="space-y-2 border rounded-md p-3">
-          <div className="flex flex-wrap items-center">
-            <div className="flex-1">
-              <div className="text-sm text-gray-600">Language</div>
-              <div className="mt-2">
-                <select className="border rounded px-3 py-2 w-full md:w-60">
-                  <option>English</option>
-                  <option>Hindi</option>
-                </select>
-              </div>
-            </div>
+      <section className="mt-7">
+        <h3 className="text-xl font-medium text-gray-800">
+          General Preferences
+        </h3>
+        <div className="font-medium">
+          <div className="text-base text-gray-600 border-b border-gray-200 py-5 flex justify-between">
+            Language <ChevronRight aria-hidden className="text-gray-400" />
+          </div>
+          <div className="text-base text-gray-600 border-b border-gray-200 py-5 flex justify-between">
+            Content Language
+            <ChevronRight aria-hidden className="text-gray-400" />
+            {/* <select className="border rounded px-3 py-2 w-full md:w-60">
+              <option>English</option>
+              <option>Hindi</option>
+            </select> */}
           </div>
         </div>
       </section>
 
-      <section className="mt-10">
-        <h3 className="text-lg font-semibold mb-3">Account Management</h3>
+      <section className="mt-7">
+        <h3 className="text-xl font-medium text-gray-800">
+          Account Management
+        </h3>
+        <div className="font-medium">
+          <div className="text-base text-red-500 border-b border-gray-200 py-5 flex justify-between">
+            Deactivate Account
+          </div>
+          <div className="text-base text-red-500 border-b border-gray-200 py-5 flex justify-between">
+            Delete Account
+          </div>
+        </div>
+        {/*         
+        <h3 className="text-xl font-medium mb-3 text-gray-800">
+          Account Management
+        </h3>
         <div className="border rounded-md p-4">
           <button className="text-red-500">Deactivate Account</button>
           <div className="h-px bg-gray-100 my-3" />
           <button className="text-red-500">Delete Account</button>
-        </div>
+        </div> */}
       </section>
     </div>
   );

@@ -1,35 +1,45 @@
 import React, { useState } from "react";
 import Tag from "./Tag";
+import { ChevronLeft } from "lucide-react";
 
-/**
- * Demographic form with simple state & skeleton-like initial load
- * In real app, fetch existing values and submit via API (e.g., Supabase)
- */
 export default function DemographicForm({ onBack }) {
   const [loading] = useState(false);
   const [gender, setGender] = useState("");
   const [disability, setDisability] = useState("");
-  const [tags, setTags] = useState(["first-gen", "urban"]);
 
   const save = () => {
-    // TODO: replace with API call
-    console.log({ gender, disability, tags });
+    console.log({ gender, disability });
     alert("Saved (mock)");
     onBack();
   };
 
   return (
-    <div>
-      <button onClick={onBack} className="text-blue-600 mb-4">
-        ← Back
+    <div className="max-w-2xl mx-auto px-4">
+      {/* Back Button */}
+      <button
+        onClick={onBack}
+        className="text-base text-gray-600 font-medium flex items-center gap-1  hover:text-gray-900 mb-6"
+      >
+        <ChevronLeft /> Back
       </button>
 
-      <h2 className="text-xl font-semibold mb-4">Demographic Information</h2>
+      {/* Header */}
+      <div className="space-y-5">
+        <h2 className="text-xl font-medium text-gray-800">
+          Demographic Information
+        </h2>
+        <p className="text-gray-600 text-base">
+          Here’s the information you’ve provided about yourself. This will not
+          be displayed on your profile.
+        </p>
+      </div>
 
       {loading ? (
-        <div className="space-y-3">
-          <div className="h-8 bg-gray-100 rounded w-2/5 animate-pulse" />
-          <div className="h-8 bg-gray-100 rounded w-3/5 animate-pulse" />
+        <div className="space-y-4">
+          <div className="h-6 bg-gray-200 w-2/5 rounded animate-pulse" />
+          <div className="h-10 bg-gray-200 w-full rounded animate-pulse" />
+          <div className="h-6 bg-gray-200 w-1/3 rounded animate-pulse" />
+          <div className="h-10 bg-gray-200 w-full rounded animate-pulse" />
         </div>
       ) : (
         <form
@@ -37,15 +47,24 @@ export default function DemographicForm({ onBack }) {
             e.preventDefault();
             save();
           }}
-          className="space-y-6"
+          className="space-y-8 mt-6"
         >
+          {/* Gender */}
+          <div className="space-y-5">
+            <label className="text-lg font-medium text-gray-600">Gender</label>
+            <p className="text-gray-600 text-base">
+              Please select your gender identity
+            </p>
+          </div>
+
           <div>
-            <label className="block text-sm font-medium mb-2">Gender</label>
+            <label className="block font-medium text-gray-900 mb-2 text-[15px]">
+              Gender
+            </label>
             <select
               value={gender}
               onChange={(e) => setGender(e.target.value)}
-              className="border rounded w-full md:w-2/3 p-2"
-              aria-label="Select gender"
+              className="border border-gray-300 rounded-lg w-full p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
               <option value="">Select</option>
               <option value="female">Female</option>
@@ -55,13 +74,21 @@ export default function DemographicForm({ onBack }) {
             </select>
           </div>
 
+          <div className="border-t" />
+
+          {/* Disability */}
           <div>
-            <label className="block text-sm font-medium mb-2">Disability</label>
+            <label className="block font-medium text-gray-900 mb-2 text-[15px]">
+              Disability
+            </label>
+            <p className="text-sm text-gray-500 mb-2">
+              Do you have a disability that substantially limits a major life
+              activity, or a history of a disability?
+            </p>
             <select
               value={disability}
               onChange={(e) => setDisability(e.target.value)}
-              className="border rounded w-full md:w-2/3 p-2"
-              aria-label="Disability status"
+              className="border border-gray-300 rounded-lg w-full p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
               <option value="">Select</option>
               <option value="no">No</option>
@@ -70,26 +97,31 @@ export default function DemographicForm({ onBack }) {
             </select>
           </div>
 
-          <div>
-            <div className="text-sm font-medium mb-2">Tags (example)</div>
-            <div className="flex items-center flex-wrap">
-              {tags.map((t) => (
-                <Tag key={t}>{t}</Tag>
-              ))}
-              <button
-                type="button"
-                onClick={() => setTags((s) => [...s, `tag-${s.length + 1}`])}
-                className="ml-1 mt-1 inline-flex items-center px-2 py-1 border rounded text-sm text-gray-600"
-              >
-                + add
-              </button>
-            </div>
+          <div className="border-t" />
+
+          {/* Info Box */}
+          <div className="bg-gray-50 p-4 rounded-lg text-sm border">
+            <p className="font-semibold text-gray-900 mb-1">
+              How YuvaNext uses this data
+            </p>
+            <p className="text-gray-600 leading-relaxed">
+              Your demographic data will not be shown on your profile. It will
+              be used to provide aggregated workforce insights, personalization,
+              and help employers reach a diverse talent pool.
+            </p>
+            <button
+              type="button"
+              className="text-blue-600 text-sm font-medium mt-1 underline"
+            >
+              Learn more
+            </button>
           </div>
 
-          <div>
+          {/* Save button */}
+          <div className="flex justify-center">
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition"
             >
               Agree and save
             </button>

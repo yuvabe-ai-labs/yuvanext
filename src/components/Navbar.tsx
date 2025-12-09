@@ -258,7 +258,7 @@ const Navbar = () => {
                     <span>Help</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => navigate("")}
+                    onClick={() => navigate("/settings")}
                     className="cursor-pointer hover:!text-blue-500 hover:bg-transparent focus:bg-transparent transition-colors [&_svg]:hover:!text-blue-500"
                   >
                     <Settings className="mr-2 h-4 w-4" />

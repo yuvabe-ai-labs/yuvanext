@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from "react";
-import Tag from "./Tag";
+import { useEffect, useState } from "react";
+// import Tag from "./Tag";
 import { ChevronDown, ChevronLeft } from "lucide-react";
 import { useProfileData } from "@/hooks/useProfileData";
-import { log } from "console";
 
 export default function DemographicForm({ onBack }) {
   const [loading] = useState(false);
@@ -12,9 +11,6 @@ export default function DemographicForm({ onBack }) {
     // loading,
     updateProfile,
     updateStudentProfile,
-    updateInterests,
-    updateCoverLetter,
-    refetch,
   } = useProfileData();
   const [initialGender, setInitialGender] = useState(null);
   const [gender, setGender] = useState(profile?.gender || "");
@@ -99,8 +95,8 @@ export default function DemographicForm({ onBack }) {
                 onChange={(e) => setGender(e.target.value)}
                 className="border border-gray-300 rounded-full w-full p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none"
               >
-                <option value="female">Female</option>
                 <option value="male">Male</option>
+                <option value="female">Female</option>
                 <option value="prefer_not">Prefer not to say</option>
               </select>
               <ChevronDown className="absolute top-3 right-5 w-4" />
@@ -146,21 +142,21 @@ export default function DemographicForm({ onBack }) {
               Your demographic data will not be shown on your profile. It will
               be used to provide aggregated workforce insights, personalization,
               and help employers reach a diverse talent pool.{" "}
-              <span className="text-blue-500 font-semibold mt-1">
+              <span className="text-blue-500 font-semibold mt-1 cursor-pointer">
                 Learn more
               </span>
             </p>
           </div>
 
           {/* Save button */}
-          <div className="flex justify-center">
+          {/* <div className="flex justify-center">
             <button
               type="submit"
               className="bg-blue-500 hover:bg-blue-600 text-white px-10 py-2 rounded-full font-medium transition"
             >
               Agree and save
             </button>
-          </div>
+          </div> */}
         </form>
       )}
     </div>

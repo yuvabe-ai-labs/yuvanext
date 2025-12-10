@@ -81,7 +81,7 @@ export default function AccountPreferences() {
         />
       </div>
 
-      <section className="mt-7">
+      {/* <section className="mt-7">
         <h3 className="text-xl font-medium text-gray-800">
           General Preferences
         </h3>
@@ -92,13 +92,13 @@ export default function AccountPreferences() {
           <div className="text-base text-gray-600 border-b border-gray-200 py-5 flex justify-between">
             Content Language
             <ChevronRight aria-hidden className="text-gray-400" />
-            {/* <select className="border rounded px-3 py-2 w-full md:w-60">
+             <select className="border rounded px-3 py-2 w-full md:w-60">
               <option>English</option>
               <option>Hindi</option>
-            </select> */}
+            </select> 
           </div>
         </div>
-      </section>
+      </section> */}
 
       <section className="mt-7">
         <h3 className="text-xl font-medium text-gray-800">

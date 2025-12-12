@@ -1,27 +1,48 @@
-import React from "react";
+import React, { useState } from "react";
+import ChangePasswordModal from "@/components/settings/ChangePasswordModal";
+import UpdateEmailModal from "@/components/settings/UpdateEmailModal";
+import UpdateMobileModal from "@/components/settings/UpdateMobileModal";
+import PreferenceItem from "./PreferenceItem";
 
-/** placeholder security settings page */
 export default function SecuritySettings() {
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showMobileModal, setShowMobileModal] = useState(false);
+
   return (
     <div>
       <h2 className="text-xl font-semibold mb-4">Sign In & Security</h2>
-      <div className="space-y-4">
-        <div className="border p-4 rounded">
-          <div className="text-sm font-medium">Password</div>
-          <div className="text-sm text-gray-500 mt-1">Change your password</div>
-          <div className="mt-3">
-            <button className="px-3 py-1 bg-blue-600 text-white rounded">
-              Change
-            </button>
-          </div>
-        </div>
 
-        <div className="border p-4 rounded">
-          <div className="text-sm font-medium">Two-factor authentication</div>
-          <div className="text-sm text-gray-500 mt-1">
-            Enable 2FA to improve account security
-          </div>
-        </div>
+      <ChangePasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+      />
+
+      <UpdateEmailModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+      />
+
+      <UpdateMobileModal
+        isOpen={showMobileModal}
+        onClose={() => setShowMobileModal(false)}
+      />
+
+      <div className="space-y-4">
+        <PreferenceItem
+          title="Email Address"
+          onClick={() => setShowEmailModal(true)}
+        />
+
+        <PreferenceItem
+          title="Change Password"
+          onClick={() => setShowPasswordModal(true)}
+        />
+
+        <PreferenceItem
+          title="Mobile Number"
+          onClick={() => setShowMobileModal(true)}
+        />
       </div>
     </div>
   );

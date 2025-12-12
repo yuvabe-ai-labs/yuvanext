@@ -28,17 +28,17 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="bg-[#F8F9FA]">
       <Navbar />
-      <main className="max-w-7xl px-[7.5rem] mx-auto">
-        <div className="bg-white rounded-lg min-h-screen shadow-sm overflow-hidden md:flex">
-          <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r-2 md:border-gray-200 ">
-            <Sidebar active={activeSection} onChange={setActiveSection} />
-          </aside>
+      {/* <main className="max-w-7xl px-[7.5rem] mx-auto"> */}
+      <div className="flex h-screen mx-24 bg-white">
+        <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r-2 md:border-gray-200 ">
+          <Sidebar active={activeSection} onChange={setActiveSection} />
+        </aside>
 
-          <section className="flex-1 p-10">{renderContent()}</section>
-        </div>
-      </main>
+        <section className="flex-1 p-10">{renderContent()}</section>
+      </div>
+      {/* </main> */}
     </div>
   );
 }

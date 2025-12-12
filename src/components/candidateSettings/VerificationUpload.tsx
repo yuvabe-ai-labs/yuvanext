@@ -1,16 +1,19 @@
+import { ChevronLeft, Folder } from "lucide-react";
 import React, { useRef, useState } from "react";
 
-/**
- * Minimal file upload UI. Replace onUpload with your storage API
- * - Accepts drag + click
- * - Shows selected file name and size
- */
-export default function VerificationUpload({ onBack }) {
-  const fileRef = useRef();
-  const [file, setFile] = useState(null);
+interface VerificationUploadProps {
+  onBack?: () => void;
+}
+
+export default function VerificationUpload({
+  onBack,
+}: VerificationUploadProps) {
+  // FIX 1: Initialize with null and add Type
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const handleFiles = (files) => {
+  const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const f = files[0];
     if (f.size > 10 * 1024 * 1024) {
@@ -20,7 +23,7 @@ export default function VerificationUpload({ onBack }) {
     setFile(f);
   };
 
-  const onDrop = (e) => {
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     handleFiles(e.dataTransfer.files);
   };
@@ -28,66 +31,104 @@ export default function VerificationUpload({ onBack }) {
   const upload = async () => {
     if (!file) return alert("Select a file");
     setUploading(true);
-    // replace with real upload API (Supabase / S3)
     await new Promise((r) => setTimeout(r, 800));
     setUploading(false);
     alert("Uploaded (mock)");
-    onBack();
+    if (onBack) onBack();
+  };
+
+  const handleBrowseClick = () => {
+    // FIX 2: Use optional chaining
+    fileRef.current?.click();
   };
 
   return (
     <div>
-      <button onClick={onBack} className="text-blue-600 mb-4">
-        ← Back
+      {/* Back Button */}
+      <button
+        onClick={onBack}
+        className="text-base text-gray-600 font-medium flex items-center gap-1  hover:text-gray-900 mb-6"
+      >
+        <ChevronLeft /> Back
       </button>
-
-      <h2 className="text-xl font-semibold mb-4">Verifications</h2>
+      <div className="mb-8">
+        <h2 className="text-2xl font-medium text-gray-800 mb-2">
+          Verifications
+        </h2>
+        <p className="text-gray-500 text-base leading-relaxed">
+          Please upload any government ID to verify your age and identity.{" "}
+          <a href="#" className="text-blue-600 font-medium hover:underline">
+            Learn more
+          </a>
+        </p>
+      </div>
 
       <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
-        className="border-dashed border-2 border-blue-200 rounded p-8 text-center bg-blue-50"
+        onClick={handleBrowseClick}
+        className="group relative border-2 border-dashed border-blue-400 bg-blue-50/50 hover:bg-blue-50 rounded-xl h-64 flex flex-col items-center justify-center cursor-pointer transition-all"
       >
-        <div className="mb-2">📁</div>
-        <div className="mb-2 font-medium">
+        <div className="mb-4 p-3 bg-blue-100 rounded-full transition-transform">
+          <Folder className="w-8 h-8 text-blue-600" />
+        </div>
+
+        <div className="text-lg font-medium text-gray-900 mb-2">
           Drag your file(s) or{" "}
           <button
-            onClick={() => fileRef.current.click()}
-            className="text-blue-600 underline"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleBrowseClick();
+            }}
+            className="text-blue-600 font-bold hover:underline"
           >
             browse
           </button>
         </div>
-        <div className="text-sm text-gray-500">Max 10 MB files are allowed</div>
+
+        <div className="text-sm text-gray-400">Max 10 MB files are allowed</div>
 
         <input
           ref={fileRef}
           type="file"
           className="hidden"
+          accept="image/*,.pdf"
           onChange={(e) => handleFiles(e.target.files)}
           aria-label="upload verification"
         />
       </div>
 
       {file && (
-        <div className="mt-4 flex items-center justify-between border rounded p-3">
-          <div>
-            <div className="font-medium">{file.name}</div>
-            <div className="text-sm text-gray-500">
-              {Math.round(file.size / 1024)} KB
+        <div className="mt-6 flex items-center justify-between border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="bg-gray-100 p-2 rounded">
+              <Folder className="w-5 h-5 text-gray-500" />
+            </div>
+            <div>
+              <div className="font-medium text-gray-900">{file.name}</div>
+              <div className="text-sm text-gray-500">
+                {Math.round(file.size / 1024)} KB
+              </div>
             </div>
           </div>
-          <div>
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setFile(null)}
-              className="text-sm text-gray-600 mr-3"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFile(null);
+              }}
+              className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-red-600 transition-colors"
             >
               Remove
             </button>
             <button
-              onClick={upload}
-              className="px-3 py-1 bg-blue-600 text-white rounded"
+              onClick={(e) => {
+                e.stopPropagation();
+                upload();
+              }}
               disabled={uploading}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors disabled:opacity-50"
             >
               {uploading ? "Uploading..." : "Upload"}
             </button>
@@ -95,7 +136,7 @@ export default function VerificationUpload({ onBack }) {
         </div>
       )}
 
-      <p className="mt-6 text-sm text-gray-500">
+      <p className="mt-8 text-center text-sm text-gray-500">
         You can delete the document and re-upload to get verified.
       </p>
     </div>

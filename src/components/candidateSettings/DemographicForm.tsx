@@ -48,7 +48,7 @@ export default function DemographicForm({ onBack }) {
   }, [disability]);
 
   return (
-    <div className="max-w-2xl mx-auto px-4">
+    <div>
       {/* Back Button */}
       <button
         onClick={onBack}

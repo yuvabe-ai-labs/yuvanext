@@ -1,37 +1,85 @@
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import PreferenceItem from "./PreferenceItem";
 import DemographicForm from "./DemographicForm";
 import VerificationUpload from "./VerificationUpload";
 import SkeletonBox from "./SkeletonBox";
-import { ChevronRight } from "lucide-react";
-
-/**
- * AccountPreferences implements an internal "activeSubView" state:
- * - null => render the list of items
- * - 'demographic' => show DemographicForm (with back)
- * - 'verification' => show VerificationUpload (with back)
- *
- * It also demonstrates skeleton loading when fetching the list (mock).
- */
+import { supabase } from "@/integrations/supabase/client";
 
 export default function AccountPreferences() {
   const [activeSubView, setActiveSubView] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
 
   const openProfile = useCallback(() => {
-    // In your app you may want to use router navigation.
-    // For now we simulate opening profile in same app:
     window.location.href = "/profile"; // or use your app's navigation
   }, []);
 
-  // mock load function for dynamic content because sometimes you want to fetch before switching
   const openSubViewWithLoad = async (sub) => {
     setLoading(true);
-    // simulate network delay
+    // Add a small delay so the transition feels smooth (or fetch data here)
     await new Promise((r) => setTimeout(r, 400));
     setLoading(false);
     setActiveSubView(sub);
-    // optionally fetch sub view data here
+  };
+  const handleDeactivateAccount = async () => {
+    const confirmed = window.confirm(
+      "Deactivate your account? You can reactivate it by logging in anytime within the next 6 months. After that, it will be permanently deleted."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setIsDeactivating(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        throw new Error("No active session found");
+      }
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ deactivated_at: new Date().toISOString() })
+        .eq("user_id", session.user.id);
+
+      if (error) throw error;
+
+      await supabase.auth.signOut();
+
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Error deactivating account:", error);
+    } finally {
+      setIsDeactivating(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete your account? This action cannot be undone."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setIsDeleting(true);
+
+      const { error } = await supabase.functions.invoke("delete-user");
+
+      if (error) throw error;
+
+      await supabase.auth.signOut();
+
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      alert("Failed to delete account. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Render logic
@@ -95,7 +143,7 @@ export default function AccountPreferences() {
              <select className="border rounded px-3 py-2 w-full md:w-60">
               <option>English</option>
               <option>Hindi</option>
-            </select> 
+            </select>
           </div>
         </div>
       </section> */}
@@ -105,14 +153,29 @@ export default function AccountPreferences() {
           Account Management
         </h3>
         <div className="font-medium">
-          <div className="text-base text-red-500 border-b border-gray-200 py-5 flex justify-between">
+          {/* <div className="text-base text-red-500 border-b border-gray-200 py-5 flex justify-between">
             Deactivate Account
-          </div>
-          <div className="text-base text-red-500 border-b border-gray-200 py-5 flex justify-between">
+          </div> */}
+          <button
+            onClick={handleDeactivateAccount}
+            disabled={isDeactivating || isDeleting}
+            className="w-full text-left text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer hover:bg-gray-50 disabled:opacity-50"
+          >
+            {isDeactivating ? "Deactivating..." : "Deactivate Account"}
+          </button>
+          <button
+            onClick={handleDeleteAccount}
+            disabled={isDeleting}
+            className="w-full text-left text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer hover:bg-gray-50 disabled:opacity-50"
+          >
+            {isDeleting ? "Deleting..." : "Delete Account"}
+          </button>
+          {/*
+          <div className="text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer">
             Delete Account
-          </div>
+          </div> */}
         </div>
-        {/*         
+        {/*
         <h3 className="text-xl font-medium mb-3 text-gray-800">
           Account Management
         </h3>

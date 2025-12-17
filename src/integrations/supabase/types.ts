@@ -1,3 +1,6 @@
+Need to install the following packages:
+supabase@2.67.2
+Ok to proceed? (y) 
 export type Json =
   | string
   | number
@@ -364,6 +367,60 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          allow_all: boolean
+          application_status_email: boolean
+          application_status_in_app: boolean
+          created_at: string
+          id: string
+          internship_updates_email: boolean
+          internship_updates_in_app: boolean
+          recommended_courses_email: boolean
+          recommended_courses_in_app: boolean
+          recommended_internship_email: boolean
+          recommended_internship_in_app: boolean
+          similar_internships_email: boolean
+          similar_internships_in_app: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allow_all?: boolean
+          application_status_email?: boolean
+          application_status_in_app?: boolean
+          created_at?: string
+          id?: string
+          internship_updates_email?: boolean
+          internship_updates_in_app?: boolean
+          recommended_courses_email?: boolean
+          recommended_courses_in_app?: boolean
+          recommended_internship_email?: boolean
+          recommended_internship_in_app?: boolean
+          similar_internships_email?: boolean
+          similar_internships_in_app?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          allow_all?: boolean
+          application_status_email?: boolean
+          application_status_in_app?: boolean
+          created_at?: string
+          id?: string
+          internship_updates_email?: boolean
+          internship_updates_in_app?: boolean
+          recommended_courses_email?: boolean
+          recommended_courses_in_app?: boolean
+          recommended_internship_email?: boolean
+          recommended_internship_in_app?: boolean
+          similar_internships_email?: boolean
+          similar_internships_in_app?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -404,6 +461,7 @@ export type Database = {
         Row: {
           created_at: string
           date_of_birth: string | null
+          deactivated_at: string | null
           email: string | null
           full_name: string
           gender: string | null
@@ -418,6 +476,7 @@ export type Database = {
         Insert: {
           created_at?: string
           date_of_birth?: string | null
+          deactivated_at?: string | null
           email?: string | null
           full_name: string
           gender?: string | null
@@ -432,6 +491,7 @@ export type Database = {
         Update: {
           created_at?: string
           date_of_birth?: string | null
+          deactivated_at?: string | null
           email?: string | null
           full_name?: string
           gender?: string | null
@@ -582,48 +642,60 @@ export type Database = {
       student_tasks: {
         Row: {
           application_id: string
+          color: string | null
           created_at: string
           description: string | null
           end_date: string | null
+          end_time: string | null
           id: string
           review_remarks: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           start_date: string | null
+          start_time: string | null
           status: Database["public"]["Enums"]["task_status"]
           student_id: string
+          submission_link: string | null
           submitted_at: string | null
           title: string
           updated_at: string
         }
         Insert: {
           application_id: string
+          color?: string | null
           created_at?: string
           description?: string | null
           end_date?: string | null
+          end_time?: string | null
           id?: string
           review_remarks?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           start_date?: string | null
+          start_time?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           student_id: string
+          submission_link?: string | null
           submitted_at?: string | null
           title: string
           updated_at?: string
         }
         Update: {
           application_id?: string
+          color?: string | null
           created_at?: string
           description?: string | null
           end_date?: string | null
+          end_time?: string | null
           id?: string
           review_remarks?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           start_date?: string | null
+          start_time?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           student_id?: string
+          submission_link?: string | null
           submitted_at?: string | null
           title?: string
           updated_at?: string
@@ -765,6 +837,14 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_unit_user: { Args: never; Returns: boolean }
+      should_send_notification: {
+        Args: {
+          p_channel: string
+          p_notification_type: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "student" | "unit" | "admin"

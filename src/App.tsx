@@ -58,7 +58,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
           // Fetch profile with role and onboarding status
           const { data: profile, error } = await supabase
             .from("profiles")
-            .select("onboarding_completed, role")
+            .select("onboarding_completed, role, deactivated_at")
             .eq("user_id", user.id)
             .maybeSingle();
 
@@ -66,6 +66,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
             console.error("Error fetching profile:", error);
             setProfileLoading(false);
             return;
+          }
+
+          // Direct Update if needed
+          if (profile?.deactivated_at) {
+            const { error: updateError } = await supabase
+              .from("profiles")
+              .update({ deactivated_at: null })
+              .eq("user_id", user.id);
+
+            if (updateError)
+              console.error("Failed to reactivate:", updateError);
           }
 
           const isOnboardingCompleted = profile?.onboarding_completed || false;

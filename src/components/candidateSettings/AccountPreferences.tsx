@@ -4,8 +4,9 @@ import DemographicForm from "./DemographicForm";
 import VerificationUpload from "./VerificationUpload";
 import SkeletonBox from "./SkeletonBox";
 import { supabase } from "@/integrations/supabase/client";
-import { AlertTriangle, X } from "lucide-react"; // Importing icons for the modal
+import { AlertTriangle } from "lucide-react"; // Importing icons for the modal
 import { useNavigate } from "react-router-dom";
+import { useProfileData } from "@/hooks/useProfileData";
 
 export default function AccountPreferences() {
   const [activeSubView, setActiveSubView] = useState(null);
@@ -17,10 +18,14 @@ export default function AccountPreferences() {
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const navigate = useNavigate(); // Initialize hook
+  const { profile } = useProfileData();
 
   const openProfile = useCallback(() => {
-    navigate("/profile");
-  }, []);
+    if (!profile) return;
+
+    const target = profile.role === "student" ? "/profile" : "/unit-profile";
+    navigate(target);
+  }, [profile, navigate]); // Dependencies are crucial here!
 
   const openSubViewWithLoad = async (sub) => {
     setLoading(true);

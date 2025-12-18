@@ -4,6 +4,7 @@ import DemographicForm from "./DemographicForm";
 import VerificationUpload from "./VerificationUpload";
 import SkeletonBox from "./SkeletonBox";
 import { supabase } from "@/integrations/supabase/client";
+import { AlertTriangle, X } from "lucide-react"; // Importing icons for the modal
 
 export default function AccountPreferences() {
   const [activeSubView, setActiveSubView] = useState(null);
@@ -11,27 +12,25 @@ export default function AccountPreferences() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
 
+  // New states for Custom Modals
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
   const openProfile = useCallback(() => {
     window.location.href = "/profile"; // or use your app's navigation
   }, []);
 
   const openSubViewWithLoad = async (sub) => {
     setLoading(true);
-    // Add a small delay so the transition feels smooth (or fetch data here)
+    // Added delay back so skeleton is visible
     await new Promise((r) => setTimeout(r, 400));
     setLoading(false);
     setActiveSubView(sub);
   };
-  const handleDeactivateAccount = async () => {
-    const confirmed = window.confirm(
-      "Deactivate your account? You can reactivate it by logging in anytime within the next 6 months. After that, it will be permanently deleted."
-    );
 
-    if (!confirmed) return;
-
+  const executeDeactivate = async () => {
     try {
       setIsDeactivating(true);
-
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -48,22 +47,16 @@ export default function AccountPreferences() {
       if (error) throw error;
 
       await supabase.auth.signOut();
-
       window.location.href = "/";
     } catch (error) {
       console.error("Error deactivating account:", error);
-    } finally {
-      setIsDeactivating(false);
+      alert("Failed to deactivate. Please try again.");
+      setIsDeactivating(false); // Only reset if error
+      setShowDeactivateModal(false);
     }
   };
 
-  const handleDeleteAccount = async () => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete your account? This action cannot be undone."
-    );
-
-    if (!confirmed) return;
-
+  const executeDelete = async () => {
     try {
       setIsDeleting(true);
 
@@ -72,13 +65,12 @@ export default function AccountPreferences() {
       if (error) throw error;
 
       await supabase.auth.signOut();
-
       window.location.href = "/";
     } catch (error) {
       console.error("Error deleting account:", error);
       alert("Failed to delete account. Please try again.");
-    } finally {
-      setIsDeleting(false);
+      setIsDeleting(false); // Only reset if error
+      setShowDeleteModal(false);
     }
   };
 
@@ -107,7 +99,7 @@ export default function AccountPreferences() {
   }
 
   return (
-    <div>
+    <div className="relative">
       <h2 className="text-xl text-gray-800 font-medium">
         Personal Information
       </h2>
@@ -143,7 +135,7 @@ export default function AccountPreferences() {
              <select className="border rounded px-3 py-2 w-full md:w-60">
               <option>English</option>
               <option>Hindi</option>
-            </select>
+            </select> 
           </div>
         </div>
       </section> */}
@@ -156,27 +148,28 @@ export default function AccountPreferences() {
           {/* <div className="text-base text-red-500 border-b border-gray-200 py-5 flex justify-between">
             Deactivate Account
           </div> */}
+
           <button
-            onClick={handleDeactivateAccount}
+            onClick={() => setShowDeactivateModal(true)} // Open Custom Modal
             disabled={isDeactivating || isDeleting}
             className="w-full text-left text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer hover:bg-gray-50 disabled:opacity-50"
           >
-            {isDeactivating ? "Deactivating..." : "Deactivate Account"}
+            Deactivate Account
           </button>
+
           <button
-            onClick={handleDeleteAccount}
-            disabled={isDeleting}
+            onClick={() => setShowDeleteModal(true)} // Open Custom Modal
+            disabled={isDeleting || isDeactivating}
             className="w-full text-left text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer hover:bg-gray-50 disabled:opacity-50"
           >
-            {isDeleting ? "Deleting..." : "Delete Account"}
+            Delete Account
           </button>
-          {/*
-          <div className="text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer">
+
+          {/* <div className="text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer">
             Delete Account
           </div> */}
         </div>
-        {/*
-        <h3 className="text-xl font-medium mb-3 text-gray-800">
+        {/* <h3 className="text-xl font-medium mb-3 text-gray-800">
           Account Management
         </h3>
         <div className="border rounded-md p-4">
@@ -185,6 +178,116 @@ export default function AccountPreferences() {
           <button className="text-red-500">Delete Account</button>
         </div> */}
       </section>
+
+      {/* --- CUSTOM MODAL: DEACTIVATE --- */}
+      {showDeactivateModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity"
+          onClick={() => !isDeactivating && setShowDeactivateModal(false)} // Close on clicking outside
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden transform transition-all"
+            onClick={(e) => e.stopPropagation()} // Prevent close when clicking inside
+          >
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-3 bg-yellow-100 rounded-full">
+                  <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Deactivate Account?
+                </h3>
+              </div>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Are you sure? You can reactivate your account by logging in
+                anytime within the next{" "}
+                <span className="font-semibold text-gray-800">6 months</span>.
+                After that, it will be permanently deleted.
+              </p>
+
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setShowDeactivateModal(false)}
+                  disabled={isDeactivating}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeDeactivate}
+                  disabled={isDeactivating}
+                  className="px-4 py-2 text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isDeactivating ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Yes, Deactivate"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- CUSTOM MODAL: DELETE --- */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity"
+          onClick={() => !isDeleting && setShowDeleteModal(false)} // Close on clicking outside
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden transform transition-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-3 bg-red-100 rounded-full">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Delete Permanently?
+                </h3>
+              </div>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                This action{" "}
+                <span className="font-bold text-gray-900">
+                  cannot be undone
+                </span>
+                . This will permanently delete your account and remove your data
+                from our servers immediately.
+              </p>
+
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={isDeleting}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeDelete}
+                  disabled={isDeleting}
+                  className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete Account"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import VerificationUpload from "./VerificationUpload";
 import SkeletonBox from "./SkeletonBox";
 import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, X } from "lucide-react"; // Importing icons for the modal
+import { useNavigate } from "react-router-dom";
 
 export default function AccountPreferences() {
   const [activeSubView, setActiveSubView] = useState(null);
@@ -15,9 +16,10 @@ export default function AccountPreferences() {
   // New states for Custom Modals
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const navigate = useNavigate(); // Initialize hook
 
   const openProfile = useCallback(() => {
-    window.location.href = "/profile"; // or use your app's navigation
+    navigate("/profile");
   }, []);
 
   const openSubViewWithLoad = async (sub) => {
@@ -47,11 +49,11 @@ export default function AccountPreferences() {
       if (error) throw error;
 
       await supabase.auth.signOut();
-      window.location.href = "/";
+      navigate("/");
     } catch (error) {
       console.error("Error deactivating account:", error);
       alert("Failed to deactivate. Please try again.");
-      setIsDeactivating(false); // Only reset if error
+      setIsDeactivating(false);
       setShowDeactivateModal(false);
     }
   };
@@ -65,7 +67,7 @@ export default function AccountPreferences() {
       if (error) throw error;
 
       await supabase.auth.signOut();
-      window.location.href = "/";
+      navigate("/");
     } catch (error) {
       console.error("Error deleting account:", error);
       alert("Failed to delete account. Please try again.");
@@ -115,10 +117,10 @@ export default function AccountPreferences() {
           onClick={() => openSubViewWithLoad("demographic")}
         />
 
-        <PreferenceItem
+        {/* <PreferenceItem
           title="Verifications"
           onClick={() => openSubViewWithLoad("verification")}
-        />
+        /> */}
       </div>
 
       {/* <section className="mt-7">
@@ -145,10 +147,6 @@ export default function AccountPreferences() {
           Account Management
         </h3>
         <div className="font-medium">
-          {/* <div className="text-base text-red-500 border-b border-gray-200 py-5 flex justify-between">
-            Deactivate Account
-          </div> */}
-
           <button
             onClick={() => setShowDeactivateModal(true)} // Open Custom Modal
             disabled={isDeactivating || isDeleting}
@@ -164,10 +162,6 @@ export default function AccountPreferences() {
           >
             Delete Account
           </button>
-
-          {/* <div className="text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer">
-            Delete Account
-          </div> */}
         </div>
         {/* <h3 className="text-xl font-medium mb-3 text-gray-800">
           Account Management

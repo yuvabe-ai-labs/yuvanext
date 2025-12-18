@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { ChevronLeft } from "lucide-react";
 import { useProfileData } from "@/hooks/useProfileData";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+
 import {
   Select,
   SelectContent,
@@ -8,6 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
+
+// Define the Schema
+const demographicSchema = z.object({
+  gender: z.string().min(1, "Please select a gender"),
+  disability: z.enum(["Yes", "No"]),
+});
 
 export default function DemographicForm({ onBack }) {
   const {
@@ -18,40 +29,47 @@ export default function DemographicForm({ onBack }) {
     updateStudentProfile,
   } = useProfileData();
 
-  const [initialGender, setInitialGender] = useState(null);
-  const [gender, setGender] = useState(profile?.gender || "");
-  const [disability, setDisability] = useState(
-    studentProfile?.is_differently_abled ? "Yes" : "No"
-  );
+  // Initialize Form
+  const form = useForm({
+    resolver: zodResolver(demographicSchema),
+    defaultValues: {
+      gender: profile?.gender || "",
+      disability: studentProfile?.is_differently_abled ? "Yes" : "No",
+    },
+  });
 
-  // Sync when profile data becomes available
+  // Update form defaults when data loads from the hook
   useEffect(() => {
     if (profile) {
-      const value = profile.gender ?? "";
-      setGender(value);
-      setInitialGender(value);
+      form.setValue("gender", profile.gender || "");
     }
-  }, [profile]);
-
-  useEffect(() => {
-    if (initialGender === null) return;
-    if (gender !== initialGender) {
-      updateProfile({ gender });
+    if (studentProfile) {
+      form.setValue(
+        "disability",
+        studentProfile.is_differently_abled ? "Yes" : "No"
+      );
     }
-  }, [gender, initialGender]);
+  }, [profile, studentProfile, form]);
 
-  useEffect(() => {
-    updateStudentProfile({
-      is_differently_abled: disability === "Yes",
-    });
-  }, [disability]);
+  // Handle auto-saving on change
+  const handleValueChange = (name, value) => {
+    form.setValue(name, value);
+
+    if (name === "gender") {
+      updateProfile({ gender: value });
+    } else if (name === "disability") {
+      updateStudentProfile({
+        is_differently_abled: value === "Yes",
+      });
+    }
+  };
 
   return (
     <div>
-      {/* Back Button - Using shadcn ghost variant */}
+      {/* Back Button */}
       <button
         onClick={onBack}
-        className="text-base text-gray-600 font-medium flex items-center gap-1  hover:text-gray-900 mb-6"
+        className="text-base text-gray-600 font-medium flex items-center gap-1 hover:text-gray-900 mb-6"
       >
         <ChevronLeft /> Back
       </button>
@@ -73,78 +91,105 @@ export default function DemographicForm({ onBack }) {
           <div className="h-10 bg-gray-200 w-full rounded animate-pulse" />
         </div>
       ) : (
-        <div className="space-y-8 mt-6">
-          {/* Gender */}
-          <div className="space-y-5">
-            <label className="text-lg font-medium text-gray-800">Gender</label>
-            <p className="text-gray-600 text-base">
-              Please select your gender identity
-            </p>
+        <Form {...form}>
+          <form className="space-y-8 mt-6">
+            {/* Gender */}
+            <FormField
+              control={form.control}
+              name="gender"
+              render={({ field }) => (
+                <FormItem className="space-y-5">
+                  <label className="text-lg font-medium text-gray-800">
+                    Gender
+                  </label>
+                  <p className="text-gray-600 text-base">
+                    Please select your gender identity
+                  </p>
+                  <Select
+                    value={field.value}
+                    onValueChange={(val) => handleValueChange("gender", val)}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="cursor-pointer w-full rounded-full border-gray-300 p-3 h-12 focus:ring-2 focus:ring-blue-500">
+                        <SelectValue placeholder="Select Gender" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem className="cursor-pointer" value="male">
+                        Male
+                      </SelectItem>
+                      <SelectItem className="cursor-pointer" value="female">
+                        Female
+                      </SelectItem>
+                      <SelectItem className="cursor-pointer" value="prefer_not">
+                        Prefer not to say
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )}
+            />
 
-            <Select value={gender} onValueChange={setGender}>
-              <SelectTrigger className="cursor-pointer w-full rounded-full border-gray-300 p-3 focus:ring-2 focus:ring-blue-500">
-                <SelectValue placeholder="Select Gender" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem className="cursor-pointer" value="male">
-                  Male
-                </SelectItem>
-                <SelectItem className="cursor-pointer" value="female">
-                  Female
-                </SelectItem>
-                <SelectItem className="cursor-pointer" value="prefer_not">
-                  Prefer not to say
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="border-t" />
 
-          <div className="border-t" />
+            {/* Disability */}
+            <FormField
+              control={form.control}
+              name="disability"
+              render={({ field }) => (
+                <FormItem className="space-y-5">
+                  <label className="text-lg font-medium text-gray-800">
+                    Disability
+                  </label>
+                  <p className="text-gray-600 text-base">
+                    Do you have a disability that substantially limits a major
+                    life activity, or a history of a disability?
+                  </p>
+                  <Select
+                    value={field.value}
+                    onValueChange={(val) =>
+                      handleValueChange("disability", val)
+                    }
+                  >
+                    <FormControl>
+                      <SelectTrigger className="cursor-pointer w-full rounded-full border-gray-300 p-3 h-12 focus:ring-2 focus:ring-blue-500">
+                        <SelectValue placeholder="Select Option" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem className="cursor-pointer" value="No">
+                        No
+                      </SelectItem>
+                      <SelectItem className="cursor-pointer" value="Yes">
+                        Yes
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )}
+            />
 
-          {/* Disability */}
-          <div className="space-y-5">
-            <label className="text-lg font-medium text-gray-800">
-              Disability
-            </label>
-            <p className="text-gray-600 text-base">
-              Do you have a disability that substantially limits a major life
-              activity, or a history of a disability?
-            </p>
+            <div className="border-t" />
 
-            <Select value={disability} onValueChange={setDisability}>
-              <SelectTrigger className="w-full rounded-full border-gray-300 p-3 focus:ring-2 focus:ring-blue-500">
-                <SelectValue placeholder="Select Option" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem className="cursor-pointer" value="No">
-                  No
-                </SelectItem>
-                <SelectItem className="cursor-pointer" value="Yes">
-                  Yes
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="border-t" />
-
-          {/* Info Box */}
-          <div className="space-y-5">
-            <p className="font-medium text-gray-800 mb-1">
-              How YuvaNext uses this data
-            </p>
-            <p className="text-gray-600 leading-relaxed">
-              Your demographic data will not be shown on your profile. It will
-              be used to provide aggregated workforce insights, personalization,
-              and help employers reach a diverse talent pool.{" "}
-              <span className="text-blue-500 font-semibold mt-1 cursor-pointer">
-                Learn more
-              </span>
-            </p>
-          </div>
-
-          {/* Save button */}
-          {/* <div className="flex justify-center">
+            {/* Info Box */}
+            <div className="space-y-5">
+              <p className="font-medium text-gray-800 mb-1">
+                How YuvaNext uses this data
+              </p>
+              <p className="text-gray-600 leading-relaxed">
+                Your demographic data will not be shown on your profile. It will
+                be used to provide aggregated workforce insights,
+                personalization, and help employers reach a diverse talent pool.{" "}
+                <span className="text-blue-500 font-semibold mt-1 cursor-pointer">
+                  Learn more
+                </span>
+              </p>
+            </div>
+          </form>
+        </Form>
+      )}
+      {/* Save button */}
+      {/* <div className="flex justify-center">
             <button
               type="submit"
               className="bg-blue-500 hover:bg-blue-600 text-white px-10 py-2 rounded-full font-medium transition"
@@ -152,8 +197,6 @@ export default function DemographicForm({ onBack }) {
               Agree and save
             </button>
           </div> */}
-        </div>
-      )}
     </div>
   );
 }

@@ -4,9 +4,26 @@ import DemographicForm from "./DemographicForm";
 import VerificationUpload from "./VerificationUpload";
 import SkeletonBox from "./SkeletonBox";
 import { supabase } from "@/integrations/supabase/client";
-import { AlertTriangle } from "lucide-react"; // Importing icons for the modal
+import { AlertTriangle, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useProfileData } from "@/hooks/useProfileData";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+// Define the Schema
+const preferencesSchema = z.object({
+  language: z.string().min(1, "Required"),
+  contentLanguage: z.string().min(1, "Required"),
+});
 
 export default function AccountPreferences() {
   const [activeSubView, setActiveSubView] = useState(null);
@@ -14,22 +31,33 @@ export default function AccountPreferences() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
 
-  // New states for Custom Modals
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const navigate = useNavigate(); // Initialize hook
+  const navigate = useNavigate();
   const { profile } = useProfileData();
+
+  // Initialize React Hook Form with Zod
+  const form = useForm({
+    resolver: zodResolver(preferencesSchema),
+    defaultValues: {
+      language: "English",
+      contentLanguage: "English",
+    },
+  });
+
+  const onSubmit = (values) => {
+    console.log("Saved Preferences:", values);
+    // Here you would typically call updateProfile({ settings: values });
+  };
 
   const openProfile = useCallback(() => {
     if (!profile) return;
-
     const target = profile.role === "student" ? "/profile" : "/unit-profile";
     navigate(target);
-  }, [profile, navigate]); // Dependencies are crucial here!
+  }, [profile, navigate]);
 
   const openSubViewWithLoad = async (sub) => {
     setLoading(true);
-    // Added delay back so skeleton is visible
     await new Promise((r) => setTimeout(r, 400));
     setLoading(false);
     setActiveSubView(sub);
@@ -41,18 +69,12 @@ export default function AccountPreferences() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-
-      if (!session?.user) {
-        throw new Error("No active session found");
-      }
-
+      if (!session?.user) throw new Error("No active session found");
       const { error } = await supabase
         .from("profiles")
         .update({ deactivated_at: new Date().toISOString() })
         .eq("user_id", session.user.id);
-
       if (error) throw error;
-
       await supabase.auth.signOut();
       navigate("/");
     } catch (error) {
@@ -66,22 +88,18 @@ export default function AccountPreferences() {
   const executeDelete = async () => {
     try {
       setIsDeleting(true);
-
       const { error } = await supabase.functions.invoke("delete-user");
-
       if (error) throw error;
-
       await supabase.auth.signOut();
       navigate("/");
     } catch (error) {
       console.error("Error deleting account:", error);
       alert("Failed to delete account. Please try again.");
-      setIsDeleting(false); // Only reset if error
+      setIsDeleting(false);
       setShowDeleteModal(false);
     }
   };
 
-  // Render logic
   if (loading) {
     return (
       <div>
@@ -97,71 +115,104 @@ export default function AccountPreferences() {
     );
   }
 
-  if (activeSubView === "demographic") {
+  if (activeSubView === "demographic")
     return <DemographicForm onBack={() => setActiveSubView(null)} />;
-  }
-
-  if (activeSubView === "verification") {
+  if (activeSubView === "verification")
     return <VerificationUpload onBack={() => setActiveSubView(null)} />;
-  }
 
   return (
     <div className="relative">
       <h2 className="text-xl text-gray-800 font-medium">
         Personal Information
       </h2>
-
       <div className="rounded-md overflow-hidden">
         <PreferenceItem
           title="Name, Skills and Interests"
           onClick={openProfile}
         />
-
         <PreferenceItem
           title="Personal Demographic Information"
           onClick={() => openSubViewWithLoad("demographic")}
         />
-
         {/* <PreferenceItem
           title="Verifications"
           onClick={() => openSubViewWithLoad("verification")}
         /> */}
       </div>
-
-      {/* <section className="mt-7">
+      {/* --- GENERAL PREFERENCES WITH ZOD & SHADCN --- */}
+      <section className="mt-7">
         <h3 className="text-xl font-medium text-gray-800">
           General Preferences
         </h3>
-        <div className="font-medium">
-          <div className="text-base text-gray-600 border-b border-gray-200 py-5 flex justify-between">
-            Language <ChevronRight aria-hidden className="text-gray-400" />
-          </div>
-          <div className="text-base text-gray-600 border-b border-gray-200 py-5 flex justify-between">
-            Content Language
-            <ChevronRight aria-hidden className="text-gray-400" />
-             <select className="border rounded px-3 py-2 w-full md:w-60">
-              <option>English</option>
-              <option>Hindi</option>
-            </select> 
-          </div>
-        </div>
-      </section> */}
+        <Form {...form}>
+          <form onChange={form.handleSubmit(onSubmit)} className="font-medium">
+            {/* Language Field */}
+            <FormField
+              control={form.control}
+              name="language"
+              render={({ field }) => (
+                <FormItem className="text-base text-gray-600 border-b border-gray-200 py-5 flex justify-between items-center space-y-0">
+                  <div className="flex items-center">Language</div>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="border rounded px-3 py-2 w-full md:w-60 h-10">
+                        <SelectValue placeholder="Select Language" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="English">English</SelectItem>
+                      <SelectItem value="Hindi">Hindi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )}
+            />
 
+            {/* Content Language Field */}
+            <FormField
+              control={form.control}
+              name="contentLanguage"
+              render={({ field }) => (
+                <FormItem className="text-base text-gray-600 border-b border-gray-200 py-5 flex justify-between items-center space-y-0">
+                  <div className="flex items-center">Content Language</div>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="border rounded px-3 py-2 w-full md:w-60 h-10">
+                        <SelectValue placeholder="Select Language" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="English">English</SelectItem>
+                      <SelectItem value="Hindi">Hindi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )}
+            />
+          </form>
+        </Form>
+      </section>
+      {/* --- ACCOUNT MANAGEMENT --- */}
       <section className="mt-7">
         <h3 className="text-xl font-medium text-gray-800">
           Account Management
         </h3>
         <div className="font-medium">
           <button
-            onClick={() => setShowDeactivateModal(true)} // Open Custom Modal
+            onClick={() => setShowDeactivateModal(true)}
             disabled={isDeactivating || isDeleting}
             className="w-full text-left text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer hover:bg-gray-50 disabled:opacity-50"
           >
             Deactivate Account
           </button>
-
           <button
-            onClick={() => setShowDeleteModal(true)} // Open Custom Modal
+            onClick={() => setShowDeleteModal(true)}
             disabled={isDeleting || isDeactivating}
             className="w-full text-left text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer hover:bg-gray-50 disabled:opacity-50"
           >
@@ -177,7 +228,6 @@ export default function AccountPreferences() {
           <button className="text-red-500">Delete Account</button>
         </div> */}
       </section>
-
       {/* --- CUSTOM MODAL: DEACTIVATE --- */}
       {showDeactivateModal && (
         <div
@@ -231,7 +281,6 @@ export default function AccountPreferences() {
           </div>
         </div>
       )}
-
       {/* --- CUSTOM MODAL: DELETE --- */}
       {showDeleteModal && (
         <div

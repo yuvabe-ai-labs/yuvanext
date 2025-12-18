@@ -28,3 +28,17 @@ export const passwordSchema = z
     message: "New passwords do not match",
     path: ["confirmNewPassword"],
   });
+
+export const notificationSchema = z.object({
+  allow_all: z.boolean(),
+  application_status_in_app: z.boolean(),
+  application_status_email: z.boolean(),
+  internship_updates_in_app: z.boolean(),
+  internship_updates_email: z.boolean(),
+  recommended_internship_in_app: z.boolean(),
+  recommended_internship_email: z.boolean(),
+  similar_internships_in_app: z.boolean(),
+  similar_internships_email: z.boolean(),
+  recommended_courses_in_app: z.boolean(),
+  recommended_courses_email: z.boolean(),
+});

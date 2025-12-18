@@ -1,12 +1,44 @@
 import { useState, useEffect } from "react";
 import { ChevronRight, Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import NotificationToggle from "./NotificationToggle";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
+import { notificationSchema } from "@/lib/schemas";
+
+type NotificationFormData = z.infer<typeof notificationSchema>;
 
 export default function NotificationsSettings() {
-  const { preferences, loading, updatePreferences, togglePreference } =
+  const { preferences, loading, updatePreferences } =
     useNotificationPreferences();
   const [activeSubView, setActiveSubView] = useState<string | null>(null);
+
+  const {
+    watch,
+    setValue,
+    handleSubmit,
+    reset,
+    formState: { isDirty },
+  } = useForm<NotificationFormData>({
+    resolver: zodResolver(notificationSchema),
+    defaultValues: {
+      allow_all: false,
+      application_status_in_app: false,
+      application_status_email: false,
+      internship_updates_in_app: false,
+      internship_updates_email: false,
+      recommended_internship_in_app: false,
+      recommended_internship_email: false,
+      similar_internships_in_app: false,
+      similar_internships_email: false,
+      recommended_courses_in_app: false,
+      recommended_courses_email: false,
+    },
+  });
+
+  // Watch all form values
+  const formValues = watch();
 
   // Descriptions map
   const descriptions = {
@@ -21,19 +53,71 @@ export default function NotificationsSettings() {
       "Suggestions for courses that can help you improve your skills.",
   };
 
+  // Initialize form with preferences
+  useEffect(() => {
+    if (preferences) {
+      reset({
+        allow_all: preferences.allow_all,
+        application_status_in_app: preferences.application_status_in_app,
+        application_status_email: preferences.application_status_email,
+        internship_updates_in_app: preferences.internship_updates_in_app,
+        internship_updates_email: preferences.internship_updates_email,
+        recommended_internship_in_app:
+          preferences.recommended_internship_in_app,
+        recommended_internship_email: preferences.recommended_internship_email,
+        similar_internships_in_app: preferences.similar_internships_in_app,
+        similar_internships_email: preferences.similar_internships_email,
+        recommended_courses_in_app: preferences.recommended_courses_in_app,
+        recommended_courses_email: preferences.recommended_courses_email,
+      });
+    }
+  }, [preferences, reset]);
+
   const openSubView = (key: string) => {
     setActiveSubView(key);
   };
 
   const handleSubToggle = async (key: string, type: "inApp" | "email") => {
     const prefKey = type === "inApp" ? `${key}_in_app` : `${key}_email`;
+    const currentValue = formValues[prefKey as keyof NotificationFormData];
 
-    await togglePreference(prefKey as any);
+    setValue(prefKey as keyof NotificationFormData, !currentValue, {
+      shouldDirty: true,
+    });
+
+    // Auto-save
+    await updatePreferences({ [prefKey]: !currentValue });
   };
 
   const handleAllowAllToggle = async () => {
-    if (!preferences) return;
-    await updatePreferences({ allow_all: !preferences.allow_all });
+    const newAllowAllValue = !formValues.allow_all;
+
+    // If turning off allow_all, turn off all notification preferences
+    if (!newAllowAllValue) {
+      const allOffData: NotificationFormData = {
+        allow_all: false,
+        application_status_in_app: false,
+        application_status_email: false,
+        internship_updates_in_app: false,
+        internship_updates_email: false,
+        recommended_internship_in_app: false,
+        recommended_internship_email: false,
+        similar_internships_in_app: false,
+        similar_internships_email: false,
+        recommended_courses_in_app: false,
+        recommended_courses_email: false,
+      };
+
+      // Update form values
+      reset(allOffData);
+
+      // Update backend
+      await updatePreferences(allOffData);
+    } else {
+      // If turning on allow_all, just toggle the allow_all flag
+      setValue("allow_all", true, { shouldDirty: true });
+      await updatePreferences({ allow_all: true });
+    }
   };
 
   const Row = ({ label, settingsObj, onClick }: any) => {
@@ -73,11 +157,11 @@ export default function NotificationsSettings() {
   // SUB VIEW RENDERING
   if (activeSubView) {
     const settingsObj = {
-      inApp: preferences[
-        `${activeSubView}_in_app` as keyof typeof preferences
+      inApp: formValues[
+        `${activeSubView}_in_app` as keyof NotificationFormData
       ] as boolean,
-      email: preferences[
-        `${activeSubView}_email` as keyof typeof preferences
+      email: formValues[
+        `${activeSubView}_email` as keyof NotificationFormData
       ] as boolean,
     };
 
@@ -111,7 +195,7 @@ export default function NotificationsSettings() {
           <input
             type="checkbox"
             className="sr-only peer"
-            checked={preferences.allow_all}
+            checked={formValues.allow_all}
             onChange={handleAllowAllToggle}
           />
           <div className="w-11 h-6 bg-gray-300 rounded-full peer peer-checked:bg-green-500 peer-focus:ring-2 peer-focus:ring-green-300 transition-colors duration-200 ease-in-out"></div>
@@ -119,45 +203,45 @@ export default function NotificationsSettings() {
         </label>
       </div>
 
-      {preferences.allow_all && (
+      {formValues.allow_all && (
         <div className="text-gray-600 font-medium space-y-1">
           <Row
             label="Application status"
             settingsObj={{
-              inApp: preferences.application_status_in_app,
-              email: preferences.application_status_email,
+              inApp: formValues.application_status_in_app,
+              email: formValues.application_status_email,
             }}
             onClick={() => openSubView("application_status")}
           />
           {/* <Row
             label="Internship updates"
             settingsObj={{
-              inApp: preferences.internship_updates_in_app,
-              email: preferences.internship_updates_email,
+              inApp: formValues.internship_updates_in_app,
+              email: formValues.internship_updates_email,
             }}
             onClick={() => openSubView("internship_updates")}
           />
           <Row
             label="Recommended internship"
             settingsObj={{
-              inApp: preferences.recommended_internship_in_app,
-              email: preferences.recommended_internship_email,
+              inApp: formValues.recommended_internship_in_app,
+              email: formValues.recommended_internship_email,
             }}
             onClick={() => openSubView("recommended_internship")}
           />
           <Row
             label="Similar internships"
             settingsObj={{
-              inApp: preferences.similar_internships_in_app,
-              email: preferences.similar_internships_email,
+              inApp: formValues.similar_internships_in_app,
+              email: formValues.similar_internships_email,
             }}
             onClick={() => openSubView("similar_internships")}
           />
           <Row
             label="Recommended courses"
             settingsObj={{
-              inApp: preferences.recommended_courses_in_app,
-              email: preferences.recommended_courses_email,
+              inApp: formValues.recommended_courses_in_app,
+              email: formValues.recommended_courses_email,
             }}
             onClick={() => openSubView("recommended_courses")}
           /> */}

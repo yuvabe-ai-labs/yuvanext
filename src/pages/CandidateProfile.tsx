@@ -173,27 +173,60 @@ const CandidateProfile = () => {
     setShowConfirmDialog(false);
 
     try {
-      const res = await supabase
+      console.log("Updating application status to:", pendingStatus);
+
+      // Step 1: Update application status in database
+      const { data: updateData, error: updateError } = await supabase
         .from("applications")
         .update({ status: pendingStatus })
-        .eq("id", data.application.id);
-      await supabase.functions.invoke("update-application-status", {
-        body: JSON.stringify({
-          applicationId: data.application.id,
-          action: pendingStatus,
-          candidateEmail: data.profile.email,
-          candidateName: data.profile.full_name,
-        }),
-      });
+        .eq("id", data.application.id)
+        .select();
 
-      console.log();
+      if (updateError) {
+        console.error("Database update error:", updateError);
+        throw updateError;
+      }
 
-      if (res.error) console.log();
+      console.log("✅ Status updated in database:", updateData);
 
-      // Refresh the data
+      // Step 2: The database trigger will automatically handle in-app notifications
+      // based on user preferences
+
+      // Step 3: Call edge function to send email notification (if user has it enabled)
+      try {
+        console.log("📧 Calling email notification edge function...");
+
+        const { data: emailData, error: emailError } =
+          await supabase.functions.invoke("update-application-status", {
+            body: {
+              applicationId: data.application.id,
+              action: pendingStatus,
+              candidateEmail: data.profile.email,
+              candidateName: data.profile.full_name,
+              internshipTitle: data.internship.title,
+            },
+          });
+
+        if (emailError) {
+          console.error("❌ Email notification error:", emailError);
+        } else {
+          console.log("✅ Email notification response:", emailData);
+          if (emailData?.emailSent) {
+            console.log("📬 Email successfully sent to candidate");
+          } else {
+            console.log("📭 Email not sent (user preferences or no template)");
+          }
+        }
+      } catch (emailError: any) {
+        // Email sending failed but status was updated successfully
+        console.error("❌ Email notification exception:", emailError);
+        // Don't throw - the status update succeeded and that's what matters most
+      }
+
+      // Step 4: Refresh the data to show updated status
       await refetch();
 
-      // Show success toast
+      // Step 5: Show success toast
       toast({
         title: "Status Updated",
         description: `Application status changed to ${getStatusLabel(
@@ -201,11 +234,13 @@ const CandidateProfile = () => {
         )}`,
         duration: 3000,
       });
-    } catch (err) {
-      console.error("Error updating status:", err);
+    } catch (err: any) {
+      console.error("❌ Error updating status:", err);
       toast({
         title: "Update Failed",
-        description: "Failed to update application status. Please try again.",
+        description:
+          err.message ||
+          "Failed to update application status. Please try again.",
         variant: "destructive",
         duration: 3000,
       });
@@ -273,12 +308,11 @@ const CandidateProfile = () => {
 
     const canvas = await html2canvas(element, {
       scale: 1.2,
-      useCORS: true, // Required for avatar
+      useCORS: true,
       allowTaint: true,
     });
 
     const imgData = canvas.toDataURL("image/jpeg", 2.8);
-    // JPEG + compression drastically reduces size
 
     const pdf = new jsPDF("p", "mm", "a4");
     const pdfWidth = pdf.internal.pageSize.getWidth();

@@ -22,24 +22,6 @@ const COLORS = [
   "#F59E0B",
 ];
 
-// Helper function to convert yyyy-mm-dd to dd/mm/yyyy
-const convertToDisplay = (dateStr: string): string => {
-  if (!dateStr) return "";
-  const parts = dateStr.split("-");
-  if (parts.length !== 3) return dateStr;
-  const [year, month, day] = parts;
-  return `${day}/${month}/${year}`;
-};
-
-// Helper function to convert dd/mm/yyyy to yyyy-mm-dd
-const convertToISO = (dateStr: string): string => {
-  if (!dateStr) return "";
-  const parts = dateStr.split("/");
-  if (parts.length !== 3) return dateStr;
-  const [day, month, year] = parts;
-  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-};
-
 export default function UpdateTaskModal({
   isOpen,
   onClose,
@@ -48,7 +30,6 @@ export default function UpdateTaskModal({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedColor, setSelectedColor] = useState(task.color || COLORS[0]);
-  const [sliderPosition, setSliderPosition] = useState(0);
   const [note, setNote] = useState("");
   const [submissionLink, setSubmissionLink] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -59,30 +40,13 @@ export default function UpdateTaskModal({
   // Pre-fill existing task values when modal opens
   useEffect(() => {
     if (task) {
-      setStartDate(convertToDisplay(task.start_date) || "");
-      setEndDate(convertToDisplay(task.end_date) || "");
+      setStartDate(task.start_date || "");
+      setEndDate(task.end_date || "");
       setSelectedColor(task.color || COLORS[0]);
       setNote(task.description || "");
       setSubmissionLink(task.submission_link || "");
-
-      // Set initial slider position based on task color
-      const colorIndex = COLORS.indexOf(task.color);
-      if (colorIndex !== -1) {
-        setSliderPosition((colorIndex / (COLORS.length - 1)) * 100);
-      }
     }
   }, [task]);
-
-  const handleDateInput = (value: string, setter: (val: string) => void) => {
-    let formatted = value.replace(/[^\d]/g, "");
-    if (formatted.length >= 2) {
-      formatted = formatted.slice(0, 2) + "/" + formatted.slice(2);
-    }
-    if (formatted.length >= 5) {
-      formatted = formatted.slice(0, 5) + "/" + formatted.slice(5, 9);
-    }
-    setter(formatted);
-  };
 
   const handleSave = async () => {
     if (!startDate || !endDate) {
@@ -90,17 +54,7 @@ export default function UpdateTaskModal({
       return;
     }
 
-    // Validate date format
-    const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
-    if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
-      alert("Please enter dates in DD/MM/YYYY format");
-      return;
-    }
-
-    const startISO = convertToISO(startDate);
-    const endISO = convertToISO(endDate);
-
-    if (new Date(endISO) < new Date(startISO)) {
+    if (new Date(endDate) < new Date(startDate)) {
       alert("Due date cannot be before start date");
       return;
     }
@@ -109,8 +63,8 @@ export default function UpdateTaskModal({
       await updateTask.mutateAsync({
         taskId: task.id,
         updates: {
-          start_date: startISO,
-          end_date: endISO,
+          start_date: startDate,
+          end_date: endDate,
           color: selectedColor,
           description: note || undefined,
           submission_link: submissionLink || undefined,
@@ -194,11 +148,9 @@ export default function UpdateTaskModal({
                 Start date <span className="text-red-500">*</span>
               </label>
               <input
-                type="text"
-                placeholder="DD/MM/YYYY"
+                type="date"
                 value={startDate}
-                onChange={(e) => handleDateInput(e.target.value, setStartDate)}
-                maxLength={10}
+                onChange={(e) => setStartDate(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500"
               />
             </div>
@@ -208,11 +160,10 @@ export default function UpdateTaskModal({
                 Due date <span className="text-red-500">*</span>
               </label>
               <input
-                type="text"
-                placeholder="DD/MM/YYYY"
+                type="date"
                 value={endDate}
-                onChange={(e) => handleDateInput(e.target.value, setEndDate)}
-                maxLength={10}
+                onChange={(e) => setEndDate(e.target.value)}
+                min={startDate}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500"
               />
             </div>
@@ -220,22 +171,16 @@ export default function UpdateTaskModal({
 
           {/* Color Picker */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Color
-            </label>
-            <div className="flex items-center justify-between gap-2 mb-3">
-              {COLORS.map((color, index) => (
+            <div className="flex items-center justify-between pb-2">
+              {COLORS.map((color) => (
                 <button
                   key={color}
                   type="button"
-                  onClick={() => {
-                    setSelectedColor(color);
-                    setSliderPosition((index / (COLORS.length - 1)) * 100);
-                  }}
-                  className={`w-8 h-8 rounded-full transition-all ${
+                  onClick={() => setSelectedColor(color)}
+                  className={`w-7 h-7 rounded-full transition-all ${
                     selectedColor === color
-                      ? "scale-110 ring-2 ring-offset-2 ring-gray-400"
-                      : "hover:scale-105"
+                      ? "scale-125 ring-2 ring-gray-400"
+                      : ""
                   }`}
                   style={{ backgroundColor: color }}
                 />
@@ -244,28 +189,32 @@ export default function UpdateTaskModal({
 
             {/* Gradient Color Slider */}
             <div
-              className="relative w-full h-5 rounded-full cursor-pointer"
+              className="relative w-full  rounded-full cursor-pointer"
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
-                const percentage = ((e.clientX - rect.left) / rect.width) * 100;
-                setSliderPosition(Math.max(0, Math.min(100, percentage)));
-
-                // Calculate color based on position
-                const colorIndex = Math.round(
-                  (percentage / 100) * (COLORS.length - 1)
-                );
-                setSelectedColor(
-                  COLORS[Math.max(0, Math.min(COLORS.length - 1, colorIndex))]
-                );
-              }}
-              style={{
-                background: `linear-gradient(90deg, ${COLORS.join(", ")})`,
+                const percentage = (e.clientX - rect.left) / rect.width;
+                const gradient = [
+                  "#FF0000",
+                  "#FF7F00",
+                  "#FFFF00",
+                  "#00FF00",
+                  "#00FFFF",
+                  "#0000FF",
+                  "#8B00FF",
+                  "#FF0000",
+                ];
+                const index = Math.floor(percentage * (gradient.length - 1));
+                setSelectedColor(gradient[index]);
               }}
             >
               <div
-                className="absolute top-1/2 -translate-y-1/2 w-[6px] h-7 bg-white rounded-full shadow-lg border-2 border-gray-300"
+                className="absolute top-1/2 -translate-y-1/2 w-[6px] h-7 bg-white rounded-full shadow"
                 style={{
-                  left: `calc(${sliderPosition}% - 3px)`,
+                  left: `calc(${(() => {
+                    const idx = COLORS.indexOf(selectedColor);
+                    const percent = idx / (COLORS.length - 1);
+                    return percent * 100;
+                  })()}% - 3px)`,
                 }}
               ></div>
             </div>

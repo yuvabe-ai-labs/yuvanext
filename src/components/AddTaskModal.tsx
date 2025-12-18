@@ -221,7 +221,7 @@ export default function AddTaskModal({
           </div>
 
           {/* Submission Link */}
-          <div className="mb-6">
+          {/* <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Submission link
             </label>
@@ -232,7 +232,7 @@ export default function AddTaskModal({
               placeholder="https://www.url.com/"
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
-          </div>
+          </div> */}
 
           {/* Action Buttons */}
           <div className="flex gap-3">

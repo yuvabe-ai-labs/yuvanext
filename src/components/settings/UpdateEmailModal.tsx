@@ -1,81 +1,105 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { updateEmailSchema } from "@/lib/schemas";
+
+type UpdateEmailFormData = z.infer<typeof updateEmailSchema>;
 
 export default function UpdateEmailModal({ isOpen, onClose }) {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const [currentEmail, setCurrentEmail] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+    setError,
+    watch,
+  } = useForm<UpdateEmailFormData>({
+    resolver: zodResolver(updateEmailSchema),
+    defaultValues: {
+      newEmail: "",
+      password: "",
+    },
+  });
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const currentEmail = user?.email || "";
+  const newEmail = watch("newEmail");
 
-  // Load user email
   useEffect(() => {
-    if (isOpen && user?.email) {
-      setCurrentEmail(user.email);
-      setNewEmail(user.email);
+    if (isOpen) {
+      reset();
     }
-  }, [isOpen, user]);
+  }, [isOpen, reset]);
 
   if (!isOpen) return null;
 
-  const handleUpdateEmail = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
+  const onSubmit = async (data: UpdateEmailFormData) => {
     if (!user?.email) {
-      setError("Unable to get user. Please login again.");
-      setLoading(false);
+      setError("root", {
+        message: "Unable to get user. Please login again.",
+      });
+      return;
+    }
+
+    // Validate that new email is different
+    if (data.newEmail.toLowerCase() === currentEmail.toLowerCase()) {
+      setError("newEmail", {
+        message: "New email must be different from current email.",
+      });
       return;
     }
 
     try {
-      // Step 1: Re-authenticate
-      const { error: loginErr } = await supabase.auth.signInWithPassword({
+      // Re-authenticate the user to verify password
+      const { error: reauthError } = await supabase.auth.signInWithPassword({
         email: currentEmail,
-        password,
+        password: data.password,
       });
 
-      if (loginErr) {
-        setError("Incorrect password.");
-        setLoading(false);
+      if (reauthError) {
+        setError("password", {
+          message: "Incorrect password.",
+        });
         return;
       }
 
-      // Step 2: Update email → sends verification link
+      // Request email change
       const { error: updateErr } = await supabase.auth.updateUser(
-        { email: newEmail },
+        { email: data.newEmail },
         {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         }
       );
 
       if (updateErr) {
-        setError(updateErr.message);
-        setLoading(false);
+        setError("root", {
+          message: updateErr.message,
+        });
         return;
       }
 
       toast({
         title: "Verification email sent",
         description:
-          "Please check your old and new inbox to confirm your email change.",
+          "Please check your new email inbox and click the confirmation link to complete the email change.",
+        duration: 8000,
       });
 
+      reset();
       onClose();
     } catch (err) {
       console.error(err);
-      setError("Something went wrong.");
+      setError("root", {
+        message: "Something went wrong. Please try again.",
+      });
     }
-
-    setLoading(false);
   };
 
   return (
@@ -87,43 +111,79 @@ export default function UpdateEmailModal({ isOpen, onClose }) {
 
         <h2 className="text-xl font-semibold mb-4">Change Email Address</h2>
 
-        {error && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+          <p className="text-xs text-blue-800">
+            <strong>Important:</strong> You'll receive a confirmation email at
+            your new email address. Click the link in the email to complete the
+            email change.
+          </p>
+        </div>
+
+        {errors.root && (
           <p className="text-red-600 text-sm mb-3 bg-red-50 p-2 rounded">
-            {error}
+            {errors.root.message}
           </p>
         )}
 
-        <form onSubmit={handleUpdateEmail} className="space-y-4">
+        <div className="space-y-4">
           <div>
-            <label className="text-sm text-gray-600">New Email</label>
+            <label className="text-sm text-gray-600 block mb-1">
+              Current Email
+            </label>
             <input
               type="email"
-              className="w-full border rounded-lg px-3 py-2 mt-1 text-sm"
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              required
+              className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"
+              value={currentEmail}
+              disabled
             />
           </div>
 
           <div>
-            <label className="text-sm text-gray-600">Current Password</label>
+            <label className="text-sm text-gray-600 block mb-1">
+              New Email
+            </label>
+            <input
+              type="email"
+              className={`w-full border rounded-lg px-3 py-2 text-sm ${
+                errors.newEmail ? "border-red-500" : ""
+              }`}
+              {...register("newEmail")}
+              placeholder="Enter your new email address"
+            />
+            {errors.newEmail && (
+              <p className="text-red-600 text-xs mt-1">
+                {errors.newEmail.message}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-600 block mb-1">
+              Current Password
+            </label>
             <input
               type="password"
-              className="w-full border rounded-lg px-3 py-2 mt-1 text-sm"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
+              className={`w-full border rounded-lg px-3 py-2 text-sm ${
+                errors.password ? "border-red-500" : ""
+              }`}
+              {...register("password")}
+              placeholder="Confirm your password"
             />
+            {errors.password && (
+              <p className="text-red-600 text-xs mt-1">
+                {errors.password.message}
+              </p>
+            )}
           </div>
 
           <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg disabled:opacity-50"
+            onClick={handleSubmit(onSubmit)}
+            disabled={isSubmitting}
+            className="w-full bg-blue-600 text-white py-2 rounded-lg disabled:opacity-50 hover:bg-blue-700 transition-colors"
           >
-            {loading ? "Updating..." : "Update Email"}
+            {isSubmitting ? "Sending verification email..." : "Update Email"}
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );

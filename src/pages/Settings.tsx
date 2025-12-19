@@ -1,5 +1,5 @@
 import Navbar from "@/components/Navbar";
-import React, { useState } from "react";
+import { useState } from "react";
 import Sidebar from "@/components/candidateSettings/Sidebar";
 import AccountPreferences from "@/components/candidateSettings/AccountPreferences";
 import SecuritySettings from "@/components/candidateSettings/SecuritySettings";
@@ -30,15 +30,13 @@ export default function Settings() {
   return (
     <div className="bg-[#F8F9FA]">
       <Navbar />
-      {/* <main className="max-w-7xl px-[7.5rem] mx-auto"> */}
-      <div className="flex h-screen mx-24 bg-white">
+      <div className="flex mx-[120px] bg-white">
         <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r-2 md:border-gray-200 ">
           <Sidebar active={activeSection} onChange={setActiveSection} />
         </aside>
 
         <section className="flex-1 p-10">{renderContent()}</section>
       </div>
-      {/* </main> */}
     </div>
   );
 }

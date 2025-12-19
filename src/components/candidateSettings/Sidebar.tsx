@@ -1,6 +1,4 @@
 // candidateSettingsSidebar;
-import React from "react";
-
 const items = [
   { id: "accountPreferences", label: "Account Preferences" },
   { id: "security", label: "Sign In & Security" },

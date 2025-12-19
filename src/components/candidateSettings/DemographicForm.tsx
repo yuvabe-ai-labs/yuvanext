@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 
-// Define the Schema
 const demographicSchema = z.object({
   gender: z.string().min(1, "Please select a gender"),
   disability: z.enum(["Yes", "No"]),
@@ -29,7 +28,6 @@ export default function DemographicForm({ onBack }) {
     updateStudentProfile,
   } = useProfileData();
 
-  // Initialize Form
   const form = useForm({
     resolver: zodResolver(demographicSchema),
     defaultValues: {
@@ -38,7 +36,6 @@ export default function DemographicForm({ onBack }) {
     },
   });
 
-  // Update form defaults when data loads from the hook
   useEffect(() => {
     if (profile) {
       form.setValue("gender", profile.gender || "");
@@ -51,16 +48,18 @@ export default function DemographicForm({ onBack }) {
     }
   }, [profile, studentProfile, form]);
 
-  // Handle auto-saving on change
-  const handleValueChange = (name, value) => {
-    form.setValue(name, value);
+  // NEW: Manual Submit Handler
+  const onSubmit = async (data) => {
+    try {
+      // Update Gender in Profile
+      await updateProfile({ gender: data.gender });
 
-    if (name === "gender") {
-      updateProfile({ gender: value });
-    } else if (name === "disability") {
-      updateStudentProfile({
-        is_differently_abled: value === "Yes",
+      // Update Disability in Student Profile
+      await updateStudentProfile({
+        is_differently_abled: data.disability === "Yes",
       });
+    } catch (error) {
+      console.error("Failed to save demographic data:", error);
     }
   };
 
@@ -92,7 +91,11 @@ export default function DemographicForm({ onBack }) {
         </div>
       ) : (
         <Form {...form}>
-          <form className="space-y-8 mt-6">
+          {/* Linked the form submit to react-hook-form */}
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-8 mt-6"
+          >
             {/* Gender */}
             <FormField
               control={form.control}
@@ -105,10 +108,7 @@ export default function DemographicForm({ onBack }) {
                   <p className="text-gray-600 text-base">
                     Please select your gender identity
                   </p>
-                  <Select
-                    value={field.value}
-                    onValueChange={(val) => handleValueChange("gender", val)}
-                  >
+                  <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger className="cursor-pointer w-full rounded-full border-gray-300 p-3 h-12 focus:ring-2 focus:ring-blue-500">
                         <SelectValue placeholder="Select Gender" />
@@ -145,12 +145,7 @@ export default function DemographicForm({ onBack }) {
                     Do you have a disability that substantially limits a major
                     life activity, or a history of a disability?
                   </p>
-                  <Select
-                    value={field.value}
-                    onValueChange={(val) =>
-                      handleValueChange("disability", val)
-                    }
-                  >
+                  <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger className="cursor-pointer w-full rounded-full border-gray-300 p-3 h-12 focus:ring-2 focus:ring-blue-500">
                         <SelectValue placeholder="Select Option" />
@@ -185,18 +180,20 @@ export default function DemographicForm({ onBack }) {
                 </span>
               </p>
             </div>
+
+            {/* Save Button */}
+            <div className="flex justify-center pt-4">
+              <button
+                type="submit"
+                className="bg-blue-500 hover:bg-blue-600 text-white px-10 py-2 rounded-full font-medium transition disabled:opacity-50"
+                disabled={form.formState.isSubmitting}
+              >
+                {form.formState.isSubmitting ? "Saving..." : "Agree and save"}
+              </button>
+            </div>
           </form>
         </Form>
       )}
-      {/* Save button */}
-      {/* <div className="flex justify-center">
-            <button
-              type="submit"
-              className="bg-blue-500 hover:bg-blue-600 text-white px-10 py-2 rounded-full font-medium transition"
-            >
-              Agree and save
-            </button>
-          </div> */}
     </div>
   );
 }

@@ -60,6 +60,12 @@ export default function TaskCalendar({
   };
 
   const getTasksForDay = (day: Date) => {
+    const isSunday = day.getDay() === 0;
+
+    if (isSunday) {
+      return [];
+    }
+
     return tasks.filter((task) => {
       if (!task.start_date || !task.end_date) return false;
 

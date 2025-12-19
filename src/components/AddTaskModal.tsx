@@ -1,14 +1,6 @@
 import { X } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { useCreateStudentTask } from "@/hooks/useStudentTasks";
-import {
-  addTaskSchema,
-  type AddTaskFormData,
-  TASK_COLORS,
-} from "@/lib/taskSchemas";
-import { toast } from "sonner";
 
 interface AddTaskModalProps {
   isOpen: boolean;
@@ -17,23 +9,15 @@ interface AddTaskModalProps {
   studentId: string;
 }
 
-// Helper function to convert dd/mm/yyyy to yyyy-mm-dd
-const convertToISO = (dateStr: string): string => {
-  if (!dateStr) return "";
-  const parts = dateStr.split("/");
-  if (parts.length !== 3) return dateStr;
-  const [day, month, year] = parts;
-  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-};
-
-// Helper function to convert yyyy-mm-dd to dd/mm/yyyy
-const convertToDisplay = (dateStr: string): string => {
-  if (!dateStr) return "";
-  const parts = dateStr.split("-");
-  if (parts.length !== 3) return dateStr;
-  const [year, month, day] = parts;
-  return `${day}/${month}/${year}`;
-};
+const COLORS = [
+  "#F97316", // Orange
+  "#10B981", // Green (Emerald)
+  "#0EA5E9", // Cyan/Teal
+  "#8B5CF6", // Purple
+  "#EC4899", // Pink
+  "#EF4444", // Red
+  "#F59E0B", // Amber/Yellow
+];
 
 export default function AddTaskModal({
   isOpen,
@@ -41,68 +25,76 @@ export default function AddTaskModal({
   applicationId,
   studentId,
 }: AddTaskModalProps) {
+  const [title, setTitle] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [selectedColor, setSelectedColor] = useState(COLORS[0]);
+  const [note, setNote] = useState("");
+  const [submissionLink, setSubmissionLink] = useState("");
+
   const createTask = useCreateStudentTask();
-  const [sliderPosition, setSliderPosition] = useState(0);
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<AddTaskFormData>({
-    resolver: zodResolver(addTaskSchema),
-    defaultValues: {
-      title: "",
-      startDate: "",
-      startTime: "",
-      endDate: "",
-      endTime: "",
-      color: TASK_COLORS[0],
-      note: "",
-      submissionLink: "",
-    },
-  });
-
-  const selectedColor = watch("color");
-
-  // Reset form when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      reset();
-      setSliderPosition(0);
+  const handleSave = async () => {
+    if (!title.trim()) {
+      alert("Please enter a task name");
+      return;
     }
-  }, [isOpen, reset]);
 
-  const onSubmit = async (data: AddTaskFormData) => {
+    if (!startDate || !endDate) {
+      alert("Please select start and due dates");
+      return;
+    }
+
+    // Validate that end date is not before start date
+    if (new Date(endDate) < new Date(startDate)) {
+      alert("Due date cannot be before start date");
+      return;
+    }
+
     try {
       await createTask.mutateAsync({
         studentId,
         taskData: {
           application_id: applicationId,
-          title: data.title,
-          description: data.note || undefined,
-          start_date: data.startDate,
-          start_time: data.startTime || undefined,
-          end_date: data.endDate,
-          end_time: data.endTime || undefined,
-          color: data.color,
-          submission_link: data.submissionLink || undefined,
+          title: title.trim(),
+          description: note.trim() || undefined,
+          start_date: startDate,
+          start_time: startTime || undefined,
+          end_date: endDate,
+          end_time: endTime || undefined,
+          color: selectedColor,
+          submission_link: submissionLink.trim() || undefined,
         },
       });
 
-      toast.success("Task created successfully");
-      reset();
+      // Reset form
+      setTitle("");
+      setStartDate("");
+      setStartTime("");
+      setEndDate("");
+      setEndTime("");
+      setSelectedColor(COLORS[0]);
+      setNote("");
+      setSubmissionLink("");
       onClose();
     } catch (error) {
       console.error("Error creating task:", error);
-      toast.error("Failed to create task. Please try again.");
+      alert("Failed to create task. Please try again.");
     }
   };
 
   const handleClose = () => {
-    reset();
+    // Reset form on close
+    setTitle("");
+    setStartDate("");
+    setStartTime("");
+    setEndDate("");
+    setEndTime("");
+    setSelectedColor(COLORS[0]);
+    setNote("");
+    setSubmissionLink("");
     onClose();
   };
 
@@ -124,225 +116,142 @@ export default function AddTaskModal({
             </button>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)}>
-            {/* Task Name */}
-            <div className="mb-5">
+          {/* Task Name */}
+          <div className="mb-5">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Task Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter task name"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Start Date and Time */}
+          <div className="grid grid-cols-2 gap-4 mb-5">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Task Name <span className="text-red-500">*</span>
+                Start date <span className="text-red-500">*</span>
               </label>
               <input
-                type="text"
-                {...register("title")}
-                placeholder="Enter task name"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
-              {errors.title && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.title.message}
-                </p>
-              )}
             </div>
-
-            {/* Start Date and Time */}
-            <div className="grid grid-cols-2 gap-4 mb-5">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Start date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="DD/MM/YYYY"
-                  {...register("startDate")}
-                  onChange={(e) => {
-                    let value = e.target.value.replace(/[^\d]/g, "");
-                    if (value.length >= 2) {
-                      value = value.slice(0, 2) + "/" + value.slice(2);
-                    }
-                    if (value.length >= 5) {
-                      value = value.slice(0, 5) + "/" + value.slice(5, 9);
-                    }
-                    e.target.value = value;
-                    setValue("startDate", value);
-                  }}
-                  maxLength={10}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                />
-                {errors.startDate && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {errors.startDate.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Time
-                </label>
-                <input
-                  type="time"
-                  {...register("startTime")}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* Due Date and Time */}
-            <div className="grid grid-cols-2 gap-4 mb-5">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Due date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="DD/MM/YYYY"
-                  {...register("endDate")}
-                  onChange={(e) => {
-                    let value = e.target.value.replace(/[^\d]/g, "");
-                    if (value.length >= 2) {
-                      value = value.slice(0, 2) + "/" + value.slice(2);
-                    }
-                    if (value.length >= 5) {
-                      value = value.slice(0, 5) + "/" + value.slice(5, 9);
-                    }
-                    e.target.value = value;
-                    setValue("endDate", value);
-                  }}
-                  maxLength={10}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                />
-                {errors.endDate && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {errors.endDate.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Time
-                </label>
-                <input
-                  type="time"
-                  {...register("endTime")}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* Color Picker */}
-            <div className="mb-5">
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Color <span className="text-red-500">*</span>
-              </label>
-              <div className="flex items-center justify-between gap-2 mb-3">
-                {TASK_COLORS.map((color, index) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => {
-                      setValue("color", color);
-                      setSliderPosition(
-                        (index / (TASK_COLORS.length - 1)) * 100
-                      );
-                    }}
-                    className={`w-8 h-8 rounded-full transition-all ${
-                      selectedColor === color
-                        ? "scale-110 ring-2 ring-offset-2 ring-gray-400"
-                        : "hover:scale-105"
-                    }`}
-                    style={{ backgroundColor: color }}
-                    aria-label={`Select color ${color}`}
-                  />
-                ))}
-              </div>
-
-              {/* Gradient Color Slider */}
-              <div
-                className="relative w-full h-5 rounded-full cursor-pointer"
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const percentage =
-                    ((e.clientX - rect.left) / rect.width) * 100;
-                  setSliderPosition(Math.max(0, Math.min(100, percentage)));
-
-                  // Calculate color based on position
-                  const colorIndex = Math.round(
-                    (percentage / 100) * (TASK_COLORS.length - 1)
-                  );
-                  setValue(
-                    "color",
-                    TASK_COLORS[
-                      Math.max(0, Math.min(TASK_COLORS.length - 1, colorIndex))
-                    ]
-                  );
-                }}
-                style={{
-                  background: `linear-gradient(90deg, ${TASK_COLORS.join(
-                    ", "
-                  )})`,
-                }}
-              >
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 w-[6px] h-7 bg-white rounded-full shadow-lg border-2 border-gray-300"
-                  style={{
-                    left: `calc(${sliderPosition}% - 3px)`,
-                  }}
-                ></div>
-              </div>
-              {errors.color && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.color.message}
-                </p>
-              )}
-            </div>
-
-            {/* Note */}
-            <div className="mb-5">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Note
-              </label>
-              <textarea
-                {...register("note")}
-                placeholder="Please describe the task"
-                rows={4}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
-              />
-            </div>
-
-            {/* Submission Link */}
-            {/* <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Submission link
+                Time
               </label>
               <input
-                type="text"
-                {...register("submissionLink")}
-                placeholder="https://www.url.com/"
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
-              {errors.submissionLink && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.submissionLink.message}
-                </p>
-              )}
-            </div> */}
-
-            {/* Action Buttons */}
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="flex-1 py-3 border border-gray-300 text-gray-700 font-medium rounded-full hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="flex-1 py-3 bg-teal-600 text-white font-medium rounded-full hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? "Saving..." : "Save"}
-              </button>
             </div>
-          </form>
+          </div>
+
+          {/* Due Date and Time */}
+          <div className="grid grid-cols-2 gap-4 mb-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Due date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                min={startDate}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Time
+              </label>
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Color Picker */}
+          <div className="mb-5">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Color <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-3 flex-wrap">
+              {COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setSelectedColor(color)}
+                  className={`w-10 h-10 rounded-full transition-all ${
+                    selectedColor === color
+                      ? "ring-2 ring-offset-2 ring-gray-400 scale-110"
+                      : "hover:scale-105"
+                  }`}
+                  style={{ backgroundColor: color }}
+                  aria-label={`Select color ${color}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Note */}
+          <div className="mb-5">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Note
+            </label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Please describe the task"
+              rows={4}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
+            />
+          </div>
+
+          {/* Submission Link */}
+          {/* <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Submission link
+            </label>
+            <input
+              type="url"
+              value={submissionLink}
+              onChange={(e) => setSubmissionLink(e.target.value)}
+              placeholder="https://www.url.com/"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            />
+          </div> */}
+
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="flex-1 py-3 border border-gray-300 text-gray-700 font-medium rounded-full hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={createTask.isPending}
+              className="flex-1 py-3 bg-teal-600 text-white font-medium rounded-full hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {createTask.isPending ? "Saving..." : "Save"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

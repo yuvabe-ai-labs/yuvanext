@@ -9,7 +9,9 @@ export const useProfileData = () => {
   const { toast } = useToast();
 
   const [profile, setProfile] = useState<DatabaseProfile | null>(null);
-  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
+  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,7 +130,7 @@ export const useProfileData = () => {
             ...updates,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: "profile_id" },
+          { onConflict: "profile_id" }
         )
         .select()
         .single();
@@ -167,25 +169,40 @@ export const useProfileData = () => {
   // Array management helpers
   const addEducationEntry = async (education: Omit<any, "id">) => {
     const currentEducation = parseJsonField(studentProfile?.education, []);
-    const newEducation = [...currentEducation, { ...education, id: crypto.randomUUID() }];
+    const newEducation = [
+      ...currentEducation,
+      { ...education, id: crypto.randomUUID() },
+    ];
     await updateStudentProfile({ education: newEducation });
   };
 
   const addProjectEntry = async (project: Omit<any, "id">) => {
     const currentProjects = parseJsonField(studentProfile?.projects, []);
-    const newProjects = [...currentProjects, { ...project, id: crypto.randomUUID() }];
+    const newProjects = [
+      ...currentProjects,
+      { ...project, id: crypto.randomUUID() },
+    ];
     await updateStudentProfile({ projects: newProjects });
   };
 
   const addCourseEntry = async (course: Omit<any, "id">) => {
-    const currentCourses = parseJsonField(studentProfile?.completed_courses, []);
-    const newCourses = [...currentCourses, { ...course, id: crypto.randomUUID() }];
+    const currentCourses = parseJsonField(
+      studentProfile?.completed_courses,
+      []
+    );
+    const newCourses = [
+      ...currentCourses,
+      { ...course, id: crypto.randomUUID() },
+    ];
     await updateStudentProfile({ completed_courses: newCourses });
   };
 
   const addLanguageEntry = async (language: Omit<any, "id">) => {
     const currentLanguages = parseJsonField(studentProfile?.languages, []);
-    const newLanguages = [...currentLanguages, { ...language, id: crypto.randomUUID() }];
+    const newLanguages = [
+      ...currentLanguages,
+      { ...language, id: crypto.randomUUID() },
+    ];
     await updateStudentProfile({ languages: newLanguages });
   };
 
@@ -197,8 +214,14 @@ export const useProfileData = () => {
 
   const addInternshipEntry = async (internship: Omit<any, "id">) => {
     // For now, we'll store in a JSON field, but could be moved to a separate table later
-    const currentInternships = parseJsonField((studentProfile as any)?.internships || [], []);
-    const newInternships = [...currentInternships, { ...internship, id: crypto.randomUUID() }];
+    const currentInternships = parseJsonField(
+      (studentProfile as any)?.internships || [],
+      []
+    );
+    const newInternships = [
+      ...currentInternships,
+      { ...internship, id: crypto.randomUUID() },
+    ];
     await updateStudentProfile({ internships: newInternships } as any);
   };
 
@@ -213,25 +236,36 @@ export const useProfileData = () => {
   // Remove functions for each array type
   const removeEducationEntry = async (id: string) => {
     const currentEducation = parseJsonField(studentProfile?.education, []);
-    const updatedEducation = currentEducation.filter((edu: any) => edu.id !== id);
+    const updatedEducation = currentEducation.filter(
+      (edu: any) => edu.id !== id
+    );
     await updateStudentProfile({ education: updatedEducation });
   };
 
   const removeProjectEntry = async (id: string) => {
     const currentProjects = parseJsonField(studentProfile?.projects, []);
-    const updatedProjects = currentProjects.filter((project: any) => project.id !== id);
+    const updatedProjects = currentProjects.filter(
+      (project: any) => project.id !== id
+    );
     await updateStudentProfile({ projects: updatedProjects });
   };
 
   const removeCourseEntry = async (id: string) => {
-    const currentCourses = parseJsonField(studentProfile?.completed_courses, []);
-    const updatedCourses = currentCourses.filter((course: any) => course.id !== id);
+    const currentCourses = parseJsonField(
+      studentProfile?.completed_courses,
+      []
+    );
+    const updatedCourses = currentCourses.filter(
+      (course: any) => course.id !== id
+    );
     await updateStudentProfile({ completed_courses: updatedCourses });
   };
 
   const removeLanguageEntry = async (id: string) => {
     const currentLanguages = parseJsonField(studentProfile?.languages, []);
-    const updatedLanguages = currentLanguages.filter((lang: any) => lang.id !== id);
+    const updatedLanguages = currentLanguages.filter(
+      (lang: any) => lang.id !== id
+    );
     await updateStudentProfile({ languages: updatedLanguages });
   };
 
@@ -242,20 +276,29 @@ export const useProfileData = () => {
   };
 
   const removeInternshipEntry = async (id: string) => {
-    const currentInternships = parseJsonField((studentProfile as any)?.internships || [], []);
-    const updatedInternships = currentInternships.filter((internship: any) => internship.id !== id);
+    const currentInternships = parseJsonField(
+      (studentProfile as any)?.internships || [],
+      []
+    );
+    const updatedInternships = currentInternships.filter(
+      (internship: any) => internship.id !== id
+    );
     await updateStudentProfile({ internships: updatedInternships } as any);
   };
 
   const removeInterest = async (interest: string) => {
     const currentInterests = parseJsonField(studentProfile?.interests, []);
-    const updatedInterests = currentInterests.filter((item: string) => item !== interest);
+    const updatedInterests = currentInterests.filter(
+      (item: string) => item !== interest
+    );
     await updateStudentProfile({ interests: updatedInterests });
   };
 
   const removeSkill = async (skill: string) => {
     const currentSkills = parseJsonField(studentProfile?.skills, []);
-    const updatedSkills = currentSkills.filter((item: string) => item !== skill);
+    const updatedSkills = currentSkills.filter(
+      (item: string) => item !== skill
+    );
     await updateStudentProfile({ skills: updatedSkills });
   };
 

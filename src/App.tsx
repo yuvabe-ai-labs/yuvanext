@@ -38,6 +38,7 @@ import ResetPassword from "./pages/ResetPassword";
 import CandidateTasks from "./pages/CandidateTasks";
 import MyTasks from "./pages/MyTasks";
 import UnitCandidateTasks from "./pages/UnitCandidateTasks";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -57,7 +58,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
           // Fetch profile with role and onboarding status
           const { data: profile, error } = await supabase
             .from("profiles")
-            .select("onboarding_completed, role")
+            .select("onboarding_completed, role, deactivated_at")
             .eq("user_id", user.id)
             .maybeSingle();
 
@@ -65,6 +66,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
             console.error("Error fetching profile:", error);
             setProfileLoading(false);
             return;
+          }
+
+          // Direct Update if needed
+          if (profile?.deactivated_at) {
+            const { error: updateError } = await supabase
+              .from("profiles")
+              .update({ deactivated_at: null })
+              .eq("user_id", user.id);
+
+            if (updateError)
+              console.error("Failed to reactivate:", updateError);
           }
 
           const isOnboardingCompleted = profile?.onboarding_completed || false;
@@ -286,6 +298,15 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <UnitCandidateTasks />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
                 </ProtectedRoute>
               }
             />

@@ -173,12 +173,22 @@ const CandidateProfile = () => {
     setShowConfirmDialog(false);
 
     try {
-      const { error: updateError } = await supabase
+      const res = await supabase
         .from("applications")
         .update({ status: pendingStatus })
         .eq("id", data.application.id);
+      await supabase.functions.invoke("update-application-status", {
+        body: JSON.stringify({
+          applicationId: data.application.id,
+          action: pendingStatus,
+          candidateEmail: data.profile.email,
+          candidateName: data.profile.full_name,
+        }),
+      });
 
-      if (updateError) throw updateError;
+      console.log();
+
+      if (res.error) console.log();
 
       // Refresh the data
       await refetch();

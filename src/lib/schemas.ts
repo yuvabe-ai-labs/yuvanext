@@ -1,21 +1,34 @@
 import { z } from "zod";
 
-export const updateEmailSchema = z.object({
-  newEmail: z
-    .string()
-    .min(1, "Email is required")
-    .email("Please enter a valid email address"),
-  password: z
-    .string()
-    .min(1, "Password is required")
-    .min(6, "Password must be at least 6 characters"),
-});
+export const updateEmailSchema = z
+  .object({
+    currentEmail: z
+      .string()
+      .min(1, "Current email is required")
+      .email("Invalid current email"),
+
+    newEmail: z
+      .string()
+      .min(1, "Email is required")
+      .email("Please enter a valid email address"),
+
+    password: z
+      .string()
+      .min(1, "Password is required")
+      .min(6, "Password must be at least 6 characters"),
+  })
+  .refine(
+    (data) => data.currentEmail.toLowerCase() !== data.newEmail.toLowerCase(),
+    {
+      message: "New email must be different from current email",
+      path: ["newEmail"],
+    }
+  );
 
 export const phoneSchema = z.object({
   phone: z
     .string()
-    .min(10, "Phone number must be at least 10 digits")
-    .regex(/^[0-9+\-\s()]+$/, "Please enter a valid phone number"),
+    .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"),
 });
 
 export const passwordSchema = z
@@ -33,12 +46,4 @@ export const notificationSchema = z.object({
   allow_all: z.boolean(),
   application_status_in_app: z.boolean(),
   application_status_email: z.boolean(),
-  internship_updates_in_app: z.boolean(),
-  internship_updates_email: z.boolean(),
-  recommended_internship_in_app: z.boolean(),
-  recommended_internship_email: z.boolean(),
-  similar_internships_in_app: z.boolean(),
-  similar_internships_email: z.boolean(),
-  recommended_courses_in_app: z.boolean(),
-  recommended_courses_email: z.boolean(),
 });

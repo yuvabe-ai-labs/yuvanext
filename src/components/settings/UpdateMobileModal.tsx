@@ -9,7 +9,15 @@ import { phoneSchema } from "@/lib/schemas";
 
 type PhoneFormData = z.infer<typeof phoneSchema>;
 
-export default function UpdateMobileModal({ isOpen, onClose }) {
+interface UpdateMobileModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function UpdateMobileModal({
+  isOpen,
+  onClose,
+}: UpdateMobileModalProps) {
   const { toast } = useToast();
   const { profile, updateProfile, refetch } = useProfileData();
 
@@ -20,12 +28,16 @@ export default function UpdateMobileModal({ isOpen, onClose }) {
     reset,
   } = useForm<PhoneFormData>({
     resolver: zodResolver(phoneSchema),
+    defaultValues: {
+      phone: "",
+    },
   });
 
-  // Load profile mobile into form
+  // Load existing phone (strip +91 if stored)
   useEffect(() => {
     if (profile?.phone) {
-      reset({ phone: profile.phone });
+      const cleanedPhone = profile.phone.replace(/^(\+91)/, "");
+      reset({ phone: cleanedPhone });
     }
   }, [profile, reset]);
 
@@ -33,7 +45,10 @@ export default function UpdateMobileModal({ isOpen, onClose }) {
 
   const onSubmit = async (data: PhoneFormData) => {
     try {
-      await updateProfile({ phone: data.phone });
+      // Store with +91 (recommended)
+      const phoneWithCountryCode = `+91${data.phone}`;
+
+      await updateProfile({ phone: phoneWithCountryCode });
 
       toast({
         title: "Mobile Updated",
@@ -44,7 +59,6 @@ export default function UpdateMobileModal({ isOpen, onClose }) {
       onClose();
     } catch (err) {
       console.error("Error updating mobile:", err);
-
       toast({
         title: "Error",
         description: "Failed to update mobile number.",
@@ -73,13 +87,31 @@ export default function UpdateMobileModal({ isOpen, onClose }) {
             <label className="text-sm text-gray-600 block mb-1">
               Mobile Number
             </label>
-            <input
-              type="text"
-              className={`w-full border rounded-lg px-3 py-2 text-sm ${
-                errors.phone ? "border-red-500" : ""
-              }`}
-              {...register("phone")}
-            />
+
+            <div className="flex">
+              {/* Country Code (fixed) */}
+              <span className="flex items-center px-3 border border-r-0 rounded-l-lg bg-gray-100 text-sm text-gray-700">
+                +91
+              </span>
+
+              {/* Phone Input */}
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={10}
+                className={`w-full border rounded-r-lg px-3 py-2 text-sm ${
+                  errors.phone ? "border-red-500" : ""
+                }`}
+                placeholder="Enter 10-digit mobile number"
+                {...register("phone")}
+                onInput={(e) => {
+                  e.currentTarget.value = e.currentTarget.value
+                    .replace(/\D/g, "")
+                    .slice(0, 10);
+                }}
+              />
+            </div>
+
             {errors.phone && (
               <p className="text-red-500 text-xs mt-1">
                 {errors.phone.message}

@@ -13,13 +13,17 @@ const AuthCallback = () => {
         console.log("Auth callback triggered");
 
         // Check the URL hash for the type parameter
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const hashParams = new URLSearchParams(
+          window.location.hash.substring(1)
+        );
         const type = hashParams.get("type");
         const accessToken = hashParams.get("access_token");
 
         // If this is a password recovery, redirect to reset password page with the token
         if (type === "recovery" && accessToken) {
-          console.log("Password recovery detected, redirecting to reset password");
+          console.log(
+            "Password recovery detected, redirecting to reset password"
+          );
           navigate("/reset-password" + window.location.hash, { replace: true });
           return;
         }

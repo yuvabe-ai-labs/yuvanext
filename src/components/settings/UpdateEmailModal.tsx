@@ -10,10 +10,20 @@ import { updateEmailSchema } from "@/lib/schemas";
 
 type UpdateEmailFormData = z.infer<typeof updateEmailSchema>;
 
-export default function UpdateEmailModal({ isOpen, onClose }) {
+interface UpdateEmailModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function UpdateEmailModal({
+  isOpen,
+  onClose,
+}: UpdateEmailModalProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+
+  const currentEmail = user?.email || "";
 
   const {
     register,
@@ -21,23 +31,24 @@ export default function UpdateEmailModal({ isOpen, onClose }) {
     formState: { errors, isSubmitting },
     reset,
     setError,
-    watch,
   } = useForm<UpdateEmailFormData>({
     resolver: zodResolver(updateEmailSchema),
     defaultValues: {
+      currentEmail,
       newEmail: "",
       password: "",
     },
   });
 
-  const currentEmail = user?.email || "";
-  const newEmail = watch("newEmail");
-
   useEffect(() => {
-    if (isOpen) {
-      reset();
+    if (isOpen && currentEmail) {
+      reset({
+        currentEmail,
+        newEmail: "",
+        password: "",
+      });
     }
-  }, [isOpen, reset]);
+  }, [isOpen, currentEmail, reset]);
 
   if (!isOpen) return null;
 
@@ -49,29 +60,19 @@ export default function UpdateEmailModal({ isOpen, onClose }) {
       return;
     }
 
-    // Validate that new email is different
-    if (data.newEmail.toLowerCase() === currentEmail.toLowerCase()) {
-      setError("newEmail", {
-        message: "New email must be different from current email.",
-      });
-      return;
-    }
-
     try {
-      // Re-authenticate the user to verify password
+      // Re-authenticate user
       const { error: reauthError } = await supabase.auth.signInWithPassword({
-        email: currentEmail,
+        email: data.currentEmail,
         password: data.password,
       });
 
       if (reauthError) {
-        setError("password", {
-          message: "Incorrect password.",
-        });
+        setError("password", { message: "Incorrect password." });
         return;
       }
 
-      // Request email change
+      // Update email
       const { error: updateErr } = await supabase.auth.updateUser(
         { email: data.newEmail },
         {
@@ -80,23 +81,21 @@ export default function UpdateEmailModal({ isOpen, onClose }) {
       );
 
       if (updateErr) {
-        setError("root", {
-          message: updateErr.message,
-        });
+        setError("root", { message: updateErr.message });
         return;
       }
 
       toast({
         title: "Verification email sent",
         description:
-          "Please check your new email inbox and click the confirmation link to complete the email change.",
+          "Please check your new email inbox and confirm the change.",
         duration: 8000,
       });
 
       reset();
       onClose();
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
       setError("root", {
         message: "Something went wrong. Please try again.",
       });
@@ -118,9 +117,8 @@ export default function UpdateEmailModal({ isOpen, onClose }) {
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
           <p className="text-xs text-blue-800">
-            <strong>Important:</strong> You'll receive a confirmation email at
-            your new email address. Click the link in the email to complete the
-            email change.
+            <strong>Important:</strong> A confirmation email will be sent to
+            your new email address.
           </p>
         </div>
 
@@ -130,6 +128,9 @@ export default function UpdateEmailModal({ isOpen, onClose }) {
           </p>
         )}
 
+        {/* Hidden field required for Zod refine */}
+        <input type="hidden" {...register("currentEmail")} />
+
         <div className="space-y-4">
           <div>
             <label className="text-sm text-gray-600 block mb-1">
@@ -137,9 +138,9 @@ export default function UpdateEmailModal({ isOpen, onClose }) {
             </label>
             <input
               type="email"
-              className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"
               value={currentEmail}
               disabled
+              className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"
             />
           </div>
 
@@ -149,11 +150,11 @@ export default function UpdateEmailModal({ isOpen, onClose }) {
             </label>
             <input
               type="email"
+              {...register("newEmail")}
               className={`w-full border rounded-lg px-3 py-2 text-sm ${
                 errors.newEmail ? "border-red-500" : ""
               }`}
-              {...register("newEmail")}
-              placeholder="Enter your new email address"
+              placeholder="Enter new email"
             />
             {errors.newEmail && (
               <p className="text-red-600 text-xs mt-1">
@@ -168,16 +169,16 @@ export default function UpdateEmailModal({ isOpen, onClose }) {
             </label>
             <input
               type={showPassword ? "text" : "password"}
+              {...register("password")}
               className={`w-full border rounded-lg px-3 py-2 pr-10 text-sm ${
                 errors.password ? "border-red-500" : ""
               }`}
-              {...register("password")}
               placeholder="Confirm your password"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-9 text-gray-500 hover:text-gray-700"
+              className="absolute right-3 top-9 text-gray-500"
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
@@ -191,7 +192,7 @@ export default function UpdateEmailModal({ isOpen, onClose }) {
           <button
             onClick={handleSubmit(onSubmit)}
             disabled={isSubmitting}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg disabled:opacity-50 hover:bg-blue-700 transition-colors"
+            className="w-full bg-blue-600 text-white py-2 rounded-lg disabled:opacity-50 hover:bg-blue-700"
           >
             {isSubmitting ? "Sending verification email..." : "Update Email"}
           </button>

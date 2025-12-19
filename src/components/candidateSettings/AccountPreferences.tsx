@@ -4,12 +4,12 @@ import DemographicForm from "./DemographicForm";
 import VerificationUpload from "./VerificationUpload";
 import SkeletonBox from "./SkeletonBox";
 import { supabase } from "@/integrations/supabase/client";
-import { AlertTriangle, ChevronRight } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useProfileData } from "@/hooks/useProfileData";
-import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useProfileData } from "@/hooks/useProfileData";
+import { preferencesSchema } from "@/lib/accountPreferenceSchema";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import {
   Select,
@@ -18,12 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-// Define the Schema
-const preferencesSchema = z.object({
-  language: z.string().min(1, "Required"),
-  contentLanguage: z.string().min(1, "Required"),
-});
 
 export default function AccountPreferences() {
   const [activeSubView, setActiveSubView] = useState(null);
@@ -36,7 +30,6 @@ export default function AccountPreferences() {
   const navigate = useNavigate();
   const { profile } = useProfileData();
 
-  // Initialize React Hook Form with Zod
   const form = useForm({
     resolver: zodResolver(preferencesSchema),
     defaultValues: {
@@ -47,7 +40,7 @@ export default function AccountPreferences() {
 
   const onSubmit = (values) => {
     console.log("Saved Preferences:", values);
-    // Here you would typically call updateProfile({ settings: values });
+    // updateProfile({ settings: values });
   };
 
   const openProfile = useCallback(() => {
@@ -139,14 +132,13 @@ export default function AccountPreferences() {
           onClick={() => openSubViewWithLoad("verification")}
         /> */}
       </div>
-      {/* --- GENERAL PREFERENCES WITH ZOD & SHADCN --- */}
-      <section className="mt-7">
+
+      {/* <section className="mt-7">
         <h3 className="text-xl font-medium text-gray-800">
           General Preferences
         </h3>
         <Form {...form}>
           <form onChange={form.handleSubmit(onSubmit)} className="font-medium">
-            {/* Language Field */}
             <FormField
               control={form.control}
               name="language"
@@ -158,7 +150,7 @@ export default function AccountPreferences() {
                     defaultValue={field.value}
                   >
                     <FormControl>
-                      <SelectTrigger className="border rounded px-3 py-2 w-full md:w-60 h-10">
+                      <SelectTrigger className="border rounded px-3 py-2 w-full md:w-60 h-10 focus:ring-2 focus:ring-blue-500">
                         <SelectValue placeholder="Select Language" />
                       </SelectTrigger>
                     </FormControl>
@@ -171,7 +163,6 @@ export default function AccountPreferences() {
               )}
             />
 
-            {/* Content Language Field */}
             <FormField
               control={form.control}
               name="contentLanguage"
@@ -183,7 +174,7 @@ export default function AccountPreferences() {
                     defaultValue={field.value}
                   >
                     <FormControl>
-                      <SelectTrigger className="border rounded px-3 py-2 w-full md:w-60 h-10">
+                      <SelectTrigger className="border rounded px-3 py-2 w-full md:w-60 h-10 focus:ring-2 focus:ring-blue-500">
                         <SelectValue placeholder="Select Language" />
                       </SelectTrigger>
                     </FormControl>
@@ -197,8 +188,8 @@ export default function AccountPreferences() {
             />
           </form>
         </Form>
-      </section>
-      {/* --- ACCOUNT MANAGEMENT --- */}
+      </section> */}
+
       <section className="mt-7">
         <h3 className="text-xl font-medium text-gray-800">
           Account Management
@@ -219,15 +210,8 @@ export default function AccountPreferences() {
             Delete Account
           </button>
         </div>
-        {/* <h3 className="text-xl font-medium mb-3 text-gray-800">
-          Account Management
-        </h3>
-        <div className="border rounded-md p-4">
-          <button className="text-red-500">Deactivate Account</button>
-          <div className="h-px bg-gray-100 my-3" />
-          <button className="text-red-500">Delete Account</button>
-        </div> */}
       </section>
+
       {/* --- CUSTOM MODAL: DEACTIVATE --- */}
       {showDeactivateModal && (
         <div
@@ -253,7 +237,6 @@ export default function AccountPreferences() {
                 <span className="font-semibold text-gray-800">6 months</span>.
                 After that, it will be permanently deleted.
               </p>
-
               <div className="flex items-center justify-end gap-3">
                 <button
                   onClick={() => setShowDeactivateModal(false)}
@@ -281,7 +264,7 @@ export default function AccountPreferences() {
           </div>
         </div>
       )}
-      {/* --- CUSTOM MODAL: DELETE --- */}
+
       {showDeleteModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity"
@@ -308,7 +291,6 @@ export default function AccountPreferences() {
                 . This will permanently delete your account and remove your data
                 from our servers immediately.
               </p>
-
               <div className="flex items-center justify-end gap-3">
                 <button
                   onClick={() => setShowDeleteModal(false)}

@@ -3,8 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import { useProfileData } from "@/hooks/useProfileData";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-
+import { demographicSchema } from "@/lib/demographicFormSchema";
 import {
   Select,
   SelectContent,
@@ -13,11 +12,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
-
-const demographicSchema = z.object({
-  gender: z.string().min(1, "Please select a gender"),
-  disability: z.enum(["Yes", "No"]),
-});
 
 export default function DemographicForm({ onBack }) {
   const {
@@ -48,7 +42,6 @@ export default function DemographicForm({ onBack }) {
     }
   }, [profile, studentProfile, form]);
 
-  // NEW: Manual Submit Handler
   const onSubmit = async (data) => {
     try {
       // Update Gender in Profile
@@ -65,7 +58,6 @@ export default function DemographicForm({ onBack }) {
 
   return (
     <div>
-      {/* Back Button */}
       <button
         onClick={onBack}
         className="text-base text-gray-600 font-medium flex items-center gap-1 hover:text-gray-900 mb-6"
@@ -73,7 +65,6 @@ export default function DemographicForm({ onBack }) {
         <ChevronLeft /> Back
       </button>
 
-      {/* Header */}
       <div className="space-y-5">
         <h2 className="text-xl font-medium text-gray-800">
           Demographic Information
@@ -91,12 +82,11 @@ export default function DemographicForm({ onBack }) {
         </div>
       ) : (
         <Form {...form}>
-          {/* Linked the form submit to react-hook-form */}
           <form
             onSubmit={form.handleSubmit(onSubmit)}
             className="space-y-8 mt-6"
           >
-            {/* Gender */}
+            {/* Gender Field */}
             <FormField
               control={form.control}
               name="gender"
@@ -132,7 +122,7 @@ export default function DemographicForm({ onBack }) {
 
             <div className="border-t" />
 
-            {/* Disability */}
+            {/* Disability Field */}
             <FormField
               control={form.control}
               name="disability"
@@ -166,7 +156,6 @@ export default function DemographicForm({ onBack }) {
 
             <div className="border-t" />
 
-            {/* Info Box */}
             <div className="space-y-5">
               <p className="font-medium text-gray-800 mb-1">
                 How YuvaNext uses this data
@@ -181,7 +170,6 @@ export default function DemographicForm({ onBack }) {
               </p>
             </div>
 
-            {/* Save Button */}
             <div className="flex justify-center pt-4">
               <button
                 type="submit"

@@ -1,5 +1,11 @@
 import React from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,15 +19,34 @@ import { ProjectEntry } from "@/types/profile";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 
-const projectSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  description: z.string().min(1, "Description is required"),
-  technologies: z.array(z.string()).min(1, "At least one technology is required"),
-  start_date: z.string().min(1, "Start date is required"),
-  end_date: z.string().optional(),
-  project_url: z.string().url().optional().or(z.literal("")),
-  is_current: z.boolean().default(false),
-});
+const projectSchema = z
+  .object({
+    title: z.string().min(1, "Title is required"),
+    description: z.string().min(1, "Description is required"),
+    technologies: z
+      .array(z.string())
+      .min(1, "At least one technology is required"),
+    start_date: z.string().min(1, "Start date is required"),
+    end_date: z.string().optional(),
+    project_url: z.string().url().optional().or(z.literal("")),
+    is_current: z.boolean().default(false),
+  })
+  .refine(
+    (data) => {
+      // If currently working, or if dates are missing, skip this validation
+      if (data.is_current || !data.end_date || !data.start_date) {
+        return true;
+      }
+      // Convert strings to Date objects for comparison
+      const start = new Date(data.start_date);
+      const end = new Date(data.end_date);
+      return end >= start;
+    },
+    {
+      message: "End date cannot be before start date",
+      path: ["end_date"], // Attach error to end_date field
+    }
+  );
 
 type ProjectFormData = z.infer<typeof projectSchema>;
 
@@ -31,10 +56,16 @@ interface ProjectDialogProps {
   onSave: (project: Omit<ProjectEntry, "id">) => Promise<void>;
 }
 
-export const ProjectDialog: React.FC<ProjectDialogProps> = ({ children, project, onSave }) => {
+export const ProjectDialog: React.FC<ProjectDialogProps> = ({
+  children,
+  project,
+  onSave,
+}) => {
   const [open, setOpen] = React.useState(false);
   const [newTech, setNewTech] = React.useState("");
-  const [technologies, setTechnologies] = React.useState<string[]>(project?.technologies || []);
+  const [technologies, setTechnologies] = React.useState<string[]>(
+    project?.technologies || []
+  );
   const { toast } = useToast();
 
   const {
@@ -43,6 +74,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ children, project,
     formState: { errors, isSubmitting },
     watch,
     setValue,
+    clearErrors, // Added clearErrors
   } = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
@@ -101,8 +133,9 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ children, project,
   React.useEffect(() => {
     if (isCurrent) {
       setValue("end_date", "");
+      clearErrors("end_date"); // Clear error when switching to current
     }
-  }, [isCurrent, setValue]);
+  }, [isCurrent, setValue, clearErrors]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -114,8 +147,17 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ children, project,
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <Label htmlFor="title">Project Title *</Label>
-            <Input id="title" {...register("title")} placeholder="e.g. E-commerce Website" className="rounded-full" />
-            {errors.title && <p className="text-sm text-destructive mt-1">{errors.title.message}</p>}
+            <Input
+              id="title"
+              {...register("title")}
+              placeholder="e.g. E-commerce Website"
+              className="rounded-full"
+            />
+            {errors.title && (
+              <p className="text-sm text-destructive mt-1">
+                {errors.title.message}
+              </p>
+            )}
           </div>
 
           <div>
@@ -127,7 +169,11 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ children, project,
               rows={3}
               className="rounded-xl"
             />
-            {errors.description && <p className="text-sm text-destructive mt-1">{errors.description.message}</p>}
+            {errors.description && (
+              <p className="text-sm text-destructive mt-1">
+                {errors.description.message}
+              </p>
+            )}
           </div>
 
           <div>
@@ -137,29 +183,56 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ children, project,
                 value={newTech}
                 onChange={(e) => setNewTech(e.target.value)}
                 placeholder="Add technology"
-                onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addTechnology())}
+                onKeyPress={(e) =>
+                  e.key === "Enter" && (e.preventDefault(), addTechnology())
+                }
                 className="rounded-full"
               />
-              <Button type="button" onClick={addTechnology} size="sm" className="rounded-full">
+              <Button
+                type="button"
+                onClick={addTechnology}
+                size="sm"
+                className="rounded-full"
+              >
                 Add
               </Button>
             </div>
             <div className="flex flex-wrap gap-2">
               {technologies.map((tech) => (
-                <Badge key={tech} variant="secondary" className="flex items-center gap-1">
+                <Badge
+                  key={tech}
+                  variant="secondary"
+                  className="flex items-center gap-1"
+                >
                   {tech}
-                  <X className="w-3 h-3 cursor-pointer" onClick={() => removeTechnology(tech)} />
+                  <X
+                    className="w-3 h-3 cursor-pointer"
+                    onClick={() => removeTechnology(tech)}
+                  />
                 </Badge>
               ))}
             </div>
-            {errors.technologies && <p className="text-sm text-destructive mt-1">{errors.technologies.message}</p>}
+            {errors.technologies && (
+              <p className="text-sm text-destructive mt-1">
+                {errors.technologies.message}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="start_date">Start Date *</Label>
-              <Input id="start_date" type="date" {...register("start_date")} className="rounded-full" />
-              {errors.start_date && <p className="text-sm text-destructive mt-1">{errors.start_date.message}</p>}
+              <Input
+                id="start_date"
+                type="date"
+                {...register("start_date")}
+                className="rounded-full"
+              />
+              {errors.start_date && (
+                <p className="text-sm text-destructive mt-1">
+                  {errors.start_date.message}
+                </p>
+              )}
             </div>
 
             <div>
@@ -171,6 +244,12 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ children, project,
                 {...register("end_date")}
                 className="rounded-full"
               />
+              {/* Added Error Message Display Below */}
+              {errors.end_date && (
+                <p className="text-sm text-destructive mt-1">
+                  {errors.end_date.message}
+                </p>
+              )}
             </div>
           </div>
 
@@ -178,9 +257,13 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ children, project,
             <Checkbox
               id="is_current"
               checked={isCurrent}
-              onCheckedChange={(checked) => setValue("is_current", checked as boolean)}
+              onCheckedChange={(checked) =>
+                setValue("is_current", checked as boolean)
+              }
             />
-            <Label htmlFor="is_current">Currently working on this project</Label>
+            <Label htmlFor="is_current">
+              Currently working on this project
+            </Label>
           </div>
 
           <div>
@@ -192,14 +275,27 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ children, project,
               {...register("project_url")}
               placeholder="https://github.com/username/project"
             />
-            {errors.project_url && <p className="text-sm text-destructive mt-1">{errors.project_url.message}</p>}
+            {errors.project_url && (
+              <p className="text-sm text-destructive mt-1">
+                {errors.project_url.message}
+              </p>
+            )}
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="rounded-full">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              className="rounded-full"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="rounded-full">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-full"
+            >
               {isSubmitting ? "Saving..." : project ? "Update" : "Add"}
             </Button>
           </div>

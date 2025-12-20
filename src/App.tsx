@@ -39,6 +39,7 @@ import CandidateTasks from "./pages/CandidateTasks";
 import MyTasks from "./pages/MyTasks";
 import UnitCandidateTasks from "./pages/UnitCandidateTasks";
 import Settings from "./pages/Settings";
+import ScrollToTop from "@/components/ScrollToTop"; // Adjust path if needed
 
 const queryClient = new QueryClient();
 
@@ -138,6 +139,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ScrollToTop />
         <AuthProvider>
           <Routes>
             <Route path="/auth/callback" element={<AuthCallback />} />

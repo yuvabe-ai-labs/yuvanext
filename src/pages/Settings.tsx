@@ -30,7 +30,7 @@ export default function Settings() {
   return (
     <div className="bg-[#F8F9FA]">
       <Navbar />
-      <div className="flex mx-[120px] bg-white">
+      <div className="flex mx-[120px] bg-white min-h-[calc(100vh_-_66px)]">
         <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r-2 md:border-gray-200 ">
           <Sidebar active={activeSection} onChange={setActiveSection} />
         </aside>

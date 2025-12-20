@@ -23,11 +23,18 @@ export default function ApplicationStatusCard({ application }) {
       <div className="flex justify-between items-center">
         {/* ... header content ... */}
         <div className="flex items-center gap-5">
-          <img
-            src={application.internships.profiles.units.avatar_url}
-            alt="logo"
-            className="w-12 h-12 rounded-full object-cover border border-gray-300"
-          />
+          {application.internships.profiles.units.avatar_url ? (
+            <img
+              src={application.internships.profiles.units.avatar_url}
+              alt="logo"
+              className="w-12 h-12 rounded-full object-cover border border-gray-300"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-full border border-gray-300 flex justify-center items-center font-bold text-lg">
+              {application.internships.profiles.units.unit_name[0]}
+            </div>
+          )}
+
           <div>
             <h2 className="font-medium text-lg">
               {application.internships.profiles.units.unit_name}

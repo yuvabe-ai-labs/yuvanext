@@ -76,20 +76,22 @@ export default function MyTasks() {
     <div className="min-h-screen bg-[#F8F9FA]">
       <Navbar />
 
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 mt-6">
-        <button
-          className="mb-7 flex items-center gap-2 text-gray-600 hover:text-gray-800 
-          border border-gray-300 rounded-lg px-3 py-1.5 bg-white"
-          onClick={() => navigate(-1)}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm">Back</span>
-        </button>
-
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] min-h-[calc(100vh-80px)] gap-20">
           {/* Calendar Section */}
           <div>
+            {/* --- MOVED BUTTON HERE --- */}
+            <button
+              className="mb-4 mt-6 flex items-center gap-2 text-gray-600 hover:text-gray-800 
+              border border-gray-300 rounded-lg px-3 py-1.5 bg-white w-fit"
+              onClick={() => navigate(-1)}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-sm">Back</span>
+            </button>
+            {/* ------------------------- */}
+
             {isLoading ? (
               <div className="flex items-center justify-center h-96">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>

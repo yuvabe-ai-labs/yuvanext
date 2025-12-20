@@ -47,3 +47,62 @@ export const notificationSchema = z.object({
   application_status_in_app: z.boolean(),
   application_status_email: z.boolean(),
 });
+
+export const taskSchema = z
+  .object({
+    title: z.string().min(1, "Task name is required").trim(),
+    startDate: z.string().min(1, "Start date is required"),
+    startTime: z.string().optional(),
+    endDate: z.string().min(1, "Due date is required"),
+    endTime: z.string().optional(),
+    color: z.string(),
+    note: z.string().optional(),
+    submissionLink: z
+      .string()
+      .url("Please enter a valid URL")
+      .optional()
+      .or(z.literal("")),
+  })
+  .refine(
+    (data) => {
+      // Validate that end date is not before start date
+      if (data.startDate && data.endDate) {
+        return new Date(data.endDate) >= new Date(data.startDate);
+      }
+      return true;
+    },
+    {
+      message: "Due date cannot be before start date",
+      path: ["endDate"],
+    }
+  );
+
+export const updateTaskSchema = z
+  .object({
+    startDate: z.string().min(1, "Start date is required"),
+    endDate: z.string().min(1, "Due date is required"),
+    color: z.string(),
+    note: z.string().optional(),
+    submissionLink: z
+      .string()
+      .transform((val) => val.trim())
+      .refine(
+        (val) => val === "" || /^https?:\/\/.+/.test(val),
+        "Please enter a valid URL"
+      )
+      .optional()
+      .or(z.literal("")),
+  })
+  .refine(
+    (data) => {
+      // Validate that end date is not before start date
+      if (data.startDate && data.endDate) {
+        return new Date(data.endDate) >= new Date(data.startDate);
+      }
+      return true;
+    },
+    {
+      message: "Due date cannot be before start date",
+      path: ["endDate"],
+    }
+  );

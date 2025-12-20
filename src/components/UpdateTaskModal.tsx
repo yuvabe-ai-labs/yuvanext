@@ -1,10 +1,14 @@
 import { X, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   useUpdateStudentTask,
   useDeleteStudentTask,
 } from "@/hooks/useStudentTasks";
 import type { StudentTask } from "@/types/studentTasks.types";
+import { updateTaskSchema } from "@/lib/schemas";
 
 interface UpdateTaskModalProps {
   isOpen: boolean;
@@ -22,52 +26,62 @@ const COLORS = [
   "#F59E0B",
 ];
 
+type UpdateTaskFormData = z.infer<typeof updateTaskSchema>;
+
 export default function UpdateTaskModal({
   isOpen,
   onClose,
   task,
 }: UpdateTaskModalProps) {
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [selectedColor, setSelectedColor] = useState(task.color || COLORS[0]);
-  const [note, setNote] = useState("");
-  const [submissionLink, setSubmissionLink] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const updateTask = useUpdateStudentTask();
   const deleteTask = useDeleteStudentTask();
 
-  // Pre-fill existing task values when modal opens
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    watch,
+    setValue,
+  } = useForm<UpdateTaskFormData>({
+    resolver: zodResolver(updateTaskSchema),
+    defaultValues: {
+      startDate: task.start_date || "",
+      endDate: task.end_date || "",
+      color: task.color || COLORS[0],
+      note: task.description || "",
+      submissionLink: task.submission_link || "",
+    },
+  });
+
+  const selectedColor = watch("color");
+  const startDate = watch("startDate");
+
+  // Reset form when task changes
   useEffect(() => {
     if (task) {
-      setStartDate(task.start_date || "");
-      setEndDate(task.end_date || "");
-      setSelectedColor(task.color || COLORS[0]);
-      setNote(task.description || "");
-      setSubmissionLink(task.submission_link || "");
+      reset({
+        startDate: task.start_date || "",
+        endDate: task.end_date || "",
+        color: task.color || COLORS[0],
+        note: task.description || "",
+        submissionLink: task.submission_link || "",
+      });
     }
-  }, [task]);
+  }, [task, reset]);
 
-  const handleSave = async () => {
-    if (!startDate || !endDate) {
-      alert("Please select start and due dates");
-      return;
-    }
-
-    if (new Date(endDate) < new Date(startDate)) {
-      alert("Due date cannot be before start date");
-      return;
-    }
-
+  const onSubmit = async (data: UpdateTaskFormData) => {
     try {
       await updateTask.mutateAsync({
         taskId: task.id,
         updates: {
-          start_date: startDate,
-          end_date: endDate,
-          color: selectedColor,
-          description: note || undefined,
-          submission_link: submissionLink || undefined,
+          start_date: data.startDate,
+          end_date: data.endDate,
+          color: data.color,
+          description: data.note?.trim() || undefined,
+          submission_link: data.submissionLink?.trim() || undefined,
         },
       });
 
@@ -149,10 +163,16 @@ export default function UpdateTaskModal({
               </label>
               <input
                 type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500"
+                {...register("startDate")}
+                className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                  errors.startDate ? "border-red-500" : "border-gray-300"
+                }`}
               />
+              {errors.startDate && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.startDate.message}
+                </p>
+              )}
             </div>
 
             <div>
@@ -161,62 +181,40 @@ export default function UpdateTaskModal({
               </label>
               <input
                 type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                {...register("endDate")}
                 min={startDate}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500"
+                className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                  errors.endDate ? "border-red-500" : "border-gray-300"
+                }`}
               />
+              {errors.endDate && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.endDate.message}
+                </p>
+              )}
             </div>
           </div>
 
           {/* Color Picker */}
           <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Color <span className="text-red-500">*</span>
+            </label>
             <div className="flex items-center justify-between pb-2">
               {COLORS.map((color) => (
                 <button
                   key={color}
                   type="button"
-                  onClick={() => setSelectedColor(color)}
+                  onClick={() => setValue("color", color)}
                   className={`w-7 h-7 rounded-full transition-all ${
                     selectedColor === color
                       ? "scale-125 ring-2 ring-gray-400"
                       : ""
                   }`}
                   style={{ backgroundColor: color }}
+                  aria-label={`Select color ${color}`}
                 />
               ))}
-            </div>
-
-            {/* Gradient Color Slider */}
-            <div
-              className="relative w-full  rounded-full cursor-pointer"
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const percentage = (e.clientX - rect.left) / rect.width;
-                const gradient = [
-                  "#FF0000",
-                  "#FF7F00",
-                  "#FFFF00",
-                  "#00FF00",
-                  "#00FFFF",
-                  "#0000FF",
-                  "#8B00FF",
-                  "#FF0000",
-                ];
-                const index = Math.floor(percentage * (gradient.length - 1));
-                setSelectedColor(gradient[index]);
-              }}
-            >
-              <div
-                className="absolute top-1/2 -translate-y-1/2 w-[6px] h-7 bg-white rounded-full shadow"
-                style={{
-                  left: `calc(${(() => {
-                    const idx = COLORS.indexOf(selectedColor);
-                    const percent = idx / (COLORS.length - 1);
-                    return percent * 100;
-                  })()}% - 3px)`,
-                }}
-              ></div>
             </div>
           </div>
 
@@ -226,11 +224,10 @@ export default function UpdateTaskModal({
               Note
             </label>
             <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
+              {...register("note")}
               placeholder="Describe this task"
               rows={4}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 resize-none"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
             />
           </div>
 
@@ -241,19 +238,25 @@ export default function UpdateTaskModal({
             </label>
             <input
               type="url"
-              value={submissionLink}
-              onChange={(e) => setSubmissionLink(e.target.value)}
+              {...register("submissionLink")}
               placeholder="https://www.url.com/"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500"
+              className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                errors.submissionLink ? "border-red-500" : "border-gray-300"
+              }`}
             />
+            {errors.submissionLink && (
+              <p className="mt-1 text-sm text-red-600">
+                {errors.submissionLink.message}
+              </p>
+            )}
           </div>
 
           {/* Save Button */}
           <button
             type="button"
-            onClick={handleSave}
+            onClick={handleSubmit(onSubmit)}
             disabled={updateTask.isPending}
-            className="w-full py-3 bg-indigo-600 text-white font-medium rounded-full hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            className="w-full py-3 bg-indigo-600 text-white font-medium rounded-full hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {updateTask.isPending ? "Saving..." : "Save"}
           </button>

@@ -55,6 +55,27 @@ const InternshipApplicants = () => {
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    const statusConfig: Record<string, { label: string; className: string }> = {
+      shortlisted: {
+        label: "Shortlisted",
+        className: "bg-green-100 text-green-700",
+      },
+      applied: { label: "Applied", className: "bg-orange-100 text-orange-700" },
+      rejected: { label: "Rejected", className: "bg-red-100 text-red-700" },
+      interviewed: {
+        label: "Interviewed",
+        className: "bg-blue-100 text-blue-700",
+      },
+      hired: { label: "Hired", className: "bg-purple-100 text-purple-700" },
+    };
+
+    const config = statusConfig[status] || statusConfig.applied;
+    return (
+      <Badge className={`text-xs ${config.className}`}>{config.label}</Badge>
+    );
+  };
+
   useEffect(() => {
     const fetchApplications = async () => {
       try {
@@ -288,7 +309,7 @@ const InternshipApplicants = () => {
           </h1>
 
           {/* Right: Filter Dropdown */}
-          <div className="relative">
+          {/* <div className="relative">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -379,7 +400,7 @@ const InternshipApplicants = () => {
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
+          </div> */}
         </div>
 
         <div className="container mx-auto px-10 py-2">
@@ -428,12 +449,12 @@ const InternshipApplicants = () => {
                     return (
                       <Card
                         key={application.id}
-                        className="border border-border/50 hover:shadow-lg transition-shadow w-full max-w-s min-h-[460px] rounded-3xl"
+                        className="border border-border/50 hover:shadow-lg transition-shadow w-full max-w-s min-h-[300px] rounded-3xl"
                       >
                         <CardContent className="p-8 space-y-5">
                           {/* Header Section */}
                           <div className="flex items-center gap-5">
-                            {/* Avatar with green ring */}
+                            {/* Avatar with colored ring based on match score */}
                             <div className="relative flex-shrink-0">
                               <Avatar
                                 className={`w-20 h-20 ring-4 ${getMatchColor(
@@ -454,16 +475,19 @@ const InternshipApplicants = () => {
                                     .join("")}
                                 </AvatarFallback>
                               </Avatar>
+                              {/* Status Badge */}
+                              <div className="absolute -top-2 -right-2">
+                                {getStatusBadge(application.status)}
+                              </div>
                             </div>
 
-                            {/* Name, Role, and Status */}
+                            {/* Name, Role, and Days Ago */}
                             <div className="flex-1 min-w-0">
                               <h3 className="font-semibold text-lg mb-1 text-gray-900">
                                 {application.profile.full_name}
                               </h3>
                               <p className="text-sm text-muted-foreground mb-2">
-                                {application.profile.role ||
-                                  application.internship.title}
+                                {application.internship.title}
                               </p>
                               <Badge className="bg-yellow-500 text-white hover:bg-yellow-500">
                                 Applied {daysAgo}{" "}
@@ -481,33 +505,45 @@ const InternshipApplicants = () => {
                               : "Passionate UI/UX designer with 3+ years of experience creating user-centered digital experiences."}
                           </p>
 
-                          {/* Skills */}
-                          <div className="flex flex-wrap gap-3">
-                            {displaySkills.map(
-                              (skill: string, index: number) => (
-                                <Badge
-                                  key={index}
-                                  variant="outline"
-                                  className="text-[11px] text-gray-600 bg-muted/40 rounded-full px-3 py-1.5"
-                                >
-                                  {skill}
-                                </Badge>
-                              )
-                            )}
-                            {skills.length > 3 && (
-                              <Badge
-                                variant="outline"
-                                className="text-[11px] text-gray-600 bg-muted/40 rounded-full px-3 py-1.5"
-                              >
-                                +{skills.length - 3}
-                              </Badge>
+                          {/* Skills (Single Line) */}
+                          <div className="min-h-7">
+                            {skills.length > 0 && (
+                              <div className="flex gap-2 overflow-hidden">
+                                {skills.length > 2 ? (
+                                  <>
+                                    {skills.slice(0, 2).map((skill, i) => (
+                                      <Badge
+                                        key={i}
+                                        variant="outline"
+                                        className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                      >
+                                        {skill}
+                                      </Badge>
+                                    ))}
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                    >
+                                      +{skills.length - 2}
+                                    </Badge>
+                                  </>
+                                ) : (
+                                  skills.map((skill, i) => (
+                                    <Badge
+                                      key={i}
+                                      variant="outline"
+                                      className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                    >
+                                      {skill}
+                                    </Badge>
+                                  ))
+                                )}
+                              </div>
                             )}
                           </div>
 
                           {/* Divider */}
                           <div className="border-t border-border/40"></div>
-
-                          {/* AI Analysis Section */}
 
                           {/* View Profile Button */}
                           <Button

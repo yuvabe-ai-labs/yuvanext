@@ -1,6 +1,9 @@
 import { X } from "lucide-react";
-import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useCreateStudentTask } from "@/hooks/useStudentTasks";
+import { taskSchema } from "@/lib/schemas";
 
 interface AddTaskModalProps {
   isOpen: boolean;
@@ -19,65 +22,58 @@ const COLORS = [
   "#F59E0B", // Amber/Yellow
 ];
 
+type TaskFormData = z.infer<typeof taskSchema>;
+
 export default function AddTaskModal({
   isOpen,
   onClose,
   applicationId,
   studentId,
 }: AddTaskModalProps) {
-  const [title, setTitle] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [selectedColor, setSelectedColor] = useState(COLORS[0]);
-  const [note, setNote] = useState("");
-  const [submissionLink, setSubmissionLink] = useState("");
-
   const createTask = useCreateStudentTask();
 
-  const handleSave = async () => {
-    if (!title.trim()) {
-      alert("Please enter a task name");
-      return;
-    }
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    watch,
+    setValue,
+  } = useForm<TaskFormData>({
+    resolver: zodResolver(taskSchema),
+    defaultValues: {
+      title: "",
+      startDate: "",
+      startTime: "",
+      endDate: "",
+      endTime: "",
+      color: COLORS[0],
+      note: "",
+      submissionLink: "",
+    },
+  });
 
-    if (!startDate || !endDate) {
-      alert("Please select start and due dates");
-      return;
-    }
+  const selectedColor = watch("color");
+  const startDate = watch("startDate");
 
-    // Validate that end date is not before start date
-    if (new Date(endDate) < new Date(startDate)) {
-      alert("Due date cannot be before start date");
-      return;
-    }
-
+  const onSubmit = async (data: TaskFormData) => {
     try {
       await createTask.mutateAsync({
         studentId,
         taskData: {
           application_id: applicationId,
-          title: title.trim(),
-          description: note.trim() || undefined,
-          start_date: startDate,
-          start_time: startTime || undefined,
-          end_date: endDate,
-          end_time: endTime || undefined,
-          color: selectedColor,
-          submission_link: submissionLink.trim() || undefined,
+          title: data.title,
+          description: data.note?.trim() || undefined,
+          start_date: data.startDate,
+          start_time: data.startTime || undefined,
+          end_date: data.endDate,
+          end_time: data.endTime || undefined,
+          color: data.color,
+          submission_link: data.submissionLink?.trim() || undefined,
         },
       });
 
-      // Reset form
-      setTitle("");
-      setStartDate("");
-      setStartTime("");
-      setEndDate("");
-      setEndTime("");
-      setSelectedColor(COLORS[0]);
-      setNote("");
-      setSubmissionLink("");
+      reset();
       onClose();
     } catch (error) {
       console.error("Error creating task:", error);
@@ -86,15 +82,7 @@ export default function AddTaskModal({
   };
 
   const handleClose = () => {
-    // Reset form on close
-    setTitle("");
-    setStartDate("");
-    setStartTime("");
-    setEndDate("");
-    setEndTime("");
-    setSelectedColor(COLORS[0]);
-    setNote("");
-    setSubmissionLink("");
+    reset();
     onClose();
   };
 
@@ -123,11 +111,17 @@ export default function AddTaskModal({
             </label>
             <input
               type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              {...register("title")}
               placeholder="Enter task name"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
+                errors.title ? "border-red-500" : "border-gray-300"
+              }`}
             />
+            {errors.title && (
+              <p className="mt-1 text-sm text-red-600">
+                {errors.title.message}
+              </p>
+            )}
           </div>
 
           {/* Start Date and Time */}
@@ -138,10 +132,16 @@ export default function AddTaskModal({
               </label>
               <input
                 type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                {...register("startDate")}
+                className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
+                  errors.startDate ? "border-red-500" : "border-gray-300"
+                }`}
               />
+              {errors.startDate && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.startDate.message}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -149,8 +149,7 @@ export default function AddTaskModal({
               </label>
               <input
                 type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                {...register("startTime")}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
@@ -164,11 +163,17 @@ export default function AddTaskModal({
               </label>
               <input
                 type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                {...register("endDate")}
                 min={startDate}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
+                  errors.endDate ? "border-red-500" : "border-gray-300"
+                }`}
               />
+              {errors.endDate && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.endDate.message}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -176,8 +181,7 @@ export default function AddTaskModal({
               </label>
               <input
                 type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
+                {...register("endTime")}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
@@ -193,7 +197,7 @@ export default function AddTaskModal({
                 <button
                   key={color}
                   type="button"
-                  onClick={() => setSelectedColor(color)}
+                  onClick={() => setValue("color", color)}
                   className={`w-10 h-10 rounded-full transition-all ${
                     selectedColor === color
                       ? "ring-2 ring-offset-2 ring-gray-400 scale-110"
@@ -212,8 +216,7 @@ export default function AddTaskModal({
               Note
             </label>
             <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
+              {...register("note")}
               placeholder="Please describe the task"
               rows={4}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
@@ -227,11 +230,17 @@ export default function AddTaskModal({
             </label>
             <input
               type="url"
-              value={submissionLink}
-              onChange={(e) => setSubmissionLink(e.target.value)}
+              {...register("submissionLink")}
               placeholder="https://www.url.com/"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
+                errors.submissionLink ? "border-red-500" : "border-gray-300"
+              }`}
             />
+            {errors.submissionLink && (
+              <p className="mt-1 text-sm text-red-600">
+                {errors.submissionLink.message}
+              </p>
+            )}
           </div> */}
 
           {/* Action Buttons */}
@@ -245,7 +254,7 @@ export default function AddTaskModal({
             </button>
             <button
               type="button"
-              onClick={handleSave}
+              onClick={handleSubmit(onSubmit)}
               disabled={createTask.isPending}
               className="flex-1 py-3 bg-teal-600 text-white font-medium rounded-full hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >

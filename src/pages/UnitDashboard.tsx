@@ -706,37 +706,39 @@ const UnitDashboard = () => {
                               : "Passionate about creating user-centered digital experiences."}
                           </p>
 
-                          <div className="flex gap-2 sm:gap-3 overflow-hidden">
-                            {skills.length > 3 ? (
-                              <>
-                                {skills
-                                  .slice(0, 3)
-                                  .map((skill: string, index: number) => (
+                          <div className="min-h-7">
+                            {skills.length > 0 && (
+                              <div className="flex gap-2 overflow-hidden">
+                                {skills.length > 2 ? (
+                                  <>
+                                    {skills.slice(0, 2).map((skill, i) => (
+                                      <Badge
+                                        key={i}
+                                        variant="outline"
+                                        className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                      >
+                                        {skill}
+                                      </Badge>
+                                    ))}
                                     <Badge
-                                      key={index}
                                       variant="outline"
-                                      className="text-[10px] sm:text-[11px] text-gray-600 bg-muted/40 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 whitespace-nowrap flex-shrink-0"
+                                      className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                    >
+                                      +{skills.length - 2}
+                                    </Badge>
+                                  </>
+                                ) : (
+                                  skills.map((skill, i) => (
+                                    <Badge
+                                      key={i}
+                                      variant="outline"
+                                      className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
                                     >
                                       {skill}
                                     </Badge>
-                                  ))}
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] sm:text-[11px] text-gray-600 bg-muted/40 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 whitespace-nowrap flex-shrink-0"
-                                >
-                                  +{skills.length - 3}
-                                </Badge>
-                              </>
-                            ) : (
-                              skills.map((skill: string, index: number) => (
-                                <Badge
-                                  key={index}
-                                  variant="outline"
-                                  className="text-[10px] sm:text-[11px] text-gray-600 bg-muted/40 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 whitespace-nowrap flex-shrink-0"
-                                >
-                                  {skill}
-                                </Badge>
-                              ))
+                                  ))
+                                )}
+                              </div>
                             )}
                           </div>
                           <div className="border-t border-border/40"></div>

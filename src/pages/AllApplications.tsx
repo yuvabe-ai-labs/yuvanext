@@ -390,8 +390,7 @@ const AllApplications = () => {
                                 {application.profile.full_name}
                               </h3>
                               <p className="text-sm text-muted-foreground mb-2">
-                                {application.profile.role ||
-                                  application.internship.title}
+                                {application.internship.title}
                               </p>
                               <Badge className="bg-yellow-500 text-white hover:bg-yellow-500">
                                 Applied {daysAgo}{" "}
@@ -410,25 +409,39 @@ const AllApplications = () => {
                           </p>
 
                           {/* Skills (Single Line) */}
-                          <div className="flex items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap">
-                            {displaySkills
-                              .slice(0, 3)
-                              .map((skill: string, index: number) => (
-                                <Badge
-                                  key={index}
-                                  variant="outline"
-                                  className="text-[11px] text-gray-600 bg-muted/40 rounded-full px-3 py-1.5 flex-shrink-0"
-                                >
-                                  {skill}
-                                </Badge>
-                              ))}
-                            {skills.length > 3 && (
-                              <Badge
-                                variant="outline"
-                                className="text-[11px] text-gray-600 bg-muted/40 rounded-full px-3 py-1.5 flex-shrink-0"
-                              >
-                                +{skills.length - 3}
-                              </Badge>
+                          <div className="min-h-7">
+                            {skills.length > 0 && (
+                              <div className="flex gap-2 overflow-hidden">
+                                {skills.length > 2 ? (
+                                  <>
+                                    {skills.slice(0, 2).map((skill, i) => (
+                                      <Badge
+                                        key={i}
+                                        variant="outline"
+                                        className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                      >
+                                        {skill}
+                                      </Badge>
+                                    ))}
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                    >
+                                      +{skills.length - 2}
+                                    </Badge>
+                                  </>
+                                ) : (
+                                  skills.map((skill, i) => (
+                                    <Badge
+                                      key={i}
+                                      variant="outline"
+                                      className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                    >
+                                      {skill}
+                                    </Badge>
+                                  ))
+                                )}
+                              </div>
                             )}
                           </div>
 

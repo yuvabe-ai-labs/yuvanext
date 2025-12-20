@@ -78,7 +78,8 @@ export const useHiredApplicants = () => {
           `
           )
           .in("internship_id", internshipIds)
-          .eq("status", "hired");
+          .eq("status", "hired")
+          .eq("offer_decision", "accepted");
 
         if (appError) throw appError;
 

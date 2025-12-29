@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+// 1. IMPORT BETTER AUTH CLIENT
+import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/hooks/use-toast";
-import signupIllustration from "@/assets/signup-illustration.png";
 import signupIllustrate from "@/assets/signinillustion.png";
 import signinLogo from "@/assets/signinLogo.svg";
 import { ArrowLeft } from "lucide-react";
@@ -20,35 +20,33 @@ const ForgotPassword = () => {
     setError("");
 
     try {
-      // Send password reset email - Supabase will only send if user exists
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        email,
-        {
-          redirectTo: `${window.location.origin}/reset-password`,
-        }
-      );
+      // ✅ CORRECTED: Use requestPasswordReset
+      const { data, error: authError } = await authClient.requestPasswordReset({
+        email: email,
+        redirectTo: "/reset-password",
+      });
 
-      if (resetError) {
-        // Check if it's a user not found error
+      if (authError) {
         if (
-          resetError.message.toLowerCase().includes("user") ||
-          resetError.message.toLowerCase().includes("not found") ||
-          resetError.message.toLowerCase().includes("invalid")
+          authError.message?.toLowerCase().includes("not found") ||
+          authError.message?.toLowerCase().includes("invalid")
         ) {
-          setError("User not found. Please enter the correct email address.");
+          setError("User not found or invalid email.");
         } else {
           toast({
             title: "Error",
-            description: resetError.message,
+            description: authError.message || "Failed to send reset link",
             variant: "destructive",
           });
         }
         setLoading(false);
         return;
+      } else {
+        // Success
+        // Note: Unlike Supabase, Better Auth doesn't throw an error if user doesn't exist
+        // (for security), so we just assume success.
+        navigate("/check-email", { state: { email } });
       }
-
-      // Navigate to check email page
-      navigate("/check-email", { state: { email } });
     } catch (err) {
       console.error("Error:", err);
       toast({
@@ -57,7 +55,6 @@ const ForgotPassword = () => {
         variant: "destructive",
       });
     }
-
     setLoading(false);
   };
 
@@ -71,8 +68,6 @@ const ForgotPassword = () => {
             alt="Signin Illustration"
             className="w-full h-full object-cover"
           />
-
-          {/* Center content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-8">
             <img src={signinLogo} alt="Sign in Logo" className="w-28 h-auto" />
             <p className="text-white text-base font-medium max-w-xl leading-relaxed">
@@ -80,8 +75,6 @@ const ForgotPassword = () => {
               through internships, courses, and real-world opportunities.
             </p>
           </div>
-
-          {/* Footer text */}
           <div className="absolute bottom-4 left-0 right-0 flex justify-between px-6 text-white/80 text-xs">
             <a
               href="https://www.yuvanext.com/privacy-policy"
@@ -99,14 +92,12 @@ const ForgotPassword = () => {
       <div className="flex-1 flex items-center justify-center bg-white px-4 sm:px-6">
         <div className="w-full max-w-[474px]">
           <div className="bg-white rounded-[15px] px-6 sm:px-12 md:px-[40px] py-8 sm:py-12 w-full">
-            {/* Header */}
             <div className="text-center mb-8">
               <h1
                 className="text-[24px] font-bold leading-[35px] mb-2"
                 style={{
                   color: "#1F2A37",
-                  fontFamily:
-                    "'Neue Haas Grotesk Text Pro', system-ui, sans-serif",
+                  fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                 }}
               >
                 Forgot Password?
@@ -115,17 +106,14 @@ const ForgotPassword = () => {
                 className="text-[14px] leading-[15px]"
                 style={{
                   color: "#9CA3AF",
-                  fontFamily:
-                    "'Neue Haas Grotesk Text Pro', system-ui, sans-serif",
+                  fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                 }}
               >
                 Don’t worry, we’ll send you reset instructions
               </p>
             </div>
 
-            {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Email */}
               <div>
                 <label
                   htmlFor="email"
@@ -153,19 +141,10 @@ const ForgotPassword = () => {
                   />
                 </div>
                 {error && (
-                  <p
-                    className="text-[12px] text-red-500 mt-1"
-                    style={{
-                      fontFamily:
-                        "'Neue Haas Grotesk Text Pro', system-ui, sans-serif",
-                    }}
-                  >
-                    {error}
-                  </p>
+                  <p className="text-[12px] text-red-500 mt-1">{error}</p>
                 )}
               </div>
 
-              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={loading}
@@ -175,7 +154,6 @@ const ForgotPassword = () => {
                 {loading ? "Sending..." : "Send Password Reset Link"}
               </button>
 
-              {/* Back to Sign In */}
               <Link
                 to="/auth/student/signin"
                 className="w-full h-[40px] rounded-lg flex items-center justify-center text-[14px] font-medium border border-[#D1D5DB] hover:bg-gray-50 transition-colors gap-2"

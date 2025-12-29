@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+// 1. IMPORT BETTER AUTH CLIENT
+import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/hooks/use-toast";
-import signupIllustration from "@/assets/signup-illustration.png";
 import signupIllustrate from "@/assets/signinillustion.png";
 import signinLogo from "@/assets/signinLogo.svg";
 import { Eye, EyeOff, Check, X } from "lucide-react";
@@ -26,7 +26,7 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [hasToken, setHasToken] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
 
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -37,16 +37,20 @@ const ResetPassword = () => {
     newPassword === confirmPassword && confirmPassword !== "";
 
   useEffect(() => {
-    // Check if there's a recovery token in the URL hash
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get("access_token");
-    const type = hashParams.get("type");
+    // 2. GET TOKEN FROM QUERY PARAMS (Better Auth style)
+    // The link in email will look like: /reset-password?token=xyz...
+    const searchParams = new URLSearchParams(window.location.search);
+    const urlToken = searchParams.get("token");
 
-    if (accessToken && type === "recovery") {
-      setHasToken(true);
+    // Fallback: Check hash just in case of weird redirects, but usually query
+    // const hashParams = new URLSearchParams(window.location.hash.substring(1));
+
+    if (urlToken) {
+      setToken(urlToken);
     } else {
       setError("Invalid or expired reset link. Please request a new one.");
-      setTimeout(() => navigate("/forgot-password"), 3000);
+      // Optional: don't redirect immediately so they can read the error
+      // setTimeout(() => navigate("/forgot-password"), 3000);
     }
   }, [navigate]);
 
@@ -67,16 +71,24 @@ const ResetPassword = () => {
       return;
     }
 
+    if (!token) {
+      setError("Missing reset token");
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
+      // 3. USE BETTER AUTH RESET PASSWORD
+      const { data, error: resetError } = await authClient.resetPassword({
+        newPassword: newPassword,
+        token: token, // Pass the token grabbed from URL
       });
 
-      if (updateError) {
-        if (updateError.message.includes("same")) {
+      if (resetError) {
+        if (resetError.message?.includes("same")) {
           setError("New password must be different from your current password");
         } else {
-          setError(updateError.message);
+          setError(resetError.message || "Failed to reset password");
         }
         setLoading(false);
         return;
@@ -88,6 +100,7 @@ const ResetPassword = () => {
         description: "Your password has been successfully updated.",
       });
 
+      // Redirect to login
       setTimeout(() => navigate("/auth/student/signin"), 2000);
     } catch (err) {
       console.error("Error:", err);
@@ -101,7 +114,7 @@ const ResetPassword = () => {
     setLoading(false);
   };
 
-  if (!hasToken && !error) return null;
+  if (!token && !error) return null;
 
   if (success) {
     return (
@@ -131,8 +144,6 @@ const ResetPassword = () => {
             alt="Signin Illustration"
             className="w-full h-full object-cover"
           />
-
-          {/* Center content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-8">
             <img src={signinLogo} alt="Sign in Logo" className="w-28 h-auto" />
             <p className="text-white text-base font-medium max-w-xl leading-relaxed">
@@ -140,8 +151,6 @@ const ResetPassword = () => {
               through internships, courses, and real-world opportunities.
             </p>
           </div>
-
-          {/* Footer text */}
           <div className="absolute bottom-4 left-0 right-0 flex justify-between px-6 text-white/80 text-xs">
             <a
               href="https://www.yuvanext.com/privacy-policy"
@@ -158,11 +167,7 @@ const ResetPassword = () => {
       {/* Right Side Form */}
       <div className="flex-1 flex items-center justify-center bg-white px-6">
         <div className="w-full max-w-[474px]">
-          <div
-            className="bg-white rounded-[15px] px-12 py-10 w-full"
-            // style={{ boxShadow: "0px 2px 25px rgba(0, 0, 0, 0.15)" }}
-          >
-            {/* Header */}
+          <div className="bg-white rounded-[15px] px-12 py-10 w-full">
             <div className="text-center mb-8">
               <h1
                 className="text-[22px] font-semibold leading-[35px] mb-2"
@@ -184,8 +189,7 @@ const ResetPassword = () => {
                 <p
                   className="text-[11px] text-red-600"
                   style={{
-                    fontFamily:
-                      "'Neue Haas Grotesk Text Pro', system-ui, sans-serif",
+                    fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                   }}
                 >
                   {error}
@@ -193,7 +197,6 @@ const ResetPassword = () => {
               </div>
             )}
 
-            {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* New Password */}
               <div>
@@ -263,7 +266,7 @@ const ResetPassword = () => {
                 </div>
               </div>
 
-              {/* Password Requirements (2-column grid) */}
+              {/* Password Rules UI (unchanged logic, just layout) */}
               <div className="grid grid-cols-2 gap-x-6 gap-y-2 mt-2">
                 {passwordRules.map((rule, idx) => {
                   const passed = rule.test(newPassword);
@@ -285,8 +288,6 @@ const ResetPassword = () => {
                     </div>
                   );
                 })}
-
-                {/* Password Match */}
                 <div className="flex items-center gap-2">
                   <div
                     className={`w-3 h-3 rounded-full flex items-center justify-center ${
@@ -306,7 +307,6 @@ const ResetPassword = () => {
                 </div>
               </div>
 
-              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={
@@ -318,7 +318,6 @@ const ResetPassword = () => {
                 {loading ? "Updating..." : "Reset Password"}
               </button>
 
-              {/* Back to Sign In */}
               <button
                 type="button"
                 onClick={() => navigate("/auth/student/signin")}

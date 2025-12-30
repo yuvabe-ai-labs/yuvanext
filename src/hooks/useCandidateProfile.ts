@@ -6,16 +6,12 @@ type Application = Tables<"applications">;
 type Internship = Tables<"internships">;
 type Profile = Tables<"profiles">;
 type StudentProfile = Tables<"student_profiles">;
-type StudentEducation = Tables<"student_education">;
-type StudentInternship = Tables<"student_internships">;
 
 export interface CandidateData {
   application: Application;
   internship: Internship;
   profile: Profile;
   studentProfile: StudentProfile;
-  education: StudentEducation[];
-  internships: StudentInternship[];
 }
 
 export const useCandidateProfile = (applicationId: string) => {
@@ -60,39 +56,20 @@ export const useCandidateProfile = (applicationId: string) => {
       if (profileError) throw profileError;
 
       // Fetch student details
-      const { data: studentProfile, error: studentProfileError } = await supabase
-        .from("student_profiles")
-        .select("*")
-        .eq("profile_id", application.student_id)
-        .single();
+      const { data: studentProfile, error: studentProfileError } =
+        await supabase
+          .from("student_profiles")
+          .select("*")
+          .eq("profile_id", application.student_id)
+          .single();
 
       if (studentProfileError) throw studentProfileError;
-
-      // Fetch education records
-      const { data: education, error: educationError } = await supabase
-        .from("student_education")
-        .select("*")
-        .eq("profile_id", application.student_id)
-        .order("end_year", { ascending: false });
-
-      if (educationError) throw educationError;
-
-      // Fetch internship history
-      const { data: internships, error: internshipsError } = await supabase
-        .from("student_internships")
-        .select("*")
-        .eq("profile_id", application.student_id)
-        .order("end_date", { ascending: false });
-
-      if (internshipsError) throw internshipsError;
 
       setData({
         application,
         internship,
         profile,
         studentProfile,
-        education: education || [],
-        internships: internships || [],
       });
     } catch (error) {
       console.error("Error fetching candidate data:", error);

@@ -52,6 +52,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useInternships } from "@/hooks/useInternships";
 import { useUnitApplications } from "@/hooks/useUnitApplications";
 import { useUnitReports } from "@/hooks/useUnitReports";
+import { useHiredApplicants } from "@/hooks/useHiredApplicants";
+import { useStudentTasks } from "@/hooks/useStudentTasks";
+import { calculateOverallTaskProgress } from "@/utils/taskProgress";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowRight,
@@ -70,6 +73,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 
 const safeParse = (data: any, fallback: any) => {
   if (!data) return fallback;
@@ -80,11 +84,76 @@ const safeParse = (data: any, fallback: any) => {
   }
 };
 
+// Component to display task progress for each candidate
+const CandidateTaskProgress = ({
+  applicationId,
+}: {
+  applicationId: string;
+}) => {
+  const { data: tasksData } = useStudentTasks(applicationId);
+  const tasks = tasksData?.data || [];
+  const taskProgress = calculateOverallTaskProgress(tasks);
+
+  // Get internship start and end dates
+  const getInternshipDates = () => {
+    if (tasks.length === 0) return { startDate: null, endDate: null };
+
+    const dates = tasks
+      .filter((task) => task.start_date && task.end_date)
+      .flatMap((task) => [new Date(task.start_date), new Date(task.end_date)]);
+
+    if (dates.length === 0) return { startDate: null, endDate: null };
+
+    const startDate = new Date(Math.min(...dates.map((d) => d.getTime())));
+    const endDate = new Date(Math.max(...dates.map((d) => d.getTime())));
+
+    return { startDate, endDate };
+  };
+
+  const { startDate, endDate } = getInternshipDates();
+
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between items-center">
+        <span className="text-sm font-medium text-gray-700">
+          Project Progress
+        </span>
+        <span className="text-sm font-semibold text-gray-800">
+          {taskProgress}%
+        </span>
+      </div>
+
+      {/* Progress Bar (thicker h-4) */}
+      <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all duration-500 ease-out"
+          style={{ width: `${taskProgress}%` }}
+        />
+      </div>
+
+      {/* Dates */}
+      <div className="flex justify-between items-center text-xs text-gray-500">
+        <span>
+          Started: {startDate ? format(startDate, "dd/MM/yyyy") : "Not started"}
+        </span>
+        <span>
+          Ends: {endDate ? format(endDate, "dd/MM/yyyy") : "No end date"}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 const UnitDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("applications");
   const { applications, stats, loading } = useUnitApplications();
   const { internships, loading: internshipsLoading } = useInternships();
+  const {
+    data: hiredCandidates,
+    unitInfo,
+    loading: hiredLoading,
+  } = useHiredApplicants();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [jobFilter, setJobFilter] = useState("all");
   const [updating, setUpdating] = useState<string | null>(null);
@@ -94,6 +163,7 @@ const UnitDashboard = () => {
   const [deletingInternship, setDeletingInternship] = useState<any>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [activatingInternship, setActivatingInternship] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const {
     weeklyData,
     monthlyData,
@@ -115,7 +185,6 @@ const UnitDashboard = () => {
 
       if (expiredInternships.length > 0) {
         try {
-          // Update all expired internships to closed status
           const updatePromises = expiredInternships.map((internship) =>
             supabase
               .from("internships")
@@ -124,8 +193,6 @@ const UnitDashboard = () => {
           );
 
           await Promise.all(updatePromises);
-
-          // Reload to reflect changes
           window.location.reload();
         } catch (err) {
           console.error("Error auto-closing expired internships:", err);
@@ -148,6 +215,17 @@ const UnitDashboard = () => {
   const filteredApplications = applications.filter((application) => {
     if (filterStatuses.length === 0) return true;
     return filterStatuses.includes(application.status);
+  });
+
+  // Filter hired candidates by search query
+  const filteredHiredCandidates = hiredCandidates.filter((candidate) => {
+    if (!searchQuery) return true;
+    const name = candidate.student?.full_name?.toLowerCase() || "";
+    const internshipTitle = candidate.internship?.title?.toLowerCase() || "";
+    return (
+      name.includes(searchQuery.toLowerCase()) ||
+      internshipTitle.includes(searchQuery.toLowerCase())
+    );
   });
 
   const handleInternshipCreated = () => {
@@ -198,12 +276,10 @@ const UnitDashboard = () => {
   };
 
   const handleToggleStatus = async (internship: any) => {
-    // If status is closed, open edit dialog to update deadline before activating
     if (internship.status !== "active") {
       setActivatingInternship(internship);
       setEditingInternship(internship);
     } else {
-      // If status is active, close it directly
       try {
         setUpdating(internship.id);
 
@@ -225,7 +301,6 @@ const UnitDashboard = () => {
   };
 
   const handleEditSuccess = async () => {
-    // If we're activating an internship, update its status after edit
     if (activatingInternship) {
       try {
         const { error: updateError } = await supabase
@@ -279,7 +354,7 @@ const UnitDashboard = () => {
       case "interviewed":
         return "Interviewed";
       case "hired":
-        return "Shortlisted";
+        return "hired";
       default:
         return "Applied";
     }
@@ -313,14 +388,22 @@ const UnitDashboard = () => {
     return `${filterStatuses.length} selected`;
   };
 
-  const hiredCandidates = applications.filter((app) => app.status === "hired");
+  const formatJobType = (jobType: string) => {
+    if (!jobType) return "Not specified";
+    return jobType
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
+  const handleViewCandidate = (applicationId: string) => {
+    navigate(`/unit/candidate-tasks/${applicationId}`);
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      {/* Main Content */}
-      {/* <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8"> */}
       <div className="container px-4 sm:px-6 lg:px-[7.5rem] py-4 lg:py-10">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
@@ -439,7 +522,6 @@ const UnitDashboard = () => {
           onValueChange={setActiveTab}
           className="space-y-4 sm:space-y-6"
         >
-          {/* Mobile: Scrollable tabs */}
           <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
             <TabsList className="grid w-full min-w-max sm:min-w-0 grid-cols-4 bg-gray-100/70 backdrop-blur-sm rounded-3xl shadow-inner border border-gray-200 h-12 sm:h-16 shadow-[inset_0_4px_10px_rgba(0,0,0,0.2)]">
               <TabsTrigger
@@ -624,37 +706,39 @@ const UnitDashboard = () => {
                               : "Passionate about creating user-centered digital experiences."}
                           </p>
 
-                          <div className="flex gap-2 sm:gap-3 overflow-hidden">
-                            {skills.length > 3 ? (
-                              <>
-                                {skills
-                                  .slice(0, 3)
-                                  .map((skill: string, index: number) => (
+                          <div className="min-h-7">
+                            {skills.length > 0 && (
+                              <div className="flex gap-2 overflow-hidden">
+                                {skills.length > 2 ? (
+                                  <>
+                                    {skills.slice(0, 2).map((skill, i) => (
+                                      <Badge
+                                        key={i}
+                                        variant="outline"
+                                        className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                      >
+                                        {skill}
+                                      </Badge>
+                                    ))}
                                     <Badge
-                                      key={index}
                                       variant="outline"
-                                      className="text-[10px] sm:text-[11px] text-gray-600 bg-muted/40 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 whitespace-nowrap flex-shrink-0"
+                                      className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                    >
+                                      +{skills.length - 2}
+                                    </Badge>
+                                  </>
+                                ) : (
+                                  skills.map((skill, i) => (
+                                    <Badge
+                                      key={i}
+                                      variant="outline"
+                                      className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
                                     >
                                       {skill}
                                     </Badge>
-                                  ))}
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] sm:text-[11px] text-gray-600 bg-muted/40 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 whitespace-nowrap flex-shrink-0"
-                                >
-                                  +{skills.length - 3}
-                                </Badge>
-                              </>
-                            ) : (
-                              skills.map((skill: string, index: number) => (
-                                <Badge
-                                  key={index}
-                                  variant="outline"
-                                  className="text-[10px] sm:text-[11px] text-gray-600 bg-muted/40 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 whitespace-nowrap flex-shrink-0"
-                                >
-                                  {skill}
-                                </Badge>
-                              ))
+                                  ))
+                                )}
+                              </div>
                             )}
                           </div>
                           <div className="border-t border-border/40"></div>
@@ -940,41 +1024,137 @@ const UnitDashboard = () => {
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <h2 className="text-xl sm:text-2xl font-semibold">
-                Candidate Management
+                Hired Candidates
+                {/* ({filteredHiredCandidates.length}) */}
               </h2>
               <div className="relative w-full sm:w-auto">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   type="text"
-                  placeholder="Select by names"
-                  className="pl-10 w-full sm:w-[250px]"
-                  disabled
+                  placeholder="Search by name or position"
+                  className="pl-10 w-full sm:w-[300px]"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
             </div>
 
-            <div className="flex justify-center items-center py-12">
-              <Card className="max-w-md w-full mx-4">
-                <CardContent className="p-6 sm:p-8 text-center">
-                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Users className="w-8 h-8 text-primary" />
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-semibold mb-2">
-                    Coming Soon
-                  </h3>
-                  <p className="text-sm sm:text-base text-muted-foreground mb-6">
-                    Candidate management feature will be available soon.
-                  </p>
-                  <Button
-                    disabled
-                    variant="outline"
-                    className="w-full sm:w-auto"
+            {hiredLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <Card key={i} className="border border-gray-200 rounded-3xl">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-4">
+                        <Skeleton className="w-20 h-20 rounded-full" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-6 w-48" />
+                          <Skeleton className="h-4 w-32" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : filteredHiredCandidates.length === 0 ? (
+              <div className="flex justify-center items-center py-12">
+                <Card className="max-w-md w-full mx-4">
+                  <CardContent className="p-6 sm:p-8 text-center">
+                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Users className="w-8 h-8 text-primary" />
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-semibold mb-2">
+                      {searchQuery
+                        ? "No Results Found"
+                        : "No Hired Candidates Yet"}
+                    </h3>
+                    <p className="text-sm sm:text-base text-muted-foreground">
+                      {searchQuery
+                        ? "Try adjusting your search query"
+                        : "Hired candidates will appear here once you hire applicants"}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {filteredHiredCandidates.map((candidate) => (
+                  <Card
+                    key={candidate.application_id}
+                    className="border border-gray-200 rounded-3xl hover:shadow-lg transition-shadow"
                   >
-                    Feature Coming Soon
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+                    <CardContent className="p-6 space-y-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-600 mb-3">
+                            {candidate.internship?.title ||
+                              "Position not specified"}
+                          </p>
+
+                          <div className="flex items-center gap-4">
+                            {/* Avatar */}
+                            <Avatar className="w-20 h-20">
+                              <AvatarImage
+                                src={candidate.student?.avatar_url || undefined}
+                                alt={
+                                  candidate.student?.full_name || "Candidate"
+                                }
+                                className="object-cover"
+                              />
+                              <AvatarFallback className="text-lg font-semibold bg-gray-200">
+                                {(candidate.student?.full_name || "NA")
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")
+                                  .toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+
+                            {/* Name */}
+                            <div>
+                              <h3 className="text-xl font-bold text-gray-900 mb-1">
+                                {candidate.student?.full_name ||
+                                  "Name not available"}
+                              </h3>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Duration Info */}
+                        <div className="text-right text-sm text-gray-600">
+                          <span>
+                            {candidate.internship?.duration ||
+                              "Duration not specified"}{" "}
+                            |{" "}
+                            {formatJobType(
+                              candidate.internship?.job_type || ""
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Task Progress */}
+                      <CandidateTaskProgress
+                        applicationId={candidate.application_id}
+                      />
+
+                      {/* Action */}
+                      <div className="flex justify-end pt-2">
+                        <Button
+                          variant="outline"
+                          className="rounded-full"
+                          onClick={() =>
+                            handleViewCandidate(candidate.application_id)
+                          }
+                        >
+                          View Details
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           {/* Reports Tab */}
@@ -1178,8 +1358,8 @@ const UnitDashboard = () => {
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm">
               This will permanently delete the job description "
-              {deletingInternship?.title}". This action cannot be undone an will
-              remove all associated data.
+              {deletingInternship?.title}". This action cannot be undone and
+              will remove all associated data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">

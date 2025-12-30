@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useInterviews } from "@/hooks/useInterviews";
 
 interface ScheduleInterviewDialogProps {
   open: boolean;
@@ -19,6 +20,7 @@ interface ScheduleInterviewDialogProps {
   candidateName: string;
   candidateEmail: string;
   applicationId: string;
+  candidateProfileId: string; // student_id
   onSuccess?: () => void;
 }
 
@@ -28,38 +30,71 @@ export default function ScheduleInterviewDialog({
   candidateName,
   candidateEmail,
   applicationId,
+  candidateProfileId,
   onSuccess,
 }: ScheduleInterviewDialogProps) {
   const { toast } = useToast();
+  const { createInterview } = useInterviews();
   const [isLoading, setIsLoading] = useState(false);
   const [senderEmail, setSenderEmail] = useState<string>("");
+  const [unitProfileId, setUnitProfileId] = useState<string>("");
 
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     date: "",
     time: "",
-    meetingType: "google",
+    meetingType: "zoom",
   });
 
   const [guestEmails, setGuestEmails] = useState<string[]>(
     candidateEmail ? [candidateEmail] : []
   );
 
-  // ✅ Fetch current user's email (view-only)
+  // Fetch current user's email and profile ID
   useEffect(() => {
-    const fetchUserEmail = async () => {
+    const fetchUserData = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
       if (user?.email) {
         setSenderEmail(user.email);
+
+        // Fetch profile ID
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("user_id", user.id)
+          .single();
+
+        if (profileError) {
+          console.error("Error fetching profile:", profileError);
+          toast({
+            title: "Error",
+            description: "Failed to fetch user profile",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (profileData) {
+          setUnitProfileId(profileData.id);
+          console.log("✅ Unit Profile ID fetched:", profileData.id);
+        }
       }
     };
-    fetchUserEmail();
+    fetchUserData();
   }, []);
 
-  // ✅ Add guest email
+  // Reset guest emails when candidate email changes
+  useEffect(() => {
+    if (candidateEmail) {
+      setGuestEmails([candidateEmail]);
+    }
+  }, [candidateEmail]);
+
+  // Add guest email
   const addEmail = (email: string) => {
     const trimmed = email.trim();
     if (
@@ -92,6 +127,7 @@ export default function ScheduleInterviewDialog({
   };
 
   const handleSubmit = async () => {
+    // Validation
     if (!formData.date || !formData.time) {
       toast({
         title: "Missing Information",
@@ -110,6 +146,16 @@ export default function ScheduleInterviewDialog({
       return;
     }
 
+    if (!unitProfileId || !candidateProfileId) {
+      toast({
+        title: "Error",
+        description: "Missing profile information. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Missing IDs:", { unitProfileId, candidateProfileId });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -117,36 +163,76 @@ export default function ScheduleInterviewDialog({
         `${formData.date}T${formData.time}:00Z`
       ).toISOString();
 
-      // ✅ Log all submission details before sending
       console.log("📩 Interview Submission Details:", {
         applicationId,
         candidateName,
+        candidateEmail,
         guestEmails,
         scheduledDate,
         title: formData.title,
         description: formData.description,
         durationMinutes: 60,
         senderEmail,
+        unitProfileId,
+        candidateProfileId,
       });
 
-      const { error } = await supabase.functions.invoke("schedule-interview", {
-        body: {
-          applicationId,
-          candidateName,
-          candidateEmail: guestEmails,
-          scheduledDate,
-          title: formData.title,
-          description: formData.description,
-          durationMinutes: 60,
-          senderEmail,
-        },
+      // Step 1: Call edge function to create Zoom meeting and send emails
+      console.log("🔄 Calling edge function to create Zoom meeting...");
+      const { data: zoomData, error: zoomError } =
+        await supabase.functions.invoke("schedule-interview", {
+          body: {
+            applicationId,
+            candidateName,
+            candidateEmail: guestEmails, // Array of all guest emails
+            scheduledDate,
+            title: formData.title,
+            description: formData.description,
+            durationMinutes: 60,
+            senderEmail,
+          },
+        });
+
+      if (zoomError) {
+        console.error("Zoom function error:", zoomError);
+        throw zoomError;
+      }
+
+      console.log("✅ Zoom meeting created:", zoomData);
+
+      // Extract meeting link from response
+      const meetingLink =
+        zoomData?.meetingLink || zoomData?.join_url || zoomData?.zoomLink || "";
+
+      if (!meetingLink) {
+        throw new Error("Failed to generate meeting link from Zoom");
+      }
+
+      console.log("🔗 Meeting link:", meetingLink);
+
+      // Step 2: Store interview in database with profile IDs
+      console.log("💾 Storing interview in database...");
+      const { error: dbError } = await createInterview({
+        applicationId,
+        scheduledDate,
+        meetingLink,
+        title: formData.title,
+        description: formData.description || "",
+        durationMinutes: 60,
+        unitId: unitProfileId,
+        studentId: candidateProfileId,
       });
 
-      if (error) throw error;
+      if (dbError) {
+        console.error("Database error:", dbError);
+        throw new Error(dbError);
+      }
+
+      console.log("✅ Interview stored in database");
 
       toast({
         title: "Interview Scheduled",
-        description: `Zoom Meet link has been sent to ${candidateName}`,
+        description: `Zoom meeting link has been sent to ${candidateName} and all guests`,
       });
 
       onOpenChange(false);
@@ -158,7 +244,7 @@ export default function ScheduleInterviewDialog({
         description: "",
         date: "",
         time: "",
-        meetingType: "google",
+        meetingType: "zoom",
       });
       setGuestEmails(candidateEmail ? [candidateEmail] : []);
     } catch (error: any) {
@@ -186,7 +272,7 @@ export default function ScheduleInterviewDialog({
         </DialogHeader>
 
         <div className="px-6 pb-6 space-y-5">
-          {/* ✅ Sender Email (view only) */}
+          {/* Sender Email (view only) */}
           {senderEmail && (
             <div className="space-y-1">
               <Label className="text-sm text-gray-700">Host Email</Label>
@@ -201,11 +287,11 @@ export default function ScheduleInterviewDialog({
           {/* Title */}
           <div className="space-y-2">
             <Label htmlFor="title" className="text-sm text-gray-700">
-              Add title
+              Add title <span className="text-red-500">*</span>
             </Label>
             <Input
               id="title"
-              placeholder="Title"
+              placeholder="e.g., Technical Interview - Software Engineer"
               value={formData.title}
               onChange={(e) =>
                 setFormData({ ...formData, title: e.target.value })
@@ -315,14 +401,11 @@ export default function ScheduleInterviewDialog({
               <button
                 type="button"
                 onClick={() =>
-                  setFormData({ ...formData, meetingType: "google" })
+                  setFormData({ ...formData, meetingType: "zoom" })
                 }
-                className={`w-full flex items-center gap-3 p-3 rounded-lg ${
-                  formData.meetingType === "google"
-                }`}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-200"
               >
                 <div className="w-6 h-6 bg-[#2196F3] rounded flex items-center justify-center">
-                  {/* <Video className="w-4 h-4 text-white" /> */}
                   <Video className="w-4 h-4 text-white fill-current" />
                 </div>
                 <span className="text-sm text-gray-500 font-medium">
@@ -336,8 +419,8 @@ export default function ScheduleInterviewDialog({
           <div className="flex justify-end pt-2">
             <Button
               onClick={handleSubmit}
-              disabled={isLoading}
-              className="bg-[#2196F3] rounded-full text-white px-8 h-11"
+              disabled={isLoading || !unitProfileId || !candidateProfileId}
+              className="bg-[#2196F3] rounded-full text-white px-8 h-11 hover:bg-[#1976D2] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? "Scheduling..." : "Save"}
             </Button>

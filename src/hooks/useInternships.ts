@@ -70,7 +70,7 @@ export const useInternships = () => {
           return;
         }
 
-        setProfile(profileData as DatabaseProfile);
+        setProfile(profileData as unknown as DatabaseProfile);
 
         // 2. Fetch internships created by this profile with status 'active' or 'closed'
         const { data, error: internshipsError } = await supabase

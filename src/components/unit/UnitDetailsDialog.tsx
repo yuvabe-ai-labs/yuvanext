@@ -158,7 +158,7 @@ export const UnitDetailsDialog = ({
             </div>
 
             <div className="col-span-2">
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="address">Location</Label>
               <Input
                 id="address"
                 value={formData.address}

@@ -209,7 +209,7 @@ const Chatbot = () => {
 
       const initialMessage: Message = {
         id: "1",
-        content: `Hey 👋, ${name}! Let's get to know you better.`,
+        content: `Hey, ${name}!👋.`,
         role: "assistant",
         timestamp: new Date(),
       };
@@ -865,6 +865,9 @@ const Chatbot = () => {
       "Community & Social Impact",
       "Education & Training",
       "Technology & Digital",
+      "soft skills",
+      "Personal Growth & Soft Skills",
+      "specific skills are you looking for",
     ];
 
     return multiSelectQuestions.some((q) => lastBotMessage.includes(q))
@@ -1150,7 +1153,7 @@ const Chatbot = () => {
 
       // 🌟 If YES → school-going students
       if (lastBotMessage.includes("Which class or grade")) {
-        return ["9th", "10th", "11th", "12th", "Add Skills"];
+        return ["9th", "10th", "11th", "12th"];
       }
       if (
         lastBotMessage.includes("soft skills") ||
@@ -1386,7 +1389,7 @@ const Chatbot = () => {
         {/* Title */}
         <h1 className="text-2xl font-bold text-[#333] mb-2">You're All Set!</h1>
         <p className="text-sm text-gray-500 mb-12">
-          Here's your personalized profile summary:
+          Here's your personalized Yuvanext Dashboard!
         </p>
 
         {/* Cards */}
@@ -1566,13 +1569,18 @@ const Chatbot = () => {
             ))}
 
             {/* ⚡ Quick Options */}
-            {quickOptions && messages.length > 0 && !isTyping && !isLoading && (
-              <div className="flex justify-start">
-                <div className="max-w-[80%]">
-                  {renderQuickOptions(quickOptions)}
-                </div>
-              </div>
-            )}
+            {quickOptions &&
+  messages.length > 0 &&
+  !isTyping &&
+  !isLoading &&
+  messages[messages.length - 1]?.role === "assistant" && (
+    <div className="flex justify-start mt-2 ml-12">
+      <div className="max-w-[80%]">
+        {renderQuickOptions(quickOptions)}
+      </div>
+    </div>
+  )}
+
 
             {/* ⌛ Typing Indicator */}
             {isTyping && (
@@ -1604,7 +1612,6 @@ const Chatbot = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
         {/* Input Area */}
         <div className="mt-4">
           <div className="flex space-x-2">

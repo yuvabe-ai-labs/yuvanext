@@ -2,7 +2,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +35,11 @@ import RecommendedInternships from "./pages/RecommendedInternships";
 import ForgotPassword from "./pages/ForgotPassword";
 import CheckEmail from "./pages/CheckEmail";
 import ResetPassword from "./pages/ResetPassword";
+import CandidateTasks from "./pages/CandidateTasks";
+import MyTasks from "./pages/MyTasks";
+import UnitCandidateTasks from "./pages/UnitCandidateTasks";
+import Settings from "./pages/Settings";
+import ScrollToTop from "@/components/ScrollToTop"; // Adjust path if needed
 
 const queryClient = new QueryClient();
 
@@ -47,7 +59,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
           // Fetch profile with role and onboarding status
           const { data: profile, error } = await supabase
             .from("profiles")
-            .select("onboarding_completed, role")
+            .select("onboarding_completed, role, deactivated_at")
             .eq("user_id", user.id)
             .maybeSingle();
 
@@ -55,6 +67,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
             console.error("Error fetching profile:", error);
             setProfileLoading(false);
             return;
+          }
+
+          // Direct Update if needed
+          if (profile?.deactivated_at) {
+            const { error: updateError } = await supabase
+              .from("profiles")
+              .update({ deactivated_at: null })
+              .eq("user_id", user.id);
+
+            if (updateError)
+              console.error("Failed to reactivate:", updateError);
           }
 
           const isOnboardingCompleted = profile?.onboarding_completed || false;
@@ -80,7 +103,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
             }
             // Redirect from chatbot to appropriate dashboard after onboarding
             else if (location.pathname === "/chatbot") {
-              const targetDashboard = role === "unit" ? "/unit-dashboard" : "/dashboard";
+              const targetDashboard =
+                role === "unit" ? "/unit-dashboard" : "/dashboard";
               navigate(targetDashboard, { replace: true });
             }
           }
@@ -115,10 +139,10 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ScrollToTop />
         <AuthProvider>
           <Routes>
             <Route path="/auth/callback" element={<AuthCallback />} />
-
             {/* Chatbot Route */}
             <Route
               path="/chatbot"
@@ -128,7 +152,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-
             <Route path="/" element={<Landing />} />
             <Route path="/auth/:role/signin" element={<SignIn />} />
             <Route path="/auth/:role/signup" element={<SignUp />} />
@@ -248,10 +271,44 @@ const App = () => (
               }
             />
             <Route
+              path="/candidate-tasks"
+              element={
+                <ProtectedRoute>
+                  <CandidateTasks />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/internship-applicants/:internshipId"
               element={
                 <ProtectedRoute>
                   <InternshipApplicants />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-tasks/:applicationId"
+              element={
+                <ProtectedRoute>
+                  <MyTasks />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/unit/candidate-tasks/:applicationId"
+              element={
+                <ProtectedRoute>
+                  <UnitCandidateTasks />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
                 </ProtectedRoute>
               }
             />

@@ -388,21 +388,30 @@ const Units = () => {
                       className="relative overflow-hidden rounded-[20px] border border-[#C94100] bg-white shadow-sm transition-all duration-300 hover:shadow-md w-[256px] h-[300px] p-1.5"
                     >
                       {/* Banner */}
-                      <div className="relative w-full h-[100px] rounded-t-[18px] overflow-visible">
-                        <img
-                          src={
-                            unit.banner_url || "/assets/banner-placeholder.jpg"
-                          }
-                          alt=""
-                          className="h-full w-full object-cover rounded-[18px]"
-                        />
-                        {/* Avatar */}
-                        <div className="absolute bottom-0 left-5 translate-y-1/6 w-[56px] h-[56px] flex items-center justify-center z-20 rounded-full">
+                      <div className="relative w-full h-[100px] rounded-t-[18px] overflow-visible bg-blue-500">
+                        {unit.banner_url ? (
                           <img
-                            src={unit.avatar_url}
-                            alt={`${unit.unit_name} logo`}
-                            className="w-[54px] h-[54px] object-cover rounded-full "
+                            src={
+                              unit.banner_url ||
+                              "/assets/banner-placeholder.jpg"
+                            }
+                            alt=""
+                            className="h-full w-full object-cover rounded-[18px]"
                           />
+                        ) : (
+                          ""
+                        )}
+                        {/* Avatar */}
+                        <div className="absolute bottom-0 left-5 translate-y-1/6 w-[56px] h-[56px] flex items-center justify-center z-20 rounded-full bg-black text-white">
+                          {unit.avatar_url ? (
+                            <img
+                              src={unit.avatar_url}
+                              alt={`${unit.unit_name} logo`}
+                              className="w-[54px] h-[54px] object-cover rounded-full "
+                            />
+                          ) : (
+                            unit.unit_name?.charAt(0) || "C"
+                          )}
                         </div>
                       </div>
 

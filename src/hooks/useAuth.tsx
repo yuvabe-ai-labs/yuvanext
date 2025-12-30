@@ -16,12 +16,14 @@ interface AuthContextType {
     email: string,
     password: string,
     fullName: string,
-    role: string
+    role: string,
+    websiteUrl?: string
   ) => Promise<{ error: any }>;
   signIn: (
     email: string,
     password: string,
-    rememberMe?: boolean
+    rememberMe?: boolean,
+    expectedRole?: string
   ) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: any }>;
@@ -89,6 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           const userData = user.user_metadata;
           const pendingRole = localStorage.getItem("pendingRole");
+          const pendingWebsite = localStorage.getItem("pendingWebsite");
           const userRole = userData.role || pendingRole || "student";
           const fullName =
             userData.full_name ||
@@ -96,10 +99,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             user.email?.split("@")[0] ||
             "User";
           const email = user.email || "";
+          const websiteUrl = userData.website_url || pendingWebsite || null;
 
-          // Clear pending role
+          // Clear pending data
           if (pendingRole) {
             localStorage.removeItem("pendingRole");
+          }
+          if (pendingWebsite) {
+            localStorage.removeItem("pendingWebsite");
           }
 
           const { data: newProfile, error: profileError } = await supabase
@@ -142,10 +149,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 console.log("Student profile initialized successfully");
               }
             } else if (userRole === "unit") {
-              const { error: unitError } = await supabase.from("units").insert({
+              const unitData: any = {
                 profile_id: newProfile.id,
-                unit_name: fullName, // Use signup name as initial unit name
-              });
+                unit_name: fullName, // Use signup name as company name
+              };
+
+              // Add website URL if provided
+              if (websiteUrl) {
+                unitData.website_url = websiteUrl;
+              }
+
+              const { error: unitError } = await supabase
+                .from("units")
+                .insert(unitData);
 
               if (unitError) {
                 console.error("Unit profile initialization failed:", unitError);
@@ -178,7 +194,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     email: string,
     password: string,
     fullName: string,
-    role: string
+    role: string,
+    websiteUrl?: string
   ) => {
     try {
       console.log("Starting signup process for:", email, "with role:", role);
@@ -186,15 +203,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Redirect to auth callback handler, which will then route to chatbot
       const redirectUrl = `${window.location.origin}/auth/callback`;
 
+      const metadata: any = {
+        full_name: fullName,
+        role: role,
+      };
+
+      // Add website URL to metadata if provided (for unit role)
+      if (websiteUrl) {
+        metadata.website_url = websiteUrl;
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: redirectUrl,
-          data: {
-            full_name: fullName,
-            role: role,
-          },
+          data: metadata,
         },
       });
 
@@ -217,9 +241,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      // Store role for use after email confirmation
+      // Store role and website for use after email confirmation
       if (role) {
         localStorage.setItem("pendingRole", role);
+      }
+      if (websiteUrl) {
+        localStorage.setItem("pendingWebsite", websiteUrl);
       }
 
       // Don't create profile immediately - will be created on first sign in
@@ -237,7 +264,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (
     email: string,
     password: string,
-    rememberMe: boolean = false
+    rememberMe: boolean = false,
+    expectedRole?: string
   ) => {
     try {
       console.log("[useAuth] Signing in with rememberMe:", rememberMe);
@@ -279,10 +307,60 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
       }
 
+      // Role validation - check if expectedRole is provided
+      if (expectedRole) {
+        console.log("[useAuth] Validating role:", expectedRole);
+
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user) {
+          // Fetch the user's profile to check their role
+          const { data: profile, error: profileError } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("user_id", user.id)
+            .single();
+
+          if (profileError) {
+            console.error("[useAuth] Error fetching profile:", profileError);
+            // Sign out on profile fetch error
+            await supabase.auth.signOut();
+            return {
+              error: {
+                message: "Unable to verify account role. Please try again.",
+              },
+            };
+          }
+
+          // Check if the profile role matches the expected role
+          if (profile.role !== expectedRole) {
+            console.log(
+              "[useAuth] Role mismatch. Expected:",
+              expectedRole,
+              "Got:",
+              profile.role
+            );
+            // Sign out the user
+            await supabase.auth.signOut();
+            return {
+              error: {
+                message: `This sign-in page is for ${expectedRole}s only. Please use the correct sign-in page for your account type.`,
+              },
+            };
+          }
+
+          console.log("[useAuth] Role validation passed");
+        }
+      }
+
       console.log("[useAuth] Sign in successful");
       return { error: null };
     } catch (error: any) {
       console.error("[useAuth] Sign in failed:", error);
+      // Sign out on any error during role validation
+      await supabase.auth.signOut();
       return { error };
     }
   };

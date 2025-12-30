@@ -13,6 +13,7 @@ import {
   Check,
   Share2,
   ChevronLeft,
+  IndianRupee,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { useApplicationStatus } from "@/hooks/useApplicationStatus";
@@ -407,7 +408,7 @@ const RecommendedInternships = () => {
                 Array.from({ length: 3 }).map((_, index) => (
                   <Card
                     key={index}
-                    className="cursor-pointer shadow-sm border border-gray-200"
+                    className="cursor-pointer shadow-sm border border-gray-200 mb-2.5"
                   >
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start mb-3">
@@ -440,10 +441,10 @@ const RecommendedInternships = () => {
                   );
                   return (
                     <>
-                      {/* Only for mobile screen xsm */}
+                      {/* Only for mobile screen md */}
                       <Card
                         key={internship.id}
-                        className="block md:hidden cursor-pointer transition-all duration-150 shadow-sm border border-orange-600 hover:shadow-md"
+                        className="block mb-2.5 lg:hidden cursor-pointer transition-all duration-150 shadow-sm border border-orange-600 hover:shadow-md"
                         onClick={() =>
                           navigate(`/internships/${internship.id}`)
                         }
@@ -452,7 +453,7 @@ const RecommendedInternships = () => {
                           <div className="flex justify-between items-start mb-3">
                             <Avatar className="w-8 h-8">
                               <AvatarImage
-                                src={internship.unit_avatar || undefined}
+                                src={matchingUnit.avatar_url || undefined}
                                 alt={internship.unit_name || "Unit"}
                               />
                               <AvatarFallback className="bg-black text-white text-xs font-bold">
@@ -489,7 +490,7 @@ const RecommendedInternships = () => {
 
                       <Card
                         key={internship.id}
-                        className={`hidden md:block cursor-pointer transition-all duration-150 shadow-sm border md:border-gray-100 rounded-none hover:shadow-md ${
+                        className={`hidden lg:block cursor-pointer transition-all duration-150 shadow-sm border lg:border-gray-100 rounded-none hover:shadow-md ${
                           selectedInternship === internship.id
                             ? "ring-1 ring-blue-500 shadow-md border-blue-200"
                             : "hover:border-gray-300"
@@ -649,7 +650,7 @@ const RecommendedInternships = () => {
                           </Button>
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-xs sm:text-sm text-gray-600">
+                      <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-xs sm:text-sm text-gray-500">
                         <div className="flex items-center">
                           <MapPin className="w-4 h-4 mr-1.5 text-gray-500" />
                           {selectedInternshipData.location}
@@ -659,11 +660,35 @@ const RecommendedInternships = () => {
                           {selectedInternshipData.duration}
                         </div>
                         <div className="flex items-center">
-                          <PayIcon className="w-4 h-4 mr-1.5 text-gray-500" />
-                          {selectedInternshipData.payment
-                            ? selectedInternshipData.payment
-                            : "Unpaid"}
+                          <IndianRupee className="w-4 h-4 mr-1.5 text-gray-500" />
+                          {selectedInternshipData.is_paid ? (
+                            <span>
+                              Paid{" "}
+                              {selectedInternshipData?.payment &&
+                                `- ${selectedInternshipData?.payment}`}
+                            </span>
+                          ) : (
+                            <span>Unpaid</span>
+                          )}
                         </div>
+
+                        <div className="flex items-cente">
+                          {selectedInternshipData.job_type === "full_time"
+                            ? "Full Time"
+                            : selectedInternshipData.job_type === "part_time"
+                            ? "Part Time"
+                            : selectedInternshipData.job_type === "both"
+                            ? "Full Time & Part Time"
+                            : "Not specified"}
+                        </div>
+
+                        {/* Minimum Age */}
+                        {selectedInternshipData.min_age_required && (
+                          <div className="flex items-center">
+                            Minimum Age:{" "}
+                            {selectedInternshipData.min_age_required}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -748,18 +773,35 @@ const RecommendedInternships = () => {
                     <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">
                       Skills Required
                     </h2>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="space-y-3">
                       {skills.map((skill, index) => (
-                        <Badge
-                          key={index}
-                          variant="secondary"
-                          className="bg-gray-100 text-gray-700 px-3 py-1"
-                        >
-                          {skill}
-                        </Badge>
+                        <div key={index} className="flex items-start space-x-3">
+                          <div className="w-5 h-5 bg-green-100 text-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Check className="w-3 h-3" />
+                          </div>
+                          <p className="text-gray-700 leading-relaxed">
+                            {skill}
+                          </p>
+                        </div>
                       ))}
                     </div>
                   </div>
+                  // <div className="mb-6 sm:mb-8">
+                  //   <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">
+                  //     Skills Required
+                  //   </h2>
+                  //   {/* <div className="flex flex-wrap gap-2">
+                  //     {skills.map((skill, index) => (
+                  //       <Badge
+                  //         key={index}
+                  //         variant="secondary"
+                  //         className="bg-gray-100 text-gray-700 px-3 py-1"
+                  //       >
+                  //         {skill}
+                  //       </Badge>
+                  //     ))}
+                  //   </div> */}
+                  // </div>
                 )}
 
                 {/* Additional Information */}

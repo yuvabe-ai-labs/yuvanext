@@ -2,20 +2,13 @@ import {
   ArrowLeft,
   MapPin,
   Clock,
-  DollarSign,
-  Bookmark,
-  Share,
+  IndianRupee,
   Check,
-  X,
-  Bell,
-  Menu,
-  Search,
   Ban,
   CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import Navbar from "@/components/Navbar";
 
 interface InternshipDetailsViewProps {
@@ -27,7 +20,7 @@ const InternshipDetailsView = ({
   internship,
   onClose,
 }: InternshipDetailsViewProps) => {
-  // Parse JSON fields safely
+  // Safe JSON parser
   const safeParse = (data: any, fallback: any) => {
     if (!data) return fallback;
     try {
@@ -39,7 +32,7 @@ const InternshipDetailsView = ({
 
   const responsibilities = safeParse(internship.responsibilities, []);
   const requirements = safeParse(internship.requirements, []);
-  const skills = safeParse(internship.skills, []);
+  const skills = safeParse(internship.skills_required, []);
   const benefits = safeParse(internship.benefits, []);
 
   const internshipData = {
@@ -52,12 +45,10 @@ const InternshipDetailsView = ({
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header - Same as InternshipApplicants */}
       <Navbar />
 
-      {/* Main Content */}
       <main className="p-6 max-w-7xl mx-auto">
-        {/* Back Button and Action Buttons */}
+        {/* Back Button */}
         <div className="flex items-center justify-between mb-8">
           <Button
             variant="outline"
@@ -70,10 +61,10 @@ const InternshipDetailsView = ({
           </Button>
         </div>
 
-        {/* Job Description Content */}
+        {/* Main Card */}
         <div className="bg-white rounded-2xl shadow-sm border p-8">
           {/* Header */}
-          <div className="flex justify-between items-start mb-8">
+          <div className="flex justify-between items-start mb-6">
             <div className="flex items-start space-x-5">
               <div className="w-16 h-16 bg-teal-600 text-white rounded-2xl flex items-center justify-center shadow-sm">
                 <svg
@@ -91,7 +82,7 @@ const InternshipDetailsView = ({
                 <p className="text-lg text-gray-700 mb-3 font-medium">
                   {internshipData.company_name}
                 </p>
-                <div className="flex items-center space-x-5 text-sm text-gray-600">
+                <div className="flex flex-wrap items-center gap-5 text-sm text-gray-600">
                   <div className="flex items-center">
                     <MapPin className="w-4 h-4 mr-1.5 text-gray-500" />
                     {internshipData.location || "Not specified"}
@@ -101,9 +92,26 @@ const InternshipDetailsView = ({
                     {internshipData.duration || "Not specified"}
                   </div>
                   <div className="flex items-center">
-                    <DollarSign className="w-4 h-4 mr-1.5 text-gray-500" />
-                    {internshipData.payment || "Not specified"}
+                    <IndianRupee className="w-4 h-4 mr-1.5 text-gray-500" />
+                    {internshipData.payment
+                      ? `Paid - ${internshipData.payment}`
+                      : "Unpaid"}
                   </div>
+                  <div className="flex items-center">
+                    {internshipData.job_type === "full_time"
+                      ? "Full Time"
+                      : internshipData.job_type === "part_time"
+                      ? "Part Time"
+                      : internshipData.job_type === "both"
+                      ? "Full Time & Part Time"
+                      : "Not specified"}
+                  </div>
+                  {/* Minimum Age */}
+                  {internshipData.min_age_required && (
+                    <div className="flex items-center">
+                      Minimum Age: {internshipData.min_age_required}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -127,6 +135,50 @@ const InternshipDetailsView = ({
             </div>
           </div>
 
+          {/* Job Type & Min Age (TOP SECTION) */}
+          {/* <div className="mb-8 flex flex-wrap items-center gap-4">
+            {internshipData.job_type && (
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Engagement Type:
+                </h3>
+                {internshipData.job_type === "both" ? (
+                  <>
+                    <Badge className="bg-blue-100 text-blue-700 font-medium">
+                      Part-Time
+                    </Badge>
+                    <Badge className="bg-green-100 text-green-700 font-medium">
+                      Full-Time
+                    </Badge>
+                  </>
+                ) : (
+                  <Badge
+                    className={`${
+                      internshipData.job_type === "part-time"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-green-100 text-green-700"
+                    } font-medium`}
+                  >
+                    {internshipData.job_type === "part-time"
+                      ? "Part-Time"
+                      : "Full-Time"}
+                  </Badge>
+                )}
+              </div>
+            )}
+
+            {internshipData.min_age_required && (
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Minimum Age:
+                </h3>
+                <p className="text-gray-700 text-base">
+                  {internshipData.min_age_required}
+                </p>
+              </div>
+            )}
+          </div> */}
+
           {/* About the Internship */}
           <div className="border-t border-gray-200 mb-8"></div>
           <div className="mb-8">
@@ -139,96 +191,106 @@ const InternshipDetailsView = ({
           </div>
 
           {/* Key Responsibilities */}
-          <div className="border-t border-gray-200 mb-8"></div>
           {internshipData.responsibilities.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                Key Responsibilities
-              </h2>
-              <div className="space-y-3">
-                {internshipData.responsibilities.map(
-                  (responsibility: string, index: number) => (
-                    <div key={index} className="flex items-start space-x-3">
-                      <div className="w-5 h-5 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Check className="w-3 h-3" />
+            <>
+              <div className="border-t border-gray-200 mb-8"></div>
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                  Key Responsibilities
+                </h2>
+                <div className="space-y-3">
+                  {internshipData.responsibilities.map(
+                    (responsibility: string, index: number) => (
+                      <div key={index} className="flex items-start space-x-3">
+                        <div className="w-5 h-5 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center mt-0.5">
+                          <Check className="w-3 h-3" />
+                        </div>
+                        <p className="text-gray-700 leading-relaxed">
+                          {responsibility}
+                        </p>
                       </div>
-                      <p className="text-gray-700 leading-relaxed">
-                        {responsibility}
-                      </p>
-                    </div>
-                  )
-                )}
+                    )
+                  )}
+                </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* Requirements */}
-          <div className="border-t border-gray-200 mb-8"></div>
           {internshipData.requirements.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                Requirements from the Candidates
-              </h2>
-              <div className="space-y-3">
-                {internshipData.requirements.map(
-                  (requirement: string, index: number) => (
-                    <div key={index} className="flex items-start space-x-3">
-                      <div className="w-5 h-5 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Check className="w-3 h-3" />
+            <>
+              <div className="border-t border-gray-200 mb-8"></div>
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                  Requirements from the Candidates
+                </h2>
+                <div className="space-y-3">
+                  {internshipData.requirements.map(
+                    (requirement: string, index: number) => (
+                      <div key={index} className="flex items-start space-x-3">
+                        <div className="w-5 h-5 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mt-0.5">
+                          <Check className="w-3 h-3" />
+                        </div>
+                        <p className="text-gray-700 leading-relaxed">
+                          {requirement}
+                        </p>
                       </div>
-                      <p className="text-gray-700 leading-relaxed">
-                        {requirement}
-                      </p>
-                    </div>
-                  )
-                )}
+                    )
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* Skills Required */}
-          <div className="border-t border-gray-200 mb-8"></div>
-          {internshipData.skills.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                Required Skills
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {internshipData.skills.map((skill: string, index: number) => (
-                  <Badge
-                    key={index}
-                    variant="secondary"
-                    className="bg-gray-100 text-gray-700 px-3 py-1.5"
-                  >
-                    {skill}
-                  </Badge>
-                ))}
-              </div>
-            </div>
+            </>
           )}
 
           {/* Benefits */}
           {internshipData.benefits.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                What You Will Get
-              </h2>
-              <div className="space-y-3">
-                {internshipData.benefits.map(
-                  (benefit: string, index: number) => (
-                    <div key={index} className="flex items-start space-x-3">
-                      <div className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Check className="w-3 h-3" />
+            <>
+              <div className="border-t border-gray-200 mb-8"></div>
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                  What You Will Get
+                </h2>
+                <div className="space-y-3">
+                  {internshipData.benefits.map(
+                    (benefit: string, index: number) => (
+                      <div key={index} className="flex items-start space-x-3">
+                        <div className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center mt-0.5">
+                          <Check className="w-3 h-3" />
+                        </div>
+                        <p className="text-gray-700 leading-relaxed">
+                          {benefit}
+                        </p>
                       </div>
-                      <p className="text-gray-700 leading-relaxed">{benefit}</p>
-                    </div>
-                  )
-                )}
+                    )
+                  )}
+                </div>
               </div>
-            </div>
+            </>
           )}
 
-          {/* Additional Information */}
+          {/* Skills Required */}
+          {internshipData.skills.length > 0 && (
+            <>
+              <div className="border-t border-gray-200 mb-8"></div>
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                  Required Skills
+                </h2>
+                <div className="space-y-3">
+                  {internshipData.skills.map((skill: string, index: number) => (
+                    <div key={index} className="flex items-start space-x-3">
+                      <div className="w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mt-0.5">
+                        <Check className="w-3 h-3" />
+                      </div>
+                      <p className="text-gray-700 leading-relaxed">{skill}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Additional Info */}
           <div className="border-t border-gray-200 mb-8"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {internshipData.application_deadline && (
@@ -243,7 +305,6 @@ const InternshipDetailsView = ({
                 </p>
               </div>
             )}
-
             {internshipData.company_email && (
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">

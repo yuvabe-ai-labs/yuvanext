@@ -12,6 +12,7 @@ import {
   Share2,
   CircleCheckBig,
   ChevronLeft,
+  IndianRupee,
 } from "lucide-react";
 import { ShareDialog } from "@/components/ShareDialog";
 import Navbar from "@/components/Navbar";
@@ -22,6 +23,7 @@ import { useApplicationStatus } from "@/hooks/useApplicationStatus";
 import { useIsSaved } from "@/hooks/useSavedInternships";
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
+import { PayIcon } from "@/components/ui/custom-icons";
 
 const safeParse = (data: any, fallback: any) => {
   if (!data) return fallback;
@@ -293,10 +295,35 @@ const InternshipDetail = () => {
                           <span>{internship.duration}</span>
                         </div>
                       )}
-                      {internship.is_paid && (
+                      {internship?.is_paid ? (
                         <div className="flex items-center gap-1 text-muted-foreground">
-                          <DollarSign className="w-3 h-3" />
-                          <span>Paid</span>
+                          <IndianRupee className="w-4 h-4" />
+                          <span>
+                            Paid{" "}
+                            {internship?.payment && `- ${internship?.payment}`}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <IndianRupee className="w-4 h-4" />
+                          <span>Unpaid</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center text-muted-foreground">
+                        {internship.job_type === "full_time"
+                          ? "Full Time"
+                          : internship.job_type === "part_time"
+                          ? "Part Time"
+                          : internship.job_type === "both"
+                          ? "Full Time & Part Time"
+                          : "Not specified"}
+                      </div>
+
+                      {/* Minimum Age */}
+                      {internship.min_age_required && (
+                        <div className="flex items-center text-muted-foreground">
+                          Minimum Age: {internship.min_age_required}
                         </div>
                       )}
                     </div>
@@ -347,10 +374,36 @@ const InternshipDetail = () => {
                           <span>{internship.duration}</span>
                         </div>
                       )}
-                      {internship.is_paid && (
+
+                      {internship?.is_paid ? (
                         <div className="flex items-center gap-1 text-muted-foreground">
-                          <DollarSign className="w-4 h-4" />
-                          <span>Paid</span>
+                          <IndianRupee className="w-4 h-4" />
+                          <span>
+                            Paid{" "}
+                            {internship?.payment && `- ${internship?.payment}`}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <IndianRupee className="w-4 h-4" />
+                          <span>Unpaid</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center text-muted-foreground">
+                        {internship.job_type === "full_time"
+                          ? "Full Time"
+                          : internship.job_type === "part_time"
+                          ? "Part Time"
+                          : internship.job_type === "both"
+                          ? "Full Time & Part Time"
+                          : "Not specified"}
+                      </div>
+
+                      {/* Minimum Age */}
+                      {internship.min_age_required && (
+                        <div className="flex items-center text-muted-foreground">
+                          Minimum Age: {internship.min_age_required}
                         </div>
                       )}
                     </div>

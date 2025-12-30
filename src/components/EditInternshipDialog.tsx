@@ -52,34 +52,31 @@ const languageSchema = z
     path: ["read"],
   });
 
-const formSchema = z
-  .object({
-    title: z.string().min(1, "Job/Intern Role is required"),
-    duration: z.string().min(1, "Internship Period is required"),
-    isPaid: z.boolean(),
-    payment: z.string().optional(),
-    description: z
-      .string()
-      .min(10, "About Internship must be at least 10 characters"),
-    responsibilities: z.string().min(10, "Key Responsibilities is required"),
-    benefits: z.string().min(10, "Post Internship benefits is required"),
-    skills_required: z.string().min(1, "Skills Required is required"),
-    language_requirements: z
-      .array(languageSchema)
-      .min(1, "At least one language is required"),
-  })
-  .refine(
-    (data) => {
-      if (data.isPaid) {
-        return data.payment && data.payment.length > 0;
-      }
-      return true;
-    },
-    {
-      message: "Payment amount is required for paid internships",
-      path: ["payment"],
-    }
-  );
+const formSchema = z.object({
+  title: z.string().min(1, "Job/Intern Role is required"),
+  duration: z.string().min(1, "Internship Period is required"),
+  isPaid: z.boolean(),
+  payment: z.string().optional(),
+  description: z
+    .string()
+    .min(10, "About Internship must be at least 10 characters"),
+  responsibilities: z.string().min(10, "Key Responsibilities is required"),
+  benefits: z.string().min(10, "Post Internship benefits is required"),
+  skills_required: z.string().min(1, "Skills Required is required"),
+  language_requirements: z
+    .array(languageSchema)
+    .min(1, "At least one language is required"),
+  min_age_required: z.coerce
+    .number({
+      required_error: "Minimum age is required",
+      invalid_type_error: "Minimum age must be a number",
+    })
+    .min(1, "Age is required"),
+  job_type: z.enum(["full_time", "part_time", "both"]),
+  application_deadline: z.date({
+    required_error: "Application deadline is required",
+  }),
+});
 
 type FormData = z.infer<typeof formSchema>;
 
@@ -147,10 +144,15 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
       language_requirements: [
         { language: "", read: false, write: false, speak: false },
       ],
+      application_deadline: undefined,
+      min_age_required: undefined,
+      job_type: "full_time",
     },
   });
 
   const isPaid = watch("isPaid");
+  const jobTitle = watch("title");
+  const isJobRoleFilled = jobTitle && jobTitle.trim().length > 0;
 
   const months = [
     "January",
@@ -248,11 +250,16 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
         benefits: benefitsText,
         skills_required: skillsText,
         language_requirements: languageReqs,
+        application_deadline: internship.application_deadline
+          ? new Date(internship.application_deadline)
+          : undefined,
+        min_age_required: internship.min_age_required || undefined,
+        job_type: internship.job_type || "full_time",
       });
     }
   }, [internship, isOpen, reset]);
 
-  // Sync date selection with form and validate
+  // Sync date selection with form
   useEffect(() => {
     if (selectedDate && selectedMonth && selectedYear) {
       const date = new Date(
@@ -263,11 +270,10 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
 
       // Check if selected date is in the past
       if (date.setHours(0, 0, 0, 0) >= new Date().setHours(0, 0, 0, 0)) {
-        // Trigger form validation by touching a field
-        setValue("title", watch("title"), { shouldValidate: true });
+        setValue("application_deadline", date, { shouldValidate: true });
       }
     }
-  }, [selectedDate, selectedMonth, selectedYear, setValue, watch]);
+  }, [selectedDate, selectedMonth, selectedYear, setValue]);
 
   // Reset date when month or year changes if it becomes invalid
   useEffect(() => {
@@ -331,13 +337,15 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
           title: data.title,
           duration: data.duration,
           is_paid: data.isPaid,
-          payment: data.isPaid ? data.payment : null,
+          payment: data.isPaid && data.payment ? data.payment : null,
           description: data.description,
           responsibilities: responsibilitiesArray,
           benefits: benefitsArray,
           skills_required: skillsArray,
           language_requirements: data.language_requirements,
           application_deadline: deadlineDate,
+          min_age_required: data.min_age_required,
+          job_type: data.job_type,
         })
         .eq("id", internship.id);
 
@@ -375,34 +383,34 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
       switch (fieldName) {
         case "description":
           prompt = `Write a single, concise, professional paragraph describing a ${jobTitle} internship.
-  Avoid introductions like "Here's a draft" or "About the internship".
-  Focus only on what the internship is about and what the intern will be doing, in 5-7 lines.
-  Return only the paragraph text, no bullet points or titles.${
-    currentValue
-      ? ` Current description: "${currentValue}". Please rewrite it as one clear paragraph.`
-      : ""
-  }`;
+Avoid introductions like "Here's a draft" or "About the internship".
+Focus only on what the internship is about and what the intern will be doing, in 5-7 lines.
+Return only the paragraph text, no bullet points or titles.${
+            currentValue
+              ? ` Current description: "${currentValue}". Please rewrite it as one clear paragraph.`
+              : ""
+          }`;
           break;
 
         case "responsibilities":
           prompt = `Write 5-7 key responsibilities for a ${jobTitle} internship.
-  Each responsibility must be on a new line, without numbering or bullet characters.
-  Avoid any introduction, summary, or phrases like "Here are the responsibilities".
-  Return only the clean list of responsibilities.${
-    currentValue
-      ? ` Current responsibilities: "${currentValue}". Please rewrite and clean them.`
-      : ""
-  }`;
+Each responsibility must be on a new line, without numbering or bullet characters.
+Avoid any introduction, summary, or phrases like "Here are the responsibilities".
+Return only the clean list of responsibilities.${
+            currentValue
+              ? ` Current responsibilities: "${currentValue}". Please rewrite and clean them.`
+              : ""
+          }`;
           break;
 
         case "benefits":
           prompt = `List 4-6 post-internship benefits that a candidate would receive after completing a ${jobTitle} internship.
-  Return only the clean list, one benefit per line, no extra text or introduction.`;
+Return only the clean list, one benefit per line, no extra text or introduction.`;
           break;
 
         case "skills_required":
           prompt = `List 5-8 essential skills required for a ${jobTitle} internship.
-  Return only the clean list — one skill per line, no commas, no numbering.`;
+Return only the clean list, one skill per line, no extra text or introduction`;
           break;
 
         default:
@@ -421,7 +429,7 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
           body: {
             message: prompt,
             conversationHistory: updatedHistory,
-            userRole: "unit",
+            userRole: "jd_generation",
           },
         }
       );
@@ -433,7 +441,7 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
           .replace(/\*\*/g, "")
           .replace(/\*/g, "")
           .replace(/^#+\s/gm, "")
-          .replace(/^(here('|'|â€™)s|sure|of course|okay|let'?s).*\n/i, "")
+          .replace(/^(here('|'|'s)|sure|of course|okay|let'?s).*\n/i, "")
           .replace(/^about .*internship.*\n?/i, "")
           .trim();
 
@@ -484,17 +492,24 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[90vh] p-0">
-        <DialogHeader className="px-6 py-3">
-          <DialogTitle className="text-xl font-semibold">
-            Edit Job Description
-          </DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground mt-1">
-            Update the information about this Job/Internship
-          </DialogDescription>
-        </DialogHeader>
+        <DialogHeader className="px-6 py-3"></DialogHeader>
 
-        <ScrollArea className="max-h-[calc(70vh-140px)] px-6">
-          <div className="space-y-6 ">
+        <ScrollArea className="max-h-[calc(90vh-140px)]">
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="px-6 space-y-6 pb-6"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-xl font-semibold">
+                  Edit Job Description
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground mt-1">
+                  Update the information about this Job/Internship
+                </DialogDescription>
+              </div>
+            </div>
+
             {/* Job/Intern Role */}
             <div className="space-y-2">
               <Label htmlFor="title" className="text-sm font-medium">
@@ -543,6 +558,58 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
               )}
             </div>
 
+            {/* Job Type */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                Engagement Type <span className="text-destructive">*</span>
+              </Label>
+              <Controller
+                name="job_type"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex items-center gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="full_time"
+                        checked={field.value === "full_time"}
+                        onChange={() => field.onChange("full_time")}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <span className="text-sm">Full Time</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="part_time"
+                        checked={field.value === "part_time"}
+                        onChange={() => field.onChange("part_time")}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <span className="text-sm">Part Time</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="both"
+                        checked={field.value === "both"}
+                        onChange={() => field.onChange("both")}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <span className="text-sm">Both</span>
+                    </label>
+                  </div>
+                )}
+              />
+              {errors.job_type && (
+                <p className="text-sm text-destructive">
+                  {errors.job_type.message}
+                </p>
+              )}
+            </div>
+
             {/* Internship Type */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">
@@ -554,19 +621,24 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
                   control={control}
                   render={({ field }) => (
                     <>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => field.onChange(true)}
-                        className={`rounded-full px-6 border border-black ${
-                          field.value
-                            ? "bg-gray-200 text-black hover:bg-gray-300"
-                            : "bg-white text-black hover:bg-gray-100"
-                        }`}
-                      >
-                        Paid
-                      </Button>
-                      {isPaid && (
+                      {/* Paid Button */}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => field.onChange(true)}
+                          className={`rounded-full px-6 border border-black ${
+                            field.value
+                              ? "bg-gray-200 text-black hover:bg-gray-300 hover:!text-black"
+                              : "bg-white text-black hover:bg-gray-100 hover:!text-black"
+                          }`}
+                        >
+                          Paid
+                        </Button>
+                      </div>
+
+                      {/* Show amount input when Paid is selected */}
+                      {field.value && (
                         <Controller
                           name="payment"
                           control={control}
@@ -574,24 +646,28 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
                             <Input
                               {...field}
                               type="text"
-                              placeholder="Enter amount"
+                              placeholder="e.g. 10000 or To be discussed"
                               className="max-w-[200px]"
                             />
                           )}
                         />
                       )}
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => field.onChange(false)}
-                        className={`rounded-full px-6 border border-black ${
-                          !field.value
-                            ? "bg-gray-200 text-black hover:bg-gray-300"
-                            : "bg-white text-black hover:bg-gray-100"
-                        }`}
-                      >
-                        Unpaid
-                      </Button>
+
+                      {/* Unpaid Button */}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => field.onChange(false)}
+                          className={`rounded-full px-6 border border-black ${
+                            !field.value
+                              ? "bg-gray-200 text-black hover:bg-gray-300 hover:!text-black"
+                              : "bg-white text-black hover:bg-gray-100 hover:!text-black"
+                          }`}
+                        >
+                          Unpaid
+                        </Button>
+                      </div>
                     </>
                   )}
                 />
@@ -599,6 +675,42 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
               {errors.payment && (
                 <p className="text-sm text-destructive">
                   {errors.payment.message}
+                </p>
+              )}
+            </div>
+
+            {/* Minimum Age Required */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                Minimum Age Required <span className="text-destructive">*</span>
+              </Label>
+              <Controller
+                name="min_age_required"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value?.toString()}
+                  >
+                    <SelectTrigger className="w-[150px] rounded-full">
+                      <SelectValue placeholder="Select age" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[...Array(10)].map((_, i) => {
+                        const age = 16 + i;
+                        return (
+                          <SelectItem key={age} value={String(age)}>
+                            {age}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.min_age_required && (
+                <p className="text-sm text-destructive">
+                  {errors.min_age_required.message}
                 </p>
               )}
             </div>
@@ -622,9 +734,13 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
                     <Button
                       type="button"
                       size="sm"
-                      className="absolute bottom-2 right-2 bg-teal-600 hover:bg-teal-700 rounded-full"
+                      className={`absolute bottom-2 right-2 rounded-full ${
+                        isJobRoleFilled
+                          ? "bg-teal-600 hover:bg-teal-700"
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      }`}
                       onClick={() => handleAIAssist("description")}
-                      disabled={aiLoading === "description"}
+                      disabled={!isJobRoleFilled || aiLoading === "description"}
                     >
                       <Sparkles className="w-4 h-4 mr-1" />
                       {aiLoading === "description"
@@ -660,9 +776,15 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
                     <Button
                       type="button"
                       size="sm"
-                      className="absolute bottom-2 right-2 bg-teal-600 hover:bg-teal-700 rounded-full"
+                      className={`absolute bottom-2 right-2 rounded-full ${
+                        isJobRoleFilled
+                          ? "bg-teal-600 hover:bg-teal-700"
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      }`}
                       onClick={() => handleAIAssist("responsibilities")}
-                      disabled={aiLoading === "responsibilities"}
+                      disabled={
+                        !isJobRoleFilled || aiLoading === "responsibilities"
+                      }
                     >
                       <Sparkles className="w-4 h-4 mr-1" />
                       {aiLoading === "responsibilities"
@@ -699,9 +821,13 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
                     <Button
                       type="button"
                       size="sm"
-                      className="absolute bottom-2 right-2 bg-teal-600 hover:bg-teal-700 rounded-full"
+                      className={`absolute bottom-2 right-2 rounded-full ${
+                        isJobRoleFilled
+                          ? "bg-teal-600 hover:bg-teal-700"
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      }`}
                       onClick={() => handleAIAssist("benefits")}
-                      disabled={aiLoading === "benefits"}
+                      disabled={!isJobRoleFilled || aiLoading === "benefits"}
                     >
                       <Sparkles className="w-4 h-4 mr-1" />
                       {aiLoading === "benefits"
@@ -737,9 +863,15 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
                     <Button
                       type="button"
                       size="sm"
-                      className="absolute bottom-2 right-2 bg-teal-600 hover:bg-teal-700 rounded-full"
+                      className={`absolute bottom-2 right-2 rounded-full ${
+                        isJobRoleFilled
+                          ? "bg-teal-600 hover:bg-teal-700"
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      }`}
                       onClick={() => handleAIAssist("skills_required")}
-                      disabled={aiLoading === "skills_required"}
+                      disabled={
+                        !isJobRoleFilled || aiLoading === "skills_required"
+                      }
                     >
                       <Sparkles className="w-4 h-4 mr-1" />
                       {aiLoading === "skills_required"
@@ -789,7 +921,10 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
                         handleLanguageChange(index, "read", checked === true)
                       }
                     />
-                    <label htmlFor={`read-${index}`} className="text-sm">
+                    <label
+                      htmlFor={`read-${index}`}
+                      className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
                       Read
                     </label>
                   </div>
@@ -802,7 +937,10 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
                         handleLanguageChange(index, "write", checked === true)
                       }
                     />
-                    <label htmlFor={`write-${index}`} className="text-sm">
+                    <label
+                      htmlFor={`write-${index}`}
+                      className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
                       Write
                     </label>
                   </div>
@@ -815,7 +953,10 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
                         handleLanguageChange(index, "speak", checked === true)
                       }
                     />
-                    <label htmlFor={`speak-${index}`} className="text-sm">
+                    <label
+                      htmlFor={`speak-${index}`}
+                      className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
                       Speak
                     </label>
                   </div>
@@ -849,17 +990,18 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
 
             {/* Last date to apply */}
             <div className="space-y-3">
-              <label className="block text-sm font-normal text-gray-700">
-                Last date to apply
+              <label className="block text-sm font-medium text-gray-700">
+                Last date to apply <span className="text-destructive">*</span>
               </label>
 
               <div className="flex gap-3">
-                {/* Year Dropdown */}
+                {/* Year Dropdown - Select year first for better UX */}
                 <div className="relative flex-1">
                   <select
                     value={selectedYear}
                     onChange={(e) => {
                       setSelectedYear(e.target.value);
+                      // Reset month and date when year changes
                       setSelectedMonth("");
                       setSelectedDate("");
                     }}
@@ -881,6 +1023,7 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
                     value={selectedMonth}
                     onChange={(e) => {
                       setSelectedMonth(e.target.value);
+                      // Reset date when month changes
                       setSelectedDate("");
                     }}
                     disabled={!selectedYear}
@@ -941,12 +1084,18 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
 
               {/* Display selected date */}
               {selectedDate && selectedMonth && selectedYear && (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 mt-2">
                   Selected: {selectedDate}/{selectedMonth}/{selectedYear}
                 </p>
               )}
+
+              {errors.application_deadline && (
+                <p className="text-sm text-destructive">
+                  {errors.application_deadline.message}
+                </p>
+              )}
             </div>
-          </div>
+          </form>
 
           <div className="px-6 py-4 flex justify-end gap-3">
             <Button

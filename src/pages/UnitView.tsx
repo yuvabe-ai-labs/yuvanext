@@ -100,7 +100,7 @@ const UnitView = () => {
           <CardContent className="p-[1.875rem]">
             <div className="flex flex-col md:flex-row items-start gap-7">
               {/* Unit Logo */}
-              <div className="hidden md:block w-32 h-32 rounded-full bg-background border-4 border-background shadow-md text-4xl font-bold text-foreground overflow-hidden">
+              <div className="hidden md:flex justify-center items-center w-32 h-32 rounded-full bg-background border-4 border-background shadow-md text-4xl font-bold text-foreground overflow-hidden">
                 {(unit as any).avatar_url ? (
                   <img
                     src={(unit as any).avatar_url}
@@ -357,7 +357,7 @@ const UnitView = () => {
                               {/* View Button */}
                               <Button
                                 variant="gradient"
-                                className="rounded-full bg-clip-text text-transparent border border-orange-600 visible w-full bg-transparent md:invisible mt-4"
+                                className="rounded-full bg-clip-text text-transparent border border-orange-600 visible w-full bg-transparent md:hidden mt-4"
                                 onClick={() =>
                                   navigate(`/internships/${internship.id}`)
                                 }

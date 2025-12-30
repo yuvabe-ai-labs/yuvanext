@@ -64,37 +64,31 @@ const languageSchema = z
     path: ["read"],
   });
 
-const formSchema = z
-  .object({
-    title: z.string().min(1, "Job/Intern Role is required"),
-    duration: z.string().min(1, "Internship Period is required"),
-    isPaid: z.boolean(),
-    payment: z.string().optional(),
-    description: z
-      .string()
-      .min(10, "About Internship must be at least 10 characters"),
-    responsibilities: z.string().min(10, "Key Responsibilities is required"),
-    benefits: z.string().min(10, "Post Internship benefits is required"),
-    skills_required: z.string().min(1, "Skills Required is required"),
-    language_requirements: z
-      .array(languageSchema)
-      .min(1, "At least one language is required"),
-    application_deadline: z.date({
-      required_error: "Application deadline is required",
-    }),
-  })
-  .refine(
-    (data) => {
-      if (data.isPaid) {
-        return data.payment && data.payment.length > 0;
-      }
-      return true;
-    },
-    {
-      message: "Payment amount is required for paid internships",
-      path: ["payment"],
-    }
-  );
+const formSchema = z.object({
+  title: z.string().min(1, "Job/Intern Role is required"),
+  duration: z.string().min(1, "Internship Period is required"),
+  isPaid: z.boolean(),
+  payment: z.string().optional(), // Changed from optional().nullable() to just optional()
+  description: z
+    .string()
+    .min(10, "About Internship must be at least 10 characters"),
+  responsibilities: z.string().min(10, "Key Responsibilities is required"),
+  benefits: z.string().min(10, "Post Internship benefits is required"),
+  skills_required: z.string().min(1, "Skills Required is required"),
+  language_requirements: z
+    .array(languageSchema)
+    .min(1, "At least one language is required"),
+  min_age_required: z.coerce
+    .number({
+      required_error: "Minimum age is required",
+      invalid_type_error: "Minimum age must be a number",
+    })
+    .min(1, "Age is required"),
+  job_type: z.enum(["full_time", "part_time", "both"]),
+  application_deadline: z.date({
+    required_error: "Application deadline is required",
+  }),
+});
 
 type FormData = z.infer<typeof formSchema>;
 
@@ -132,7 +126,7 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
   ]);
 
   const [conversationHistory, setConversationHistory] = useState<any[]>([]);
-  const [isPaidState, setIsPaidState] = React.useState<boolean | null>(null); // ✅ renamed
+  const [isPaidState, setIsPaidState] = React.useState<boolean | null>(null); // âœ… renamed
 
   const {
     control,
@@ -156,6 +150,8 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
         { language: "", read: false, write: false, speak: false },
       ],
       application_deadline: undefined,
+      min_age_required: undefined, // Changed from "" to undefined
+      job_type: "full_time",
     },
   });
   const jobTitle = watch("title");
@@ -215,16 +211,18 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
       }
 
       // Parse skills and responsibilities into arrays
-      const skillsArray = data.skills_required.split(",").map((s) => s.trim());
+      const skillsArray = data.skills_required
+        .split("\n")
+        .filter((s) => s.trim());
       const responsibilitiesArray = data.responsibilities
         .split("\n")
         .filter((r) => r.trim());
       const benefitsArray = data.benefits.split("\n").filter((b) => b.trim());
 
-      // Get unit name from units table
+      // Get unit name and address from units table
       const { data: units, error: unitsError } = await supabase
         .from("units")
-        .select("unit_name")
+        .select("unit_name, address")
         .eq("profile_id", profile.id)
         .maybeSingle();
 
@@ -238,7 +236,7 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
         title: data.title,
         duration: data.duration,
         is_paid: data.isPaid,
-        payment: data.isPaid ? data.payment : null,
+        payment: data.isPaid && data.payment ? data.payment : null,
         description: data.description,
         responsibilities: responsibilitiesArray,
         benefits: benefitsArray,
@@ -248,6 +246,9 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
         created_by: profile.id,
         status: "active",
         company_name: units?.unit_name || "Unit",
+        location: units?.address || null, // Add location from unit address
+        min_age_required: data.min_age_required,
+        job_type: data.job_type,
       });
 
       if (error) throw error;
@@ -312,7 +313,7 @@ Return only the clean list, one benefit per line, no extra text or introduction.
 
         case "skills_required":
           prompt = `List 5-8 essential skills required for a ${jobTitle} internship.
-Return as a comma-separated list, with no extra explanation or headers.`;
+Return only the clean list, one skill per line, no extra text or introduction`;
           break;
 
         default:
@@ -344,20 +345,20 @@ Return as a comma-separated list, with no extra explanation or headers.`;
           .replace(/\*\*/g, "")
           .replace(/\*/g, "")
           .replace(/^#+\s/gm, "")
-          .replace(/^(here('|’)s|sure|of course|okay|let'?s).*\n/i, "")
+          .replace(/^(here('|â€™)s|sure|of course|okay|let'?s).*\n/i, "")
           .replace(/^about .*internship.*\n?/i, "")
           .trim();
 
-        // For description — keep only first paragraph
+        // For description â€” keep only first paragraph
         if (fieldName === "description") {
           cleanResponse = cleanResponse.split(/\n\s*\n/)[0].trim();
         }
 
-        // For responsibilities/benefits — keep only clean lines
+        // For responsibilities/benefits â€” keep only clean lines
         if (["responsibilities", "benefits"].includes(fieldName)) {
           cleanResponse = cleanResponse
             .split(/\n+/)
-            .map((line) => line.replace(/^[-•\d.]\s*/, "").trim())
+            .map((line) => line.replace(/^[-â€¢\d.]\s*/, "").trim())
             .filter((line) => line.length > 0)
             .join("\n");
         }
@@ -579,6 +580,58 @@ Return as a comma-separated list, with no extra explanation or headers.`;
               )}
             </div>
 
+            {/* Job Type */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                Engagement Type <span className="text-destructive">*</span>
+              </Label>
+              <Controller
+                name="job_type"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex items-center gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="full_time"
+                        checked={field.value === "full_time"}
+                        onChange={() => field.onChange("full_time")}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <span className="text-sm">Full Time</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="part_time"
+                        checked={field.value === "part_time"}
+                        onChange={() => field.onChange("part_time")}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <span className="text-sm">Part Time</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="both"
+                        checked={field.value === "both"}
+                        onChange={() => field.onChange("both")}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <span className="text-sm">Both</span>
+                    </label>
+                  </div>
+                )}
+              />
+              {errors.job_type && (
+                <p className="text-sm text-destructive">
+                  {errors.job_type.message}
+                </p>
+              )}
+            </div>
+
             {/* Internship Type */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">
@@ -590,6 +643,7 @@ Return as a comma-separated list, with no extra explanation or headers.`;
                   control={control}
                   render={({ field }) => (
                     <>
+                      {/* Paid Button */}
                       <div className="flex items-center gap-2">
                         <Button
                           type="button"
@@ -608,7 +662,8 @@ Return as a comma-separated list, with no extra explanation or headers.`;
                         </Button>
                       </div>
 
-                      {isPaid && (
+                      {/* Show amount input when Paid is selected */}
+                      {field.value && (
                         <Controller
                           name="payment"
                           control={control}
@@ -616,13 +671,14 @@ Return as a comma-separated list, with no extra explanation or headers.`;
                             <Input
                               {...field}
                               type="text"
-                              placeholder="Enter amount"
+                              placeholder="e.g. 10000 or To be discussed"
                               className="max-w-[200px]"
                             />
                           )}
                         />
                       )}
 
+                      {/* Unpaid Button */}
                       <div className="flex items-center gap-2">
                         <Button
                           type="button"
@@ -644,9 +700,43 @@ Return as a comma-separated list, with no extra explanation or headers.`;
                   )}
                 />
               </div>
+
               {errors.payment && (
                 <p className="text-sm text-destructive">
                   {errors.payment.message}
+                </p>
+              )}
+            </div>
+
+            {/* Minimum Age Required */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                Minimum Age Required <span className="text-destructive">*</span>
+              </Label>
+              <Controller
+                name="min_age_required"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange}>
+                    <SelectTrigger className="w-[150px] rounded-full">
+                      <SelectValue placeholder="Select age" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[...Array(10)].map((_, i) => {
+                        const age = 16 + i;
+                        return (
+                          <SelectItem key={age} value={String(age)}>
+                            {age}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.min_age_required && (
+                <p className="text-sm text-destructive">
+                  {errors.min_age_required.message}
                 </p>
               )}
             </div>

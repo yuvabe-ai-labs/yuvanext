@@ -11,7 +11,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 // 1. IMPORT BETTER AUTH CLIENT
-import { authClient } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
 import { useState, useEffect } from "react";
 import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
@@ -33,7 +33,7 @@ import InternshipDetail from "./pages/InternshipDetail";
 import AuthCallback from "@/hooks/AuthCallback";
 import RecommendedInternships from "./pages/RecommendedInternships";
 import ForgotPassword from "./pages/ForgotPassword";
-import CheckEmail from "./pages/CheckEmail";
+import CheckEmail from "./components/CheckEmail";
 import ResetPassword from "./pages/ResetPassword";
 import CandidateTasks from "./pages/CandidateTasks";
 import MyTasks from "./pages/MyTasks";
@@ -46,7 +46,7 @@ const queryClient = new QueryClient();
 // Protected Route component with onboarding check and role-based routing
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   // 2. CHECK SESSION STATUS
-  const { data: session, isPending: isAuthPending } = authClient.useSession();
+  const { data: session, isPending: isAuthPending } = useSession();
 
   const [profileLoading, setProfileLoading] = useState(true);
   const navigate = useNavigate();
@@ -152,7 +152,6 @@ const App = () => (
           <Route path="/auth/:role/signin" element={<SignIn />} />
           <Route path="/auth/:role/signup" element={<SignUp />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/check-email" element={<CheckEmail />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
           <Route

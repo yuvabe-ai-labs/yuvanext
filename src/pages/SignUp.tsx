@@ -72,30 +72,36 @@ const SignUp = () => {
       password: password,
       name: fullName,
       metadata: {
-        role: "candidate",
+        role: role || "candidate",
+        companyWebsite: isUnitRole ? companyWebsite : undefined,
       },
       // IMPORTANT: Ensure your backend schema has 'role' and 'companyWebsite' fields defined
       // or these extra fields might be ignored/cause errors depending on your config.
-      // role: role || "student",
-      // companyWebsite: isUnitRole ? companyWebsite : undefined,
+      //
     });
 
     if (error) {
       // Check for specific error messages (Better Auth API structure)
-      if (
-        error.message?.includes("already registered") ||
-        error.message?.toLowerCase().includes("exists")
-      ) {
+      if (error.status === 409) {
+        // Status 409: Conflict (User already exists)
         toast({
           title: "Account already exists",
           description:
             "This email is already registered. Please sign in instead.",
           variant: "destructive",
         });
+      } else if (error.status === 429) {
+        // Status 429: Rate Limit
+        toast({
+          title: "Too many attempts",
+          description: "Please wait a moment before trying again.",
+          variant: "destructive",
+        });
       } else {
+        // Fallback for 500 or 400
         toast({
           title: "Sign up failed",
-          description: error.message || "An unknown error occurred",
+          description: error.message || "An unknown error occurred.",
           variant: "destructive",
         });
       }

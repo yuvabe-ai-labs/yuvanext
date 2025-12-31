@@ -128,3 +128,13 @@ export const useInternships = () => {
     refetch,
   };
 };
+
+import { useQuery } from "@tanstack/react-query";
+import { getInternships } from "@/services/internships.service";
+
+export const useInternship = () => {
+  return useQuery({
+    queryKey: ["internships"],
+    queryFn: getInternships,
+  });
+};

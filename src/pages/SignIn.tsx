@@ -38,28 +38,23 @@ const SignIn = () => {
     if (error) {
       let errorMessage =
         error.message || "Something went wrong. Please try again.";
+      let errorTitle = "Sign in failed";
 
-      // Better Auth usually provides clear messages, but we can map common ones
-      if (
-        errorMessage.toLowerCase().includes("invalid") ||
-        errorMessage.toLowerCase().includes("credentials") ||
-        errorMessage.toLowerCase().includes("password")
-      ) {
+      if (error.status === 401) {
+        // Status 401: Unauthorized (Wrong Credentials)
         errorMessage =
           "Incorrect email or password. Please check your credentials.";
-      }
-
-      // Handle email verification if your config requires it
-      if (
-        errorMessage.toLowerCase().includes("verify") ||
-        errorMessage.includes("verified")
-      ) {
+      } else if (error.status === 403) {
+        // Status 403: Forbidden (Email not verified)
         errorMessage =
           "Please check your email and verify your account before signing in.";
+        errorTitle = "Verification Required";
+      } else if (error.status === 429) {
+        errorMessage = "Too many login attempts. Please try again later.";
       }
 
       toast({
-        title: "Sign in failed",
+        title: errorTitle,
         description: errorMessage,
         variant: "destructive",
       });

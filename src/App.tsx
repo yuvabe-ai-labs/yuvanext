@@ -11,7 +11,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 // 1. IMPORT BETTER AUTH CLIENT
-import { authClient } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
 import { useState, useEffect } from "react";
 import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
@@ -33,20 +33,20 @@ import InternshipDetail from "./pages/InternshipDetail";
 import AuthCallback from "@/hooks/AuthCallback";
 import RecommendedInternships from "./pages/RecommendedInternships";
 import ForgotPassword from "./pages/ForgotPassword";
-import CheckEmail from "./pages/CheckEmail";
+import CheckEmail from "./components/CheckEmail";
 import ResetPassword from "./pages/ResetPassword";
 import CandidateTasks from "./pages/CandidateTasks";
 import MyTasks from "./pages/MyTasks";
 import UnitCandidateTasks from "./pages/UnitCandidateTasks";
 import Settings from "./pages/Settings";
 import ScrollToTop from "@/components/ScrollToTop";
-
+import { NuqsAdapter } from "nuqs/adapters/react-router";
 const queryClient = new QueryClient();
 
 // Protected Route component with role-based routing (onboarding redirect removed)
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   // 2. CHECK SESSION STATUS
-  const { data: session, isPending: isAuthPending } = authClient.useSession();
+  const { data: session, isPending: isAuthPending } = useSession();
 
   const [profileLoading, setProfileLoading] = useState(true);
   const navigate = useNavigate();
@@ -118,163 +118,164 @@ const App = () => (
       <BrowserRouter>
         <ScrollToTop />
         {/* 4. REMOVED AuthProvider (Better Auth manages its own state) */}
-        <Routes>
-          <Route path="/auth/callback" element={<AuthCallback />} />
+        <NuqsAdapter>
+          <Routes>
+            <Route path="/auth/callback" element={<AuthCallback />} />
 
-          <Route
-            path="/chatbot"
-            element={
-              <ProtectedRoute>
-                <Chatbot />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/" element={<Landing />} />
-          <Route path="/auth/:role/signin" element={<SignIn />} />
-          <Route path="/auth/:role/signup" element={<SignUp />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/check-email" element={<CheckEmail />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
+            <Route
+              path="/chatbot"
+              element={
+                <ProtectedRoute>
+                  <Chatbot />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/" element={<Landing />} />
+            <Route path="/auth/:role/signin" element={<SignIn />} />
+            <Route path="/auth/:role/signup" element={<SignUp />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
-          <Route
-            path="/internships/:id"
-            element={
-              <ProtectedRoute>
-                <InternshipDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/recommended-internships"
-            element={
-              <ProtectedRoute>
-                <RecommendedInternships />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/unit-dashboard"
-            element={
-              <ProtectedRoute>
-                <UnitDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/internships"
-            element={
-              <ProtectedRoute>
-                <Internships />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/courses"
-            element={
-              <ProtectedRoute>
-                <Courses />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/units"
-            element={
-              <ProtectedRoute>
-                <Units />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/units/:id"
-            element={
-              <ProtectedRoute>
-                <UnitView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/candidate/:id"
-            element={
-              <ProtectedRoute>
-                <CandidateProfile />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/internships/:id"
+              element={
+                <ProtectedRoute>
+                  <InternshipDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/recommended-internships"
+              element={
+                <ProtectedRoute>
+                  <RecommendedInternships />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/unit-dashboard"
+              element={
+                <ProtectedRoute>
+                  <UnitDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/internships"
+              element={
+                <ProtectedRoute>
+                  <Internships />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/courses"
+              element={
+                <ProtectedRoute>
+                  <Courses />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/units"
+              element={
+                <ProtectedRoute>
+                  <Units />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/units/:id"
+              element={
+                <ProtectedRoute>
+                  <UnitView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/candidate/:id"
+              element={
+                <ProtectedRoute>
+                  <CandidateProfile />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/unit-profile"
-            element={
-              <ProtectedRoute>
-                <UnitProfile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/all-applications"
-            element={
-              <ProtectedRoute>
-                <AllApplications />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/candidate-tasks"
-            element={
-              <ProtectedRoute>
-                <CandidateTasks />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/internship-applicants/:internshipId"
-            element={
-              <ProtectedRoute>
-                <InternshipApplicants />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/my-tasks/:applicationId"
-            element={
-              <ProtectedRoute>
-                <MyTasks />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/unit/candidate-tasks/:applicationId"
-            element={
-              <ProtectedRoute>
-                <UnitCandidateTasks />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute>
-                <Settings />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/unit-profile"
+              element={
+                <ProtectedRoute>
+                  <UnitProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/all-applications"
+              element={
+                <ProtectedRoute>
+                  <AllApplications />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/candidate-tasks"
+              element={
+                <ProtectedRoute>
+                  <CandidateTasks />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/internship-applicants/:internshipId"
+              element={
+                <ProtectedRoute>
+                  <InternshipApplicants />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-tasks/:applicationId"
+              element={
+                <ProtectedRoute>
+                  <MyTasks />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/unit/candidate-tasks/:applicationId"
+              element={
+                <ProtectedRoute>
+                  <UnitCandidateTasks />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </NuqsAdapter>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

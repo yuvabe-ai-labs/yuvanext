@@ -38,7 +38,7 @@ const AuthCallback = () => {
             description: error.message || "Failed to authenticate",
             variant: "destructive",
           });
-          navigate("/auth/student/signin");
+          navigate("/auth/candidate/signin");
           return;
         }
 
@@ -60,7 +60,7 @@ const AuthCallback = () => {
             title: "Verification Complete",
             description: "Please sign in to continue.",
           });
-          navigate("/auth/student/signin");
+          navigate("/auth/candidate/signin");
         }
       } catch (error: any) {
         console.error("Callback error:", error);
@@ -69,7 +69,7 @@ const AuthCallback = () => {
           description: "Something went wrong. Please try signing in.",
           variant: "destructive",
         });
-        navigate("/auth/student/signin");
+        navigate("/auth/candidate/signin");
       }
     };
 

@@ -158,7 +158,7 @@ const ForgotPassword = () => {
                   </button>
 
                   <Link
-                    to="/auth/student/signin"
+                    to="/auth/candidate/signin"
                     className="w-full h-[40px] rounded-lg flex items-center justify-center text-[14px] font-medium border border-[#D1D5DB] hover:bg-gray-50 transition-colors gap-2"
                     style={{ color: "#3F83F8" }}
                   >

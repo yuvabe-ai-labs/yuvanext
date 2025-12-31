@@ -115,7 +115,7 @@ const Navbar = () => {
     if (userRole === "unit") {
       navigate("/auth/unit/signin");
     } else {
-      navigate("/auth/student/signin");
+      navigate("/auth/candidate/signin");
     }
 
     setMobileMenuOpen(false);

@@ -10,9 +10,9 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/hooks/useAuth";
+// 1. IMPORT BETTER AUTH CLIENT
+import { useSession } from "@/lib/auth-client";
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
@@ -33,96 +33,91 @@ import InternshipDetail from "./pages/InternshipDetail";
 import AuthCallback from "@/hooks/AuthCallback";
 import RecommendedInternships from "./pages/RecommendedInternships";
 import ForgotPassword from "./pages/ForgotPassword";
-import CheckEmail from "./pages/CheckEmail";
+import CheckEmail from "./components/CheckEmail";
 import ResetPassword from "./pages/ResetPassword";
 import CandidateTasks from "./pages/CandidateTasks";
 import MyTasks from "./pages/MyTasks";
 import UnitCandidateTasks from "./pages/UnitCandidateTasks";
 import Settings from "./pages/Settings";
-import ScrollToTop from "@/components/ScrollToTop"; // Adjust path if needed
-
+import ScrollToTop from "@/components/ScrollToTop";
+import { NuqsAdapter } from "nuqs/adapters/react-router";
 const queryClient = new QueryClient();
 
 // Protected Route component with onboarding check and role-based routing
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
+  // 2. CHECK SESSION STATUS
+  const { data: session, isPending: isAuthPending } = useSession();
+
   const [profileLoading, setProfileLoading] = useState(true);
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     const checkProfileAndRedirect = async () => {
-      if (user) {
-        try {
-          // Fetch profile with role and onboarding status
-          const { data: profile, error } = await supabase
-            .from("profiles")
-            .select("onboarding_completed, role, deactivated_at")
-            .eq("user_id", user.id)
-            .maybeSingle();
+      // If auth is still loading, do nothing yet
+      if (isAuthPending) return;
 
-          if (error) {
-            console.error("Error fetching profile:", error);
-            setProfileLoading(false);
-            return;
-          }
-
-          // Direct Update if needed
-          if (profile?.deactivated_at) {
-            const { error: updateError } = await supabase
-              .from("profiles")
-              .update({ deactivated_at: null })
-              .eq("user_id", user.id);
-
-            if (updateError)
-              console.error("Failed to reactivate:", updateError);
-          }
-
-          const isOnboardingCompleted = profile?.onboarding_completed || false;
-          const role = profile?.role || "student";
-
-          setHasCompletedOnboarding(isOnboardingCompleted);
-          setUserRole(role);
-
-          // If onboarding not completed, redirect to chatbot
-          if (!isOnboardingCompleted && location.pathname !== "/chatbot") {
-            navigate("/chatbot", { replace: true });
-            setProfileLoading(false);
-            return;
-          }
-
-          // Role-based routing after onboarding is complete
-          if (isOnboardingCompleted) {
-            // For students accessing unit dashboard or vice versa
-            if (role === "student" && location.pathname === "/unit-dashboard") {
-              navigate("/dashboard", { replace: true });
-            } else if (role === "unit" && location.pathname === "/dashboard") {
-              navigate("/unit-dashboard", { replace: true });
-            }
-            // Redirect from chatbot to appropriate dashboard after onboarding
-            else if (location.pathname === "/chatbot") {
-              const targetDashboard =
-                role === "unit" ? "/unit-dashboard" : "/dashboard";
-              navigate(targetDashboard, { replace: true });
-            }
-          }
-        } catch (error) {
-          console.error("Error checking profile:", error);
-        }
+      // If no session, the render will handle the redirect to "/"
+      if (!session) {
+        setProfileLoading(false);
+        return;
       }
-      setProfileLoading(false);
+
+      try {
+        // 3. FETCH PROFILE DATA FROM YOUR BACKEND (Hono)
+        // Ensure you have a GET route like '/api/profile' or '/api/profile/me'
+        // that returns { onboarding_completed, role }
+        const response = await fetch("http://localhost:3000/api/profile", {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          // CRITICAL: Send cookies to backend so it knows who we are
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          console.error("Failed to fetch profile");
+          setProfileLoading(false);
+          return;
+        }
+
+        const profile = await response.json();
+        // You mentioned the api/chatbot endpoint returns this data too.
+        // If you prefer that, change the URL above to "/api/chatbot"
+        // and adjust the object access below.
+
+        const isOnboardingCompleted = profile?.onboarding_completed || false;
+        const role = profile?.role || "student";
+
+        // Logic from your original code:
+        if (!isOnboardingCompleted && location.pathname !== "/chatbot") {
+          navigate("/chatbot", { replace: true });
+          setProfileLoading(false);
+          return;
+        }
+
+        if (isOnboardingCompleted) {
+          if (role === "student" && location.pathname === "/unit-dashboard") {
+            navigate("/dashboard", { replace: true });
+          } else if (role === "unit" && location.pathname === "/dashboard") {
+            navigate("/unit-dashboard", { replace: true });
+          } else if (location.pathname === "/chatbot") {
+            const targetDashboard =
+              role === "unit" ? "/unit-dashboard" : "/dashboard";
+            navigate(targetDashboard, { replace: true });
+          }
+        }
+      } catch (error) {
+        console.error("Error checking profile:", error);
+      } finally {
+        setProfileLoading(false);
+      }
     };
 
-    if (!loading && user) {
-      checkProfileAndRedirect();
-    } else {
-      setProfileLoading(false);
-    }
-  }, [user, loading, location.pathname, navigate]);
+    checkProfileAndRedirect();
+  }, [session, isAuthPending, location.pathname, navigate]);
 
-  if (loading || profileLoading) {
+  if (isAuthPending || (session && profileLoading)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-muted flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -130,7 +125,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  return user ? <>{children}</> : <Navigate to="/" replace />;
+  // If not authenticated, redirect to Landing
+  return session ? <>{children}</> : <Navigate to="/" replace />;
 };
 
 const App = () => (
@@ -140,10 +136,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ScrollToTop />
-        <AuthProvider>
+        {/* 4. REMOVED AuthProvider (Better Auth manages its own state) */}
+        <NuqsAdapter>
           <Routes>
             <Route path="/auth/callback" element={<AuthCallback />} />
-            {/* Chatbot Route */}
+
             <Route
               path="/chatbot"
               element={
@@ -156,8 +153,8 @@ const App = () => (
             <Route path="/auth/:role/signin" element={<SignIn />} />
             <Route path="/auth/:role/signup" element={<SignUp />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/check-email" element={<CheckEmail />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+
             <Route
               path="/internships/:id"
               element={
@@ -187,14 +184,6 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <UnitDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/chatbot"
-              element={
-                <ProtectedRoute>
-                  <Chatbot />
                 </ProtectedRoute>
               }
             />
@@ -238,14 +227,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* <Route
-              path="/candidate"
-              element={
-                <ProtectedRoute>
-                  <CandidateProfile />
-                </ProtectedRoute>
-              }
-            /> */}
+
             <Route
               path="/profile"
               element={
@@ -294,7 +276,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/unit/candidate-tasks/:applicationId"
               element={
@@ -303,7 +284,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/settings"
               element={
@@ -312,10 +292,9 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </AuthProvider>
+        </NuqsAdapter>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

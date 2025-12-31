@@ -7,7 +7,7 @@ import { handleApiResponse, handleApiError } from "@/lib/api-handler";
  */
 export const getInternships = async (): Promise<Internship[]> => {
   try {
-    const response = await axiosInstance.get("/api/internships");
+    const response = await axiosInstance.get("/internships");
     return handleApiResponse<Internship[]>(response, []);
   } catch (error) {
     return handleApiError(error, "Failed to fetch internships");

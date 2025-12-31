@@ -20,7 +20,6 @@ import Dashboard from "./pages/Dashboard";
 import UnitDashboard from "./pages/UnitDashboard";
 import Chatbot from "./pages/Chatbot";
 import Internships from "./pages/Internships";
-import InternshipList from "./pages/InternshipList";
 import Courses from "./pages/Courses";
 import Units from "./pages/Units";
 import UnitView from "./pages/UnitView";
@@ -174,14 +173,6 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Internships />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/internshiplist"
-            element={
-              <ProtectedRoute>
-                <InternshipList />
               </ProtectedRoute>
             }
           />

@@ -65,7 +65,6 @@ const SignUp = () => {
     }
 
     setLoading(true);
-    const finalRole = role === "student" ? "candidate" : role;
 
     // 2. USE BETTER AUTH SIGN UP
     const { data, error } = await authClient.signUp.email({
@@ -73,7 +72,7 @@ const SignUp = () => {
       password: password,
       name: fullName,
       metadata: {
-        role: finalRole,
+        role: role,
         companyWebsite: isUnitRole ? companyWebsite : undefined,
       },
     });

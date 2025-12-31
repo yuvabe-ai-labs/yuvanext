@@ -99,7 +99,7 @@ const ResetPassword = () => {
         description: "Your password has been successfully updated.",
       });
 
-      setTimeout(() => navigate("/auth/student/signin"), 2000);
+      setTimeout(() => navigate("/auth/candidate/signin"), 2000);
     } catch (err) {
       console.error("Error:", err);
       toast({
@@ -318,7 +318,7 @@ const ResetPassword = () => {
 
               <button
                 type="button"
-                onClick={() => navigate("/auth/student/signin")}
+                onClick={() => navigate("/auth/candidate/signin")}
                 className="w-full h-[38px] rounded-lg flex items-center justify-center text-[13px] font-medium border border-[#D1D5DB] hover:bg-gray-50 transition-all"
                 style={{ color: "#76A9FA" }}
               >

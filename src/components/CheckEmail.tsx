@@ -45,7 +45,7 @@ const CheckEmail = () => {
 
           {/* Back to Sign In */}
           <Link
-            to="/auth/student/signin"
+            to="/auth/candidate/signin"
             className="w-full h-[30px] rounded-lg flex items-center justify-center text-[12px] font-medium text-white hover:opacity-90 transition-colors gap-2"
             style={{ backgroundColor: "#76A9FA" }}
           >

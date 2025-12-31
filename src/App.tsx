@@ -20,6 +20,7 @@ import Dashboard from "./pages/Dashboard";
 import UnitDashboard from "./pages/UnitDashboard";
 import Chatbot from "./pages/Chatbot";
 import Internships from "./pages/Internships";
+import InternshipList from "./pages/InternshipList";
 import Courses from "./pages/Courses";
 import Units from "./pages/Units";
 import UnitView from "./pages/UnitView";
@@ -43,7 +44,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
-// Protected Route component with onboarding check and role-based routing
+// Protected Route component with role-based routing (onboarding redirect removed)
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   // 2. CHECK SESSION STATUS
   const { data: session, isPending: isAuthPending } = authClient.useSession();
@@ -65,9 +66,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
       try {
         // 3. FETCH PROFILE DATA FROM YOUR BACKEND (Hono)
-        // Ensure you have a GET route like '/api/profile' or '/api/profile/me'
-        // that returns { onboarding_completed, role }
-        const response = await fetch("http://localhost:3000/api/profile", {
+        const response = await fetch("http://localhost:9999/api/profile", {
           headers: {
             "Content-Type": "application/json",
           },
@@ -82,30 +81,13 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         }
 
         const profile = await response.json();
-        // You mentioned the api/chatbot endpoint returns this data too.
-        // If you prefer that, change the URL above to "/api/chatbot"
-        // and adjust the object access below.
+        const role = profile?.role;
 
-        const isOnboardingCompleted = profile?.onboarding_completed || false;
-        const role = profile?.role || "student";
-
-        // Logic from your original code:
-        if (!isOnboardingCompleted && location.pathname !== "/chatbot") {
-          navigate("/chatbot", { replace: true });
-          setProfileLoading(false);
-          return;
-        }
-
-        if (isOnboardingCompleted) {
-          if (role === "student" && location.pathname === "/unit-dashboard") {
-            navigate("/dashboard", { replace: true });
-          } else if (role === "unit" && location.pathname === "/dashboard") {
-            navigate("/unit-dashboard", { replace: true });
-          } else if (location.pathname === "/chatbot") {
-            const targetDashboard =
-              role === "unit" ? "/unit-dashboard" : "/dashboard";
-            navigate(targetDashboard, { replace: true });
-          }
+        // Only handle role-based dashboard redirects
+        if (role === "candidate" && location.pathname === "/unit-dashboard") {
+          navigate("/dashboard", { replace: true });
+        } else if (role === "unit" && location.pathname === "/dashboard") {
+          navigate("/unit-dashboard", { replace: true });
         }
       } catch (error) {
         console.error("Error checking profile:", error);
@@ -192,6 +174,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Internships />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/internshiplist"
+            element={
+              <ProtectedRoute>
+                <InternshipList />
               </ProtectedRoute>
             }
           />

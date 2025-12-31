@@ -72,7 +72,7 @@ const SignUp = () => {
       password: password,
       name: fullName,
       metadata: {
-        role: "candidate",
+        role: role,
       },
       // IMPORTANT: Ensure your backend schema has 'role' and 'companyWebsite' fields defined
       // or these extra fields might be ignored/cause errors depending on your config.

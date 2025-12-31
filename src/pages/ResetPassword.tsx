@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-// 1. IMPORT BETTER AUTH CLIENT
+// 1. IMPORT NUQS
+import { useQueryState } from "nuqs";
 import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/hooks/use-toast";
 import signupIllustrate from "@/assets/signinillustion.png";
@@ -26,7 +27,10 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
+
+  // 2. REPLACE MANUAL PARSING WITH NUQS HOOK
+  // This automatically reads ?token=... from the URL
+  const [token] = useQueryState("token");
 
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -36,23 +40,12 @@ const ResetPassword = () => {
   const passwordsMatch =
     newPassword === confirmPassword && confirmPassword !== "";
 
+  // 3. SIMPLIFIED EFFECT (Only for error checking now)
   useEffect(() => {
-    // 2. GET TOKEN FROM QUERY PARAMS (Better Auth style)
-    // The link in email will look like: /reset-password?token=xyz...
-    const searchParams = new URLSearchParams(window.location.search);
-    const urlToken = searchParams.get("token");
-
-    // Fallback: Check hash just in case of weird redirects, but usually query
-    // const hashParams = new URLSearchParams(window.location.hash.substring(1));
-
-    if (urlToken) {
-      setToken(urlToken);
-    } else {
+    if (!token) {
       setError("Invalid or expired reset link. Please request a new one.");
-      // Optional: don't redirect immediately so they can read the error
-      // setTimeout(() => navigate("/forgot-password"), 3000);
     }
-  }, [navigate]);
+  }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,10 +71,9 @@ const ResetPassword = () => {
     }
 
     try {
-      // 3. USE BETTER AUTH RESET PASSWORD
       const { data, error: resetError } = await authClient.resetPassword({
         newPassword: newPassword,
-        token: token, // Pass the token grabbed from URL
+        token: token, // Uses the token from nuqs
       });
 
       if (resetError) {
@@ -100,7 +92,6 @@ const ResetPassword = () => {
         description: "Your password has been successfully updated.",
       });
 
-      // Redirect to login
       setTimeout(() => navigate("/auth/student/signin"), 2000);
     } catch (err) {
       console.error("Error:", err);

@@ -65,6 +65,7 @@ const SignUp = () => {
     }
 
     setLoading(true);
+    const finalRole = role === "student" ? "candidate" : role;
 
     // 2. USE BETTER AUTH SIGN UP
     const { data, error } = await authClient.signUp.email({
@@ -72,12 +73,9 @@ const SignUp = () => {
       password: password,
       name: fullName,
       metadata: {
-        role: role || "candidate",
+        role: finalRole,
         companyWebsite: isUnitRole ? companyWebsite : undefined,
       },
-      // IMPORTANT: Ensure your backend schema has 'role' and 'companyWebsite' fields defined
-      // or these extra fields might be ignored/cause errors depending on your config.
-      //
     });
 
     if (error) {

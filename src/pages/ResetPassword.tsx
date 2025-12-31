@@ -77,8 +77,15 @@ const ResetPassword = () => {
       });
 
       if (resetError) {
-        if (resetError.message?.includes("same")) {
-          setError("New password must be different from your current password");
+        // ✅ Status 401 or 403: Invalid/Expired Token
+        if (resetError.status === 401 || resetError.status === 403) {
+          setError(
+            "This link is invalid or expired. Please request a new one."
+          );
+        }
+        // ✅ Status 429: Rate Limit
+        else if (resetError.status === 429) {
+          setError("Too many attempts. Please try again later.");
         } else {
           setError(resetError.message || "Failed to reset password");
         }

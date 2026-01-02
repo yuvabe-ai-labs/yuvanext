@@ -27,8 +27,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 import {
@@ -36,8 +34,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuCheckboxItem,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
@@ -49,13 +45,16 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// Hooks (Refactored)
 import { useInternships } from "@/hooks/useInternships";
 import { useUnitApplications } from "@/hooks/useUnitApplications";
 import { useUnitReports } from "@/hooks/useUnitReports";
 import { useHiredApplicants } from "@/hooks/useHiredApplicants";
 import { useStudentTasks } from "@/hooks/useStudentTasks";
+// Utilities
 import { calculateOverallTaskProgress } from "@/utils/taskProgress";
-import { supabase } from "@/integrations/supabase/client";
+// Axios Instance (Replaces Supabase)
+import axiosInstance from "@/config/platform-api";
 import {
   ArrowRight,
   Briefcase,
@@ -99,13 +98,16 @@ const CandidateTaskProgress = ({
     if (tasks.length === 0) return { startDate: null, endDate: null };
 
     const dates = tasks
-      .filter((task) => task.start_date && task.end_date)
-      .flatMap((task) => [new Date(task.start_date), new Date(task.end_date)]);
+      .filter((task: any) => task.start_date && task.end_date)
+      .flatMap((task: any) => [
+        new Date(task.start_date),
+        new Date(task.end_date),
+      ]);
 
     if (dates.length === 0) return { startDate: null, endDate: null };
 
-    const startDate = new Date(Math.min(...dates.map((d) => d.getTime())));
-    const endDate = new Date(Math.max(...dates.map((d) => d.getTime())));
+    const startDate = new Date(Math.min(...dates.map((d: any) => d.getTime())));
+    const endDate = new Date(Math.max(...dates.map((d: any) => d.getTime())));
 
     return { startDate, endDate };
   };
@@ -123,7 +125,6 @@ const CandidateTaskProgress = ({
         </span>
       </div>
 
-      {/* Progress Bar (thicker h-4) */}
       <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
         <div
           className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all duration-500 ease-out"
@@ -131,7 +132,6 @@ const CandidateTaskProgress = ({
         />
       </div>
 
-      {/* Dates */}
       <div className="flex justify-between items-center text-xs text-gray-500">
         <span>
           Started: {startDate ? format(startDate, "dd/MM/yyyy") : "Not started"}
@@ -147,13 +147,23 @@ const CandidateTaskProgress = ({
 const UnitDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("applications");
+
+  // Custom Hooks (Using Axios internally now)
   const { applications, stats, loading } = useUnitApplications();
   const { internships, loading: internshipsLoading } = useInternships();
+  const { data: hiredCandidates, loading: hiredLoading } = useHiredApplicants();
+
+  console.log("************");
+  console.log(internships);
+  console.log(applications);
+  console.log(hiredCandidates);
+
   const {
-    data: hiredCandidates,
-    unitInfo,
-    loading: hiredLoading,
-  } = useHiredApplicants();
+    weeklyData,
+    stats: reportStats,
+    loading: reportsLoading,
+  } = useUnitReports();
+
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [jobFilter, setJobFilter] = useState("all");
   const [updating, setUpdating] = useState<string | null>(null);
@@ -164,12 +174,6 @@ const UnitDashboard = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [activatingInternship, setActivatingInternship] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const {
-    weeklyData,
-    monthlyData,
-    stats: reportStats,
-    loading: reportsLoading,
-  } = useUnitReports();
 
   // Auto-close internships when deadline passes
   useEffect(() => {
@@ -179,17 +183,19 @@ const UnitDashboard = () => {
       const now = new Date();
       const expiredInternships = internships.filter((internship) => {
         if (internship.status !== "active") return false;
+        // Use application_deadline field from your API response
         const deadline = new Date(internship.application_deadline);
         return deadline < now;
       });
 
       if (expiredInternships.length > 0) {
         try {
+          // Batch update: Loop through and close each
+          // Ideally backend has a cron job, but frontend can trigger individual updates
           const updatePromises = expiredInternships.map((internship) =>
-            supabase
-              .from("internships")
-              .update({ status: "closed" })
-              .eq("id", internship.id)
+            axiosInstance.put(`/internships/${internship.id}`, {
+              status: "closed",
+            })
           );
 
           await Promise.all(updatePromises);
@@ -232,13 +238,6 @@ const UnitDashboard = () => {
     window.location.reload();
   };
 
-  const handleViewDetails = (internshipId: string) => {
-    const internship = internships.find((i) => i.id === internshipId);
-    if (internship) {
-      setSelectedInternship(internship);
-    }
-  };
-
   const handleAddComments = (internshipId: string) => {
     const internship = internships.find((i) => i.id === internshipId);
     if (internship) {
@@ -257,12 +256,8 @@ const UnitDashboard = () => {
     try {
       setUpdating(deletingInternship.id);
 
-      const { error: deleteError } = await supabase
-        .from("internships")
-        .delete()
-        .eq("id", deletingInternship.id);
-
-      if (deleteError) throw deleteError;
+      // AXIOS DELETE: /api/internships/{id}
+      await axiosInstance.delete(`/internships/${deletingInternship.id}`);
 
       setShowDeleteDialog(false);
       setDeletingInternship(null);
@@ -283,12 +278,10 @@ const UnitDashboard = () => {
       try {
         setUpdating(internship.id);
 
-        const { error: updateError } = await supabase
-          .from("internships")
-          .update({ status: "closed" })
-          .eq("id", internship.id);
-
-        if (updateError) throw updateError;
+        // AXIOS PUT: /api/internships/{id}
+        await axiosInstance.put(`/internships/${internship.id}`, {
+          status: "closed",
+        });
 
         window.location.reload();
       } catch (err: any) {
@@ -303,12 +296,10 @@ const UnitDashboard = () => {
   const handleEditSuccess = async () => {
     if (activatingInternship) {
       try {
-        const { error: updateError } = await supabase
-          .from("internships")
-          .update({ status: "active" })
-          .eq("id", activatingInternship.id);
-
-        if (updateError) throw updateError;
+        // AXIOS PUT
+        await axiosInstance.put(`/internships/${activatingInternship.id}`, {
+          status: "active",
+        });
 
         setActivatingInternship(null);
         setEditingInternship(null);
@@ -350,20 +341,14 @@ const UnitDashboard = () => {
       case "shortlisted":
         return "Shortlisted";
       case "rejected":
-        return "Not Shortlist";
+        return "Not Shortlisted"; // Fixed Typo "Not Shortlist"
       case "interviewed":
         return "Interviewed";
       case "hired":
-        return "hired";
+        return "Hired";
       default:
         return "Applied";
     }
-  };
-
-  const getMatchColor = (score: number) => {
-    if (score >= 80) return "text-green-600";
-    if (score >= 60) return "text-orange-600";
-    return "text-red-600";
   };
 
   const toggleStatusFilter = (status: string) => {
@@ -382,6 +367,7 @@ const UnitDashboard = () => {
         interviewed: "Interviewed",
         rejected: "Rejected",
         hired: "Hired",
+        applied: "Applied",
       };
       return statusLabels[filterStatuses[0]] || "Select Filter";
     }
@@ -400,13 +386,15 @@ const UnitDashboard = () => {
     navigate(`/unit/candidate-tasks/${applicationId}`);
   };
 
+  // --- RENDER ---
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
       <div className="container px-4 sm:px-6 lg:px-[7.5rem] py-4 lg:py-10">
-        {/* Stats Cards */}
+        {/* STATS CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          {/* Total Applications */}
           <Card className="rounded-2xl">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
@@ -432,11 +420,12 @@ const UnitDashboard = () => {
             </CardContent>
           </Card>
 
+          {/* Total Job Descriptions */}
           <Card className="rounded-2xl">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs sm:text-sm font-medium ">
+                  <p className="text-xs sm:text-sm font-medium">
                     Total Job Descriptions
                   </p>
                   {loading ? (
@@ -459,11 +448,12 @@ const UnitDashboard = () => {
             </CardContent>
           </Card>
 
+          {/* Interview Scheduled */}
           <Card className="rounded-2xl">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs sm:text-sm font-medium ">
+                  <p className="text-xs sm:text-sm font-medium">
                     Interview Scheduled
                   </p>
                   {loading ? (
@@ -486,11 +476,12 @@ const UnitDashboard = () => {
             </CardContent>
           </Card>
 
+          {/* Hired This Month */}
           <Card className="rounded-2xl">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs sm:text-sm font-medium ">
+                  <p className="text-xs sm:text-sm font-medium">
                     Hired This Month
                   </p>
                   {loading ? (
@@ -516,7 +507,7 @@ const UnitDashboard = () => {
           </Card>
         </div>
 
-        {/* Navigation Tabs */}
+        {/* NAVIGATION TABS */}
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
@@ -524,34 +515,24 @@ const UnitDashboard = () => {
         >
           <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
             <TabsList className="grid w-full min-w-max sm:min-w-0 grid-cols-4 bg-gray-100/70 backdrop-blur-sm rounded-3xl shadow-inner border border-gray-200 h-12 sm:h-16 shadow-[inset_0_4px_10px_rgba(0,0,0,0.2)]">
-              <TabsTrigger
-                value="applications"
-                className="rounded-3xl px-3 sm:px-5 py-2 sm:py-4 text-xs sm:text-sm font-medium text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all duration-200 whitespace-nowrap"
-              >
-                Applications
-              </TabsTrigger>
-              <TabsTrigger
-                value="job-descriptions"
-                className="rounded-3xl px-3 sm:px-5 py-2 sm:py-4 text-xs sm:text-sm font-medium text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all duration-200 whitespace-nowrap"
-              >
-                Job Descriptions
-              </TabsTrigger>
-              <TabsTrigger
-                value="candidates"
-                className="rounded-3xl px-3 sm:px-5 py-2 sm:py-4 text-xs sm:text-sm font-medium text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all duration-200 whitespace-nowrap"
-              >
-                Candidates
-              </TabsTrigger>
-              <TabsTrigger
-                value="reports"
-                className="rounded-3xl px-3 sm:px-5 py-2 sm:py-4 text-xs sm:text-sm font-medium text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all duration-200 whitespace-nowrap"
-              >
-                Reports
-              </TabsTrigger>
+              {[
+                "applications",
+                "job-descriptions",
+                "candidates",
+                "reports",
+              ].map((tab) => (
+                <TabsTrigger
+                  key={tab}
+                  value={tab}
+                  className="rounded-3xl px-3 sm:px-5 py-2 sm:py-4 text-xs sm:text-sm font-medium text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all duration-200 whitespace-nowrap capitalize"
+                >
+                  {tab.replace("-", " ")}
+                </TabsTrigger>
+              ))}
             </TabsList>
           </div>
 
-          {/* Applications Tab */}
+          {/* TAB 1: APPLICATIONS */}
           <TabsContent
             value="applications"
             className="px-0 sm:px-4 lg:px-10 py-2"
@@ -566,10 +547,7 @@ const UnitDashboard = () => {
                     variant="outline"
                     className="w-full sm:w-[200px] justify-between items-center rounded-full"
                   >
-                    {/* Left side text */}
                     <span className="truncate">{getFilterDisplayText()}</span>
-
-                    {/* Right side icons */}
                     <div className="flex items-center gap-1">
                       {filterStatuses.length > 0 && (
                         <Badge
@@ -583,31 +561,30 @@ const UnitDashboard = () => {
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
-
                 <DropdownMenuContent
                   align="end"
                   className="w-[220px] rounded-2xl p-2 shadow-md"
                 >
                   {[
-                    { value: "applied", label: "Applied" },
-                    { value: "shortlisted", label: "Shortlisted" },
-                    { value: "interviewed", label: "Interviewed" },
-                    { value: "rejected", label: "Rejected" },
-                    { value: "hired", label: "Hired" },
+                    "applied",
+                    "shortlisted",
+                    "interviewed",
+                    "rejected",
+                    "hired",
                   ].map((status) => (
                     <DropdownMenuItem
-                      key={status.value}
+                      key={status}
                       onSelect={(e) => e.preventDefault()}
                       className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-muted transition-colors"
-                      onClick={() => toggleStatusFilter(status.value)}
+                      onClick={() => toggleStatusFilter(status)}
                     >
                       <input
                         type="checkbox"
-                        checked={filterStatuses.includes(status.value)}
+                        checked={filterStatuses.includes(status)}
                         readOnly
                         className="h-4 w-4 rounded border-gray-300 accent-blue-600"
                       />
-                      <span>{status.label}</span>
+                      <span className="capitalize">{status}</span>
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
@@ -632,9 +609,7 @@ const UnitDashboard = () => {
               <div className="text-center py-12">
                 <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                 <h3 className="text-lg font-medium mb-2">
-                  {filterStatuses.length === 0
-                    ? "No Applications Yet"
-                    : "No Applications Found"}
+                  No Applications Found
                 </h3>
                 <p className="text-muted-foreground text-sm">
                   {filterStatuses.length === 0
@@ -643,138 +618,90 @@ const UnitDashboard = () => {
                 </p>
               </div>
             ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                  {filteredApplications.slice(0, 9).map((application) => {
-                    const skills = safeParse(
-                      application.studentProfile?.skills,
-                      []
-                    );
-                    const displaySkills = skills
-                      .slice(0, 3)
-                      .map((s: any) =>
-                        typeof s === "string" ? s : s.name || s
-                      );
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {filteredApplications.slice(0, 9).map((application) => {
+                  // Note: Ensure your 'candidate' object in hooks has 'skills' property
+                  const skills = safeParse(application.candidate?.skills, []);
+                  const displaySkills = skills
+                    .slice(0, 3)
+                    .map((s: any) => (typeof s === "string" ? s : s.name || s));
 
-                    return (
-                      <Card
-                        key={application.id}
-                        className="border border-border/50 hover:shadow-lg transition-shadow rounded-3xl"
-                      >
-                        <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5">
-                          <div className="flex items-center gap-3 sm:gap-5">
-                            <div className="relative flex-shrink-0">
-                              <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500">
-                                <AvatarImage
-                                  src={
-                                    application.studentProfile?.avatar_url ||
-                                    undefined
-                                  }
-                                  alt={application.profile.full_name}
-                                />
-                                <AvatarFallback className="text-base sm:text-lg font-semibold">
-                                  {application.profile.full_name
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .join("")}
-                                </AvatarFallback>
-                              </Avatar>
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-base sm:text-lg mb-1 text-gray-900 truncate">
-                                {application.profile.full_name}
-                              </h3>
-                              <p className="text-xs sm:text-sm text-muted-foreground mb-2 truncate">
-                                {application.internship.title}
-                              </p>
-                              <Badge
-                                className={`${getStatusColor(
-                                  application.status
-                                )} text-xs sm:text-sm px-2 sm:px-3 py-1`}
-                              >
-                                {getStatusLabel(application.status)}
-                              </Badge>
-                            </div>
-                          </div>
-
-                          <p className="text-sm sm:text-base text-gray-700 leading-relaxed line-clamp-3">
-                            {typeof application.studentProfile?.bio === "string"
-                              ? application.studentProfile.bio
-                              : Array.isArray(application.studentProfile?.bio)
-                              ? application.studentProfile.bio.join(" ")
-                              : "Passionate about creating user-centered digital experiences."}
-                          </p>
-
-                          <div className="min-h-7">
-                            {skills.length > 0 && (
-                              <div className="flex gap-2 overflow-hidden">
-                                {skills.length > 2 ? (
-                                  <>
-                                    {skills.slice(0, 2).map((skill, i) => (
-                                      <Badge
-                                        key={i}
-                                        variant="outline"
-                                        className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                                      >
-                                        {skill}
-                                      </Badge>
-                                    ))}
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                                    >
-                                      +{skills.length - 2}
-                                    </Badge>
-                                  </>
-                                ) : (
-                                  skills.map((skill, i) => (
-                                    <Badge
-                                      key={i}
-                                      variant="outline"
-                                      className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                                    >
-                                      {skill}
-                                    </Badge>
-                                  ))
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <div className="border-t border-border/40"></div>
-
-                          <Button
-                            variant="outline"
-                            size="lg"
-                            className="w-full border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full"
-                            onClick={() =>
-                              navigate(`/candidate/${application.id}`)
-                            }
-                          >
-                            View Profile
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-
-                {filteredApplications.length > 0 && (
-                  <div className="flex justify-center mt-6 sm:mt-8">
-                    <Button
-                      variant="outline"
-                      className="px-6 sm:px-8"
-                      onClick={() => navigate("/all-applications")}
+                  return (
+                    <Card
+                      key={application.id}
+                      className="border border-border/50 hover:shadow-lg transition-shadow rounded-3xl"
                     >
-                      View All
-                    </Button>
-                  </div>
-                )}
-              </>
+                      <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5">
+                        <div className="flex items-center gap-3 sm:gap-5">
+                          <div className="relative flex-shrink-0">
+                            <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500">
+                              <AvatarImage
+                                src={
+                                  application.candidate?.avatar_url || undefined
+                                }
+                                alt={application.candidate?.full_name || "User"}
+                              />
+                              <AvatarFallback className="text-base sm:text-lg font-semibold">
+                                {(application.candidate?.full_name || "U")
+                                  .charAt(0)
+                                  .toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-base sm:text-lg mb-1 text-gray-900 truncate">
+                              {application.candidate?.full_name ||
+                                "Unknown Candidate"}
+                            </h3>
+                            <p className="text-xs sm:text-sm text-muted-foreground mb-2 truncate">
+                              {application.internship.title}
+                            </p>
+                            <Badge
+                              className={`${getStatusColor(
+                                application.status
+                              )} text-xs sm:text-sm px-2 sm:px-3 py-1`}
+                            >
+                              {getStatusLabel(application.status)}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Skills / Bio placeholder */}
+                        <div className="min-h-7">
+                          {displaySkills.length > 0 && (
+                            <div className="flex gap-2 overflow-hidden">
+                              {displaySkills.map((skill: string, i: number) => (
+                                <Badge
+                                  key={i}
+                                  variant="outline"
+                                  className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                >
+                                  {skill}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="border-t border-border/40"></div>
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          className="w-full border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full"
+                          onClick={() =>
+                            navigate(`/candidate/${application.candidate.id}`)
+                          }
+                        >
+                          View Profile
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             )}
           </TabsContent>
 
-          {/* Job Descriptions Tab */}
+          {/* TAB 2: JOB DESCRIPTIONS */}
           <TabsContent
             value="job-descriptions"
             className="px-0 sm:px-4 lg:px-10 py-2"
@@ -805,17 +732,13 @@ const UnitDashboard = () => {
             </div>
 
             {internshipsLoading ? (
+              // ... Skeletons
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <Card key={i}>
-                    <CardContent className="p-4 sm:p-6">
-                      <Skeleton className="h-6 w-32 mb-4" />
-                      <Skeleton className="h-4 w-24 mb-2" />
-                      <Skeleton className="h-4 w-full mb-2" />
-                      <Skeleton className="h-10 w-full mt-4" />
-                    </CardContent>
-                  </Card>
-                ))}
+                <Card>
+                  <CardContent className="p-6">
+                    <Skeleton className="h-6 w-32 mb-4" />
+                  </CardContent>
+                </Card>
               </div>
             ) : internships.length === 0 ? (
               <div className="text-center py-12">
@@ -828,204 +751,116 @@ const UnitDashboard = () => {
                 </p>
               </div>
             ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                  {internships
-                    .filter((internship) => {
-                      if (jobFilter === "all") return true;
-                      if (jobFilter === "active")
-                        return internship.status === "active";
-                      if (jobFilter === "closed")
-                        return internship.status !== "active";
-                      return true;
-                    })
-                    .slice(0, 6)
-                    .map((internship) => {
-                      const applicationCount = applications.filter(
-                        (app) => app.internship_id === internship.id
-                      ).length;
-
-                      return (
-                        <Card
-                          key={internship.id}
-                          className="relative rounded-3xl border border-black-50"
-                        >
-                          <CardContent className="p-4 sm:p-6">
-                            <div className="flex items-start justify-between mb-4 sm:mb-6 gap-2">
-                              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                                <h3 className="font-semibold text-base sm:text-lg leading-tight truncate">
-                                  {internship.title}
-                                </h3>
-                                <Badge
-                                  className={`${
-                                    internship.status === "active"
-                                      ? "bg-green-500 text-white hover:bg-green-500"
-                                      : "bg-red-500 text-white hover:bg-red-500"
-                                  } text-xs px-2 sm:px-3 py-1 whitespace-nowrap flex-shrink-0`}
-                                >
-                                  {internship.status === "active"
-                                    ? "Active"
-                                    : "Closed"}
-                                </Badge>
-                              </div>
-
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0 flex-shrink-0"
-                                  >
-                                    <EllipsisIcon className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                  align="end"
-                                  className="w-48"
-                                >
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      setSelectedInternship(internship)
-                                    }
-                                  >
-                                    <Eye className="w-4 h-4 mr-2" />
-                                    View Details
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      handleAddComments(internship.id)
-                                    }
-                                  >
-                                    <Pencil className="w-4 h-4 mr-2" />
-                                    Edit JD
-                                  </DropdownMenuItem>
-                                  {/* <DropdownMenuItem
-                                    onClick={() =>
-                                      handleToggleStatus(internship)
-                                    }
-                                  >
-                                    {internship.status === "active" ? (
-                                      <span className="flex items-center text-red-500">
-                                        <Ban className="w-4 h-4 mr-2" />
-                                        Close JD
-                                      </span>
-                                    ) : (
-                                      <span className="flex items-center text-green-500">
-                                        <CheckCircle className="w-4 h-4 mr-2" />
-                                        Activate JD
-                                      </span>
-                                    )}
-                                  </DropdownMenuItem> */}
-                                  {internship.status !== "active" && (
-                                    <DropdownMenuItem
-                                      onClick={() =>
-                                        handleToggleStatus(internship)
-                                      }
-                                    >
-                                      <span className="flex items-center text-green-500">
-                                        <CheckCircle className="w-4 h-4 mr-2" />
-                                        Activate JD
-                                      </span>
-                                    </DropdownMenuItem>
-                                  )}
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      handleDeleteClick(internship)
-                                    }
-                                    className="text-red-600 focus:text-red-600"
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    Delete JD
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-
-                            <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
-                              <div className="flex justify-between text-xs sm:text-sm">
-                                <span className="text-muted-foreground">
-                                  Applications:
-                                </span>
-                                <span className="font-medium">
-                                  {applicationCount} Applied
-                                </span>
-                              </div>
-                              <div className="flex justify-between text-xs sm:text-sm">
-                                <span className="text-muted-foreground">
-                                  Duration:
-                                </span>
-                                <span className="font-medium">
-                                  {internship.duration || "Not specified"}
-                                </span>
-                              </div>
-                              <div className="flex justify-between text-xs sm:text-sm">
-                                <span className="text-muted-foreground">
-                                  Created on:
-                                </span>
-                                <span className="font-medium">
-                                  {new Date(
-                                    internship.created_at
-                                  ).toLocaleDateString("en-US", {
-                                    day: "numeric",
-                                    month: "long",
-                                    year: "numeric",
-                                  })}
-                                </span>
-                              </div>
-                              <div className="flex justify-between text-xs sm:text-sm">
-                                <span className="text-muted-foreground">
-                                  Deadline:
-                                </span>
-                                <span className="font-medium">
-                                  {new Date(
-                                    internship.application_deadline
-                                  ).toLocaleDateString("en-US", {
-                                    day: "numeric",
-                                    month: "long",
-                                    year: "numeric",
-                                  })}
-                                </span>
-                              </div>
-                            </div>
-
-                            <Button
-                              variant="outline"
-                              className="w-full rounded-full text-sm"
-                              onClick={() =>
-                                navigate(
-                                  `/internship-applicants/${internship.id}`
-                                )
-                              }
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {internships
+                  .filter((i) => jobFilter === "all" || i.status === jobFilter)
+                  .map((internship) => (
+                    <Card
+                      key={internship.id}
+                      className="relative rounded-3xl border border-black-50"
+                    >
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="flex items-start justify-between mb-4 sm:mb-6 gap-2">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                            <h3 className="font-semibold text-base sm:text-lg leading-tight truncate">
+                              {internship.title}
+                            </h3>
+                            <Badge
+                              className={`${
+                                internship.status === "active"
+                                  ? "bg-green-500"
+                                  : "bg-red-500"
+                              } text-white text-xs px-2 py-1`}
                             >
-                              View Applicants
-                              <ArrowRight className="w-4 h-4 ml-2" />
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                </div>
+                              {internship.status === "active"
+                                ? "Active"
+                                : "Closed"}
+                            </Badge>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 flex-shrink-0"
+                              >
+                                <EllipsisIcon className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  setSelectedInternship(internship)
+                                }
+                              >
+                                <Eye className="w-4 h-4 mr-2" /> View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleAddComments(internship.id)}
+                              >
+                                <Pencil className="w-4 h-4 mr-2" /> Edit JD
+                              </DropdownMenuItem>
+                              {internship.status !== "active" && (
+                                <DropdownMenuItem
+                                  onClick={() => handleToggleStatus(internship)}
+                                >
+                                  <span className="flex items-center text-green-500">
+                                    <CheckCircle className="w-4 h-4 mr-2" />{" "}
+                                    Activate JD
+                                  </span>
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteClick(internship)}
+                                className="text-red-600 focus:text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" /> Delete JD
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
 
-                {internships.length > 6 && (
-                  <div className="flex justify-center mt-6 sm:mt-8">
-                    <Button variant="link" className="text-primary font-medium">
-                      View More
-                    </Button>
-                  </div>
-                )}
-              </>
+                        <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
+                          <div className="flex justify-between text-xs sm:text-sm">
+                            <span className="text-muted-foreground">
+                              Deadline:
+                            </span>
+                            <span className="font-medium">
+                              {new Date(
+                                internship.applicationDeadline
+                              ).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          className="w-full rounded-full text-sm"
+                          onClick={() =>
+                            navigate(`/internship-applicants/${internship.id}`)
+                          }
+                        >
+                          View Applicants{" "}
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+              </div>
             )}
           </TabsContent>
 
-          {/* Candidates Management Tab */}
+          {/* TAB 3: CANDIDATES (HIRED) */}
           <TabsContent
             value="candidates"
             className="space-y-6 px-0 sm:px-4 lg:px-10"
           >
+            {/* ... Logic remains same, maps over filteredHiredCandidates ... */}
+            {/* Use candidate.student or candidate.candidate based on API structure */}
+            {/* ... */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <h2 className="text-xl sm:text-2xl font-semibold">
-                Hired Candidates
-                {/* ({filteredHiredCandidates.length}) */}
+                Hired Candidates ({filteredHiredCandidates.length})
               </h2>
               <div className="relative w-full sm:w-auto">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
@@ -1157,14 +992,13 @@ const UnitDashboard = () => {
             )}
           </TabsContent>
 
-          {/* Reports Tab */}
+          {/* TAB 4: REPORTS */}
           <TabsContent value="reports" className="px-0 sm:px-4 lg:px-10 py-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <h2 className="text-xl sm:text-2xl font-semibold">
                 Reports for this Month
               </h2>
             </div>
-
             <Card className="rounded-2xl">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -1284,7 +1118,6 @@ const UnitDashboard = () => {
                 )}
               </CardContent>
             </Card>
-
             {/* Quick Stats Overview */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
               <Card>
@@ -1351,32 +1184,24 @@ const UnitDashboard = () => {
         </Tabs>
       </div>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="max-w-[90vw] sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm">
-              This will permanently delete the job description "
-              {deletingInternship?.title}". This action cannot be undone and
-              will remove all associated data.
+            <AlertDialogDescription>
+              This will permanently delete "{deletingInternship?.title}".
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel
-              onClick={() => {
-                setShowDeleteDialog(false);
-                setDeletingInternship(null);
-              }}
-              className="w-full sm:w-auto"
-            >
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
-              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
+              className="bg-red-600 hover:bg-red-700"
             >
-              {updating === deletingInternship?.id ? "Deleting..." : "Delete"}
+              {updating ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1388,7 +1213,6 @@ const UnitDashboard = () => {
         onSuccess={handleEditSuccess}
         internship={editingInternship}
       />
-
       <CreateInternshipDialog
         isOpen={showCreateDialog}
         onClose={() => setShowCreateDialog(false)}

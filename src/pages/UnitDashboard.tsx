@@ -47,7 +47,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Hooks (Refactored)
 import { useInternships } from "@/hooks/useInternships";
-import { useUnitApplications } from "@/hooks/useUnitApplications";
+// import { useUnitApplications } from "@/hooks/useUnitApplications";
+import { useUnitStats, useUnitApplications } from "@/hooks/useUnitApplications";
 import { useUnitReports } from "@/hooks/useUnitReports";
 import { useHiredApplicants } from "@/hooks/useHiredApplicants";
 import { useStudentTasks } from "@/hooks/useStudentTasks";
@@ -148,16 +149,15 @@ const UnitDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("applications");
 
-  // Custom Hooks (Using Axios internally now)
-  const { applications, stats, loading } = useUnitApplications();
-  const { internships, loading: internshipsLoading } = useInternships();
-  const { data: hiredCandidates, loading: hiredLoading } = useHiredApplicants();
-
-  console.log("************");
-  console.log(internships);
+  // const { applications, stats, loading } = useUnitApplications();
+  const { data: applications, isLoading: loading } = useUnitApplications();
+  console.log("==========================");
   console.log(applications);
-  console.log(hiredCandidates);
 
+  const { data: stats, isLoading: statsLoading } = useUnitStats();
+  const { internships, loading: internshipsLoading } = useInternships();
+
+  const { data: hiredCandidates, loading: hiredLoading } = useHiredApplicants();
   const {
     weeklyData,
     stats: reportStats,
@@ -183,15 +183,14 @@ const UnitDashboard = () => {
       const now = new Date();
       const expiredInternships = internships.filter((internship) => {
         if (internship.status !== "active") return false;
-        // Use application_deadline field from your API response
-        const deadline = new Date(internship.application_deadline);
+        // FIELD MAPPING: use 'closingDate' instead of 'application_deadline'
+        const deadline = new Date(internship.closingDate);
         return deadline < now;
       });
 
       if (expiredInternships.length > 0) {
         try {
           // Batch update: Loop through and close each
-          // Ideally backend has a cron job, but frontend can trigger individual updates
           const updatePromises = expiredInternships.map((internship) =>
             axiosInstance.put(`/internships/${internship.id}`, {
               status: "closed",
@@ -218,15 +217,18 @@ const UnitDashboard = () => {
     );
   }
 
-  const filteredApplications = applications.filter((application) => {
+  const filteredApplications = applications?.filter((appObj: any) => {
+    // If it returns raw structure: appObj.application.status
+    const status = appObj.application?.status;
     if (filterStatuses.length === 0) return true;
-    return filterStatuses.includes(application.status);
+    return filterStatuses.includes(status);
   });
 
   // Filter hired candidates by search query
-  const filteredHiredCandidates = hiredCandidates.filter((candidate) => {
+  const filteredHiredCandidates = hiredCandidates?.filter((candidate: any) => {
     if (!searchQuery) return true;
-    const name = candidate.student?.full_name?.toLowerCase() || "";
+    // FIELD MAPPING: use 'name' instead of 'full_name'
+    const name = candidate.candidate?.name?.toLowerCase() || "";
     const internshipTitle = candidate.internship?.title?.toLowerCase() || "";
     return (
       name.includes(searchQuery.toLowerCase()) ||
@@ -341,7 +343,7 @@ const UnitDashboard = () => {
       case "shortlisted":
         return "Shortlisted";
       case "rejected":
-        return "Not Shortlisted"; // Fixed Typo "Not Shortlist"
+        return "Not Shortlisted";
       case "interviewed":
         return "Interviewed";
       case "hired":
@@ -386,7 +388,6 @@ const UnitDashboard = () => {
     navigate(`/unit/candidate-tasks/${applicationId}`);
   };
 
-  // --- RENDER ---
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -407,7 +408,7 @@ const UnitDashboard = () => {
                   ) : (
                     <>
                       <p className="text-2xl sm:text-3xl font-bold">
-                        {stats.total}
+                        {stats?.total}
                       </p>
                       <p className="text-xs text-muted-foreground">All time</p>
                     </>
@@ -619,16 +620,24 @@ const UnitDashboard = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                {filteredApplications.slice(0, 9).map((application) => {
-                  // Note: Ensure your 'candidate' object in hooks has 'skills' property
-                  const skills = safeParse(application.candidate?.skills, []);
+                {filteredApplications.slice(0, 9).map((appData: any) => {
+                  // MAPPING: Ensure we access fields correctly whether nested or flat
+                  // 'appData' might be the whole object, or have 'application', 'candidate', 'internship' keys
+                  const appStatus = appData.application?.status;
+                  const appId = appData.application?.id;
+
+                  const candidate = appData.candidate || {};
+                  const internship = appData.internship || {};
+
+                  // Note: Ensure your 'candidate' object in hooks has 'skills' property (it might be an array of strings)
+                  const skills = safeParse(candidate.skills, []);
                   const displaySkills = skills
                     .slice(0, 3)
                     .map((s: any) => (typeof s === "string" ? s : s.name || s));
 
                   return (
                     <Card
-                      key={application.id}
+                      key={appId}
                       className="border border-border/50 hover:shadow-lg transition-shadow rounded-3xl"
                     >
                       <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5">
@@ -636,13 +645,11 @@ const UnitDashboard = () => {
                           <div className="relative flex-shrink-0">
                             <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500">
                               <AvatarImage
-                                src={
-                                  application.candidate?.avatar_url || undefined
-                                }
-                                alt={application.candidate?.full_name || "User"}
+                                src={candidate.avatarUrl || undefined}
+                                alt={candidate.name || "User"}
                               />
                               <AvatarFallback className="text-base sm:text-lg font-semibold">
-                                {(application.candidate?.full_name || "U")
+                                {(candidate.name || "U")
                                   .charAt(0)
                                   .toUpperCase()}
                               </AvatarFallback>
@@ -650,24 +657,28 @@ const UnitDashboard = () => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-base sm:text-lg mb-1 text-gray-900 truncate">
-                              {application.candidate?.full_name ||
-                                "Unknown Candidate"}
+                              {candidate.name || "Unknown Candidate"}
                             </h3>
                             <p className="text-xs sm:text-sm text-muted-foreground mb-2 truncate">
-                              {application.internship.title}
+                              {internship.title}
                             </p>
                             <Badge
                               className={`${getStatusColor(
-                                application.status
+                                appStatus
                               )} text-xs sm:text-sm px-2 sm:px-3 py-1`}
                             >
-                              {getStatusLabel(application.status)}
+                              {getStatusLabel(appStatus)}
                             </Badge>
                           </div>
                         </div>
 
                         {/* Skills / Bio placeholder */}
+                        {/* Display profileSummary if available, else skills */}
                         <div className="min-h-7">
+                          <p className="text-sm sm:text-base text-gray-700 leading-relaxed line-clamp-3 mb-2">
+                            {candidate.profileSummary ||
+                              "Passionate about creating user-centered digital experiences."}
+                          </p>
                           {displaySkills.length > 0 && (
                             <div className="flex gap-2 overflow-hidden">
                               {displaySkills.map((skill: string, i: number) => (
@@ -688,7 +699,7 @@ const UnitDashboard = () => {
                           size="lg"
                           className="w-full border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full"
                           onClick={() =>
-                            navigate(`/candidate/${application.candidate.id}`)
+                            navigate(`/candidate/${candidate.userId}`)
                           }
                         >
                           View Profile
@@ -823,11 +834,42 @@ const UnitDashboard = () => {
                         <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
                           <div className="flex justify-between text-xs sm:text-sm">
                             <span className="text-muted-foreground">
-                              Deadline:
+                              Applications:
+                            </span>
+                            <span className="font-medium">
+                              {/* {applicationCount} Applied */}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs sm:text-sm">
+                            <span className="text-muted-foreground">
+                              Duration:
+                            </span>
+                            <span className="font-medium">
+                              {internship.duration || "Not specified"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs sm:text-sm">
+                            <span className="text-muted-foreground">
+                              Created on:
                             </span>
                             <span className="font-medium">
                               {new Date(
-                                internship.applicationDeadline
+                                internship.createdAt
+                              ).toLocaleDateString("en-US", {
+                                day: "numeric",
+                                month: "long",
+                                year: "numeric",
+                              })}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs sm:text-sm">
+                            <span className="text-muted-foreground">
+                              Deadline:
+                            </span>
+                            <span className="font-medium">
+                              {/* FIELD MAPPING: closingDate */}
+                              {new Date(
+                                internship.closingDate
                               ).toLocaleDateString()}
                             </span>
                           </div>
@@ -855,9 +897,7 @@ const UnitDashboard = () => {
             value="candidates"
             className="space-y-6 px-0 sm:px-4 lg:px-10"
           >
-            {/* ... Logic remains same, maps over filteredHiredCandidates ... */}
-            {/* Use candidate.student or candidate.candidate based on API structure */}
-            {/* ... */}
+            {/* Logic for filtering displayed above in filteredHiredCandidates definition */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <h2 className="text-xl sm:text-2xl font-semibold">
                 Hired Candidates ({filteredHiredCandidates.length})
@@ -879,110 +919,81 @@ const UnitDashboard = () => {
                 {[1, 2, 3, 4].map((i) => (
                   <Card key={i} className="border border-gray-200 rounded-3xl">
                     <CardContent className="p-6">
-                      <div className="flex items-center gap-4">
-                        <Skeleton className="w-20 h-20 rounded-full" />
-                        <div className="flex-1 space-y-2">
-                          <Skeleton className="h-6 w-48" />
-                          <Skeleton className="h-4 w-32" />
-                        </div>
-                      </div>
+                      <Skeleton className="h-6 w-32 mb-4" />
                     </CardContent>
                   </Card>
                 ))}
               </div>
             ) : filteredHiredCandidates.length === 0 ? (
-              <div className="flex justify-center items-center py-12">
-                <Card className="max-w-md w-full mx-4">
-                  <CardContent className="p-6 sm:p-8 text-center">
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Users className="w-8 h-8 text-primary" />
-                    </div>
-                    <h3 className="text-lg sm:text-xl font-semibold mb-2">
-                      {searchQuery
-                        ? "No Results Found"
-                        : "No Hired Candidates Yet"}
-                    </h3>
-                    <p className="text-sm sm:text-base text-muted-foreground">
-                      {searchQuery
-                        ? "Try adjusting your search query"
-                        : "Hired candidates will appear here once you hire applicants"}
-                    </p>
-                  </CardContent>
-                </Card>
+              <div className="text-center py-12">
+                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                <h3 className="text-lg font-medium mb-2">
+                  No Hired Candidates
+                </h3>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filteredHiredCandidates.map((candidate) => (
+                {filteredHiredCandidates.map((hired) => (
                   <Card
-                    key={candidate.application_id}
+                    key={hired.id || hired.application?.id}
                     className="border border-gray-200 rounded-3xl hover:shadow-lg transition-shadow"
                   >
                     <CardContent className="p-6 space-y-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="text-sm text-gray-600 mb-3">
-                            {candidate.internship?.title ||
+                            {hired.internship?.title ||
                               "Position not specified"}
                           </p>
 
                           <div className="flex items-center gap-4">
-                            {/* Avatar */}
                             <Avatar className="w-20 h-20">
                               <AvatarImage
-                                src={candidate.student?.avatar_url || undefined}
-                                alt={
-                                  candidate.student?.full_name || "Candidate"
-                                }
+                                src={hired.candidate?.avatarUrl || undefined}
+                                alt={hired.candidate?.name || "Candidate"}
                                 className="object-cover"
                               />
                               <AvatarFallback className="text-lg font-semibold bg-gray-200">
-                                {(candidate.student?.full_name || "NA")
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")
+                                {(hired.candidate?.name || "NA")
+                                  .charAt(0)
                                   .toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
 
-                            {/* Name */}
                             <div>
                               <h3 className="text-xl font-bold text-gray-900 mb-1">
-                                {candidate.student?.full_name ||
-                                  "Name not available"}
+                                {hired.candidate?.name || "Name not available"}
                               </h3>
                             </div>
                           </div>
                         </div>
 
-                        {/* Duration Info */}
                         <div className="text-right text-sm text-gray-600">
                           <span>
-                            {candidate.internship?.duration ||
+                            {hired.internship?.duration ||
                               "Duration not specified"}{" "}
-                            |{" "}
-                            {formatJobType(
-                              candidate.internship?.job_type || ""
-                            )}
+                            | {formatJobType(hired.internship?.type || "")}
                           </span>
                         </div>
                       </div>
 
                       {/* Task Progress */}
+                      {/* Note: Ensure applicationId corresponds to the application object id */}
                       <CandidateTaskProgress
-                        applicationId={candidate.application_id}
+                        applicationId={hired.id || hired.application?.id}
                       />
 
-                      {/* Action */}
                       <div className="flex justify-end pt-2">
                         <Button
                           variant="outline"
                           className="rounded-full"
                           onClick={() =>
-                            handleViewCandidate(candidate.application_id)
+                            handleViewCandidate(
+                              hired.id || hired.application?.id
+                            )
                           }
                         >
-                          View Details
-                          <ArrowRight className="w-4 h-4 ml-2" />
+                          View Details <ArrowRight className="w-4 h-4 ml-2" />
                         </Button>
                       </div>
                     </CardContent>
@@ -994,6 +1005,7 @@ const UnitDashboard = () => {
 
           {/* TAB 4: REPORTS */}
           <TabsContent value="reports" className="px-0 sm:px-4 lg:px-10 py-2">
+            {/* ... Chart logic remains the same (assuming your useUnitReports hook returns the right data structure now) ... */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <h2 className="text-xl sm:text-2xl font-semibold">
                 Reports for this Month

@@ -38,68 +38,6 @@ const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
-  // Fetch user role and profile data
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (!user) {
-        setUserRole(null);
-        setAvatarUrl(null);
-        setProfileId(null);
-        return;
-      }
-
-      try {
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("id, role")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error("Error fetching user profile:", profileError);
-          return;
-        }
-
-        if (!profileData) return;
-
-        setUserRole(profileData.role);
-        setProfileId(profileData.id);
-
-        if (profileData.role === "student") {
-          const { data: studentData, error: studentError } = await supabase
-            .from("student_profiles")
-            .select("avatar_url")
-            .eq("profile_id", profileData.id)
-            .maybeSingle();
-
-          if (studentError) {
-            console.error("Error fetching student avatar:", studentError);
-            return;
-          }
-
-          setAvatarUrl(studentData?.avatar_url || null);
-        } else if (profileData.role === "unit") {
-          const { data: unitData, error: unitError } = await supabase
-            .from("units")
-            .select("avatar_url")
-            .eq("profile_id", profileData.id)
-            .maybeSingle();
-
-          if (unitError) {
-            console.error("Error fetching unit avatar:", unitError);
-            return;
-          }
-
-          setAvatarUrl(unitData?.avatar_url || null);
-        }
-      } catch (error) {
-        console.error("Failed to fetch user data:", error);
-      }
-    };
-
-    fetchUserData();
-  }, [user]);
-
   const allNavItems = [
     { name: "Internships", path: "/internships" },
     { name: "Courses", path: "/courses" },

@@ -1,13 +1,9 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import type { Tables } from "@/integrations/supabase/types";
-import type { DatabaseProfile } from "@/types/profile";
+import { useState, useEffect, useCallback } from "react";
+import axiosInstance from "@/config/platform-api";
 
-type Internship = Tables<"internships">;
-
+// 1. For Candidates (Dashboard View)
 export const useIntern = () => {
-  const [internships, setInternships] = useState<Internship[]>([]);
+  const [internships, setInternships] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,15 +11,10 @@ export const useIntern = () => {
     const fetchInternships = async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from("internships")
-          .select("*")
-          .eq("status", "active")
-          .order("created_at", { ascending: false });
-
-        if (error) throw error;
-        setInternships(data || []);
-      } catch (error) {
+        // Backend filters for 'active' automatically for candidates
+        const { data } = await axiosInstance.get("/internships");
+        setInternships(Array.isArray(data) ? data : data.internships || []);
+      } catch (error: any) {
         console.error("Error fetching internships:", error);
         setError("Failed to fetch internships");
       } finally {
@@ -37,104 +28,98 @@ export const useIntern = () => {
   return { internships, loading, error };
 };
 
+// 2. For Units (My Internships View)
 export const useInternships = () => {
-  const { user } = useAuth();
-  const [internships, setInternships] = useState<Internship[]>([]);
+  const [internships, setInternships] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [profile, setProfile] = useState<DatabaseProfile | null>(null);
+  const [profile, setProfile] = useState<any>(null);
 
-  useEffect(() => {
-    const fetchProfileAndInternships = async () => {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        // 1. First, fetch the user's profile to get the profile ID
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (profileError) throw profileError;
-
-        if (!profileData) {
-          setError("Profile not found");
-          setLoading(false);
-          return;
-        }
-
-        setProfile(profileData as unknown as DatabaseProfile);
-
-        // 2. Fetch internships created by this profile with status 'active' or 'closed'
-        const { data, error: internshipsError } = await supabase
-          .from("internships")
-          .select("*")
-          .eq("created_by", profileData.id)
-          .in("status", ["active", "closed"])
-          .order("created_at", { ascending: false });
-
-        if (internshipsError) throw internshipsError;
-
-        setInternships(data || []);
-      } catch (err: any) {
-        console.error("Error fetching internships:", err);
-        setError(err.message || "Failed to fetch internships");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfileAndInternships();
-  }, [user?.id]);
-
-  // Optional: Add a refetch function for manual refresh
-  const refetch = async () => {
-    if (!user || !profile) return;
-
+  const fetchInternships = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const { data, error: internshipsError } = await supabase
-        .from("internships")
-        .select("*")
-        .eq("created_by", profile.id)
-        .in("status", ["active", "closed"])
-        .order("created_at", { ascending: false });
+      // Fetch Profile (Optional, if you need the ID)
+      const profileRes = await axiosInstance.get("/profile");
+      setProfile(profileRes.data.data);
 
-      if (internshipsError) throw internshipsError;
+      // Fetch Internships (Backend uses session to return ONLY this unit's posts)
+      const { data } = await axiosInstance.get("/internships");
 
-      setInternships(data || []);
+      setInternships(Array.isArray(data) ? data : data.data || []);
     } catch (err: any) {
-      console.error("Error refetching internships:", err);
-      setError(err.message || "Failed to refetch internships");
+      console.error("Error fetching internships:", err);
+      setError(err.message || "Failed to fetch internships");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchInternships();
+  }, [fetchInternships]);
 
   return {
     internships,
     loading,
     error,
     profile,
-    refetch,
+    refetch: fetchInternships,
   };
 };
 
-import { useQuery } from "@tanstack/react-query";
-import { getInternships } from "@/services/internships.service";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createInternship } from "@/services/internships.service";
+import { useToast } from "@/hooks/use-toast";
+import type { CreateInternshipPayload } from "@/types/internships.types";
 
-export const useInternship = () => {
-  return useQuery({
-    queryKey: ["internships"],
-    queryFn: getInternships,
+export const useCreateInternship = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (payload: CreateInternshipPayload) => createInternship(payload),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Internship posted successfully!",
+      });
+      // Invalidate the list so the new internship appears immediately
+      queryClient.invalidateQueries({ queryKey: ["internships"] });
+      // Also invalidate stats if you have a dashboard query
+      queryClient.invalidateQueries({ queryKey: ["unitStats"] });
+    },
+    onError: (error: any) => {
+      console.error("Create internship failed", error);
+      // Toast is handled in service or here, but service returns rejected promise so this fires
+    },
+  });
+};
+
+import { updateInternship } from "@/services/internships.service"; // Import update service
+import type { UpdateInternshipPayload } from "@/types/internships.types";
+
+export const useUpdateInternship = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (payload: UpdateInternshipPayload) => updateInternship(payload),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Internship updated successfully!",
+      });
+
+      // Invalidate list to show updated data
+      queryClient.invalidateQueries({ queryKey: ["internships"] });
+      // If you have a detail view query, invalidate that too:
+      // queryClient.invalidateQueries({ queryKey: ["internship", id] });
+    },
+    onError: (error: any) => {
+      console.error("Update internship failed", error);
+      // Toast handled by error callback in component or global handler
+    },
   });
 };

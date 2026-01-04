@@ -1,42 +1,47 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import type { Tables } from '@/integrations/supabase/types';
+import axiosInstance from '@/config/platform-api';
 
-type Application = Tables<'applications'>;
+// Application interface (replacing Supabase types)
+export interface Application {
+  id: string;
+  internship_id: string;
+  student_id: string;
+  status: string;
+  applied_date: string;
+  profile_match_score: number | null;
+  offer_decision: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export const useApplications = () => {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
 
   useEffect(() => {
     const fetchApplications = async () => {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('applications')
-          .select('*')
-          .order('applied_date', { ascending: false });
+        setError(null);
 
-        if (error) throw error;
-        setApplications(data || []);
-      } catch (error) {
-        console.error('Error fetching applications:', error);
-        setError('Failed to fetch applications');
+        // Assumption: GET /api/applications (for candidate view)
+        // Backend should filter by authenticated user's profile
+        const { data } = await axiosInstance.get('/applications');
+
+        setApplications(
+          Array.isArray(data) ? data : data.applications || []
+        );
+      } catch (err: any) {
+        console.error('Error fetching applications:', err);
+        setError(err.message || 'Failed to fetch applications');
       } finally {
         setLoading(false);
       }
     };
 
     fetchApplications();
-  }, [user]);
+  }, []);
 
   return { applications, loading, error };
 };

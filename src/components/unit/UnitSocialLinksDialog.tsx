@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface SocialLink {
@@ -37,7 +37,7 @@ export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
   children,
 }) => {
   const [open, setOpen] = useState(false);
-  const [links, setLinks] = useState<SocialLink[]>(currentLinks);
+  const [links, setLinks] = useState<SocialLink[]>([]);
   const [newLink, setNewLink] = useState<SocialLink>({
     platform: "",
     url: "",
@@ -45,13 +45,18 @@ export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
   });
   const { toast } = useToast();
 
+  // Sync state with props when dialog opens or props change
+  useEffect(() => {
+    setLinks(currentLinks || []);
+  }, [currentLinks]);
+
   const platformOptions = [
-    // { value: "website", label: "Website" },
     { value: "linkedin", label: "LinkedIn" },
     { value: "instagram", label: "Instagram" },
     { value: "facebook", label: "Facebook" },
     { value: "x", label: "X" },
     { value: "threads", label: "Threads" },
+    { value: "website", label: "Website" }, // Added generic website option
   ];
 
   const addNewLink = () => {
@@ -63,7 +68,8 @@ export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
         (l) => l.url.toLowerCase() === newLink.url.toLowerCase()
       );
 
-      if (platformExists) {
+      // Relaxed duplicate check: Allow multiple 'website' links if needed, but restrict social platforms
+      if (platformExists && newLink.platform !== "website") {
         toast({
           title: "Duplicate Platform",
           description: "This platform already exists.",
@@ -87,7 +93,7 @@ export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
 
       toast({
         title: "Success",
-        description: "Link added successfully",
+        description: "Link added to list (click Save to confirm)",
       });
     }
   };
@@ -98,10 +104,6 @@ export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
 
   const handleSave = () => {
     onSave(links);
-    toast({
-      title: "Success",
-      description: "Links saved successfully",
-    });
     setOpen(false);
   };
 
@@ -128,7 +130,7 @@ export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
                   key={link.id}
                   className="grid grid-cols-5 items-center gap-2 border rounded-2xl px-3 py-2"
                 >
-                  <p className="font-medium col-span-1">
+                  <p className="font-medium col-span-1 capitalize">
                     {getPlatformLabel(link.platform)}
                   </p>
                   <a
@@ -153,13 +155,7 @@ export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
           )}
 
           {/* Add New Link */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              addNewLink();
-            }}
-            className="space-y-4 border-t pt-4"
-          >
+          <div className="space-y-4 border-t pt-4">
             <div>
               <Label htmlFor="platform">Platform *</Label>
               <Select
@@ -208,14 +204,15 @@ export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
                 Clear
               </Button>
               <Button
-                type="submit"
+                type="button"
+                onClick={addNewLink}
                 disabled={!newLink.platform || !newLink.url}
                 className="rounded-full"
               >
                 Add
               </Button>
             </div>
-          </form>
+          </div>
         </div>
 
         <div className="flex justify-end space-x-2 mt-6">

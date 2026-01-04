@@ -4,20 +4,19 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2, X, ZoomIn } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import axiosInstance from "@/config/platform-api"; // Import Axios
+import { useUpdateUnitProfile } from "@/hooks/useUnitProfile"; // Import mutation hook
 
 interface GalleryDialogProps {
   isOpen: boolean;
   onClose: () => void;
   userId: string;
   currentImages: string[];
-  onSuccess: () => void;
+  onSuccess: () => void; // This triggers refetch in parent
 }
 
 export const GalleryDialog = ({
@@ -34,8 +33,9 @@ export const GalleryDialog = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const bucketName = "user-media";
-  const folderName = "gallery";
+  // Use the mutation hook to update the profile data after upload
+  const updateProfileMutation = useUpdateUnitProfile();
+
   const maxFileSize = 5242880; // 5MB
   const maxFiles = 10;
 
@@ -107,38 +107,29 @@ export const GalleryDialog = ({
       setUploading(true);
       const uploadedUrls: string[] = [];
 
+      // Upload each file to the backend
       for (const file of selectedFiles) {
-        const fileExt = file.name.split(".").pop();
-        const fileName = `${Date.now()}_${Math.random()
-          .toString(36)
-          .substring(7)}.${fileExt}`;
-        const filePath = `${folderName}/${userId}/${fileName}`;
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("type", "gallery");
+        formData.append("userId", userId);
 
-        const { error: uploadError } = await supabase.storage
-          .from(bucketName)
-          .upload(filePath, file);
+        // POST /api/upload (Backend handles storage logic)
+        const response = await axiosInstance.post("/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
 
-        if (uploadError) throw uploadError;
-
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from(bucketName).getPublicUrl(filePath);
-
-        uploadedUrls.push(publicUrl);
+        if (response.data.url) {
+          uploadedUrls.push(response.data.url);
+        }
       }
 
-      // Update gallery_images in units table
+      // Update galleryImages in profile via API
       const newGalleryImages = [...currentImages, ...uploadedUrls];
-      const { error: updateError } = await supabase
-        .from("units")
-        .update({ gallery_images: JSON.stringify(newGalleryImages) } as any)
-        .eq("profile_id", userId);
 
-      if (updateError) throw updateError;
-
-      toast({
-        title: "Success",
-        description: `${uploadedUrls.length} image(s) uploaded successfully`,
+      // Use the mutation hook to update the profile
+      await updateProfileMutation.mutateAsync({
+        galleryImages: newGalleryImages,
       });
 
       setSelectedFiles([]);
@@ -149,7 +140,7 @@ export const GalleryDialog = ({
       console.error("Error uploading gallery images:", error);
       toast({
         title: "Upload failed",
-        description: error.message || "Failed to upload images",
+        description: error.response?.data?.message || "Failed to upload images",
         variant: "destructive",
       });
     } finally {
@@ -161,38 +152,28 @@ export const GalleryDialog = ({
     imageUrl: string,
     event: React.MouseEvent
   ) => {
-    event.stopPropagation(); // Prevent event bubbling
+    event.stopPropagation();
 
     try {
       setUploading(true);
 
-      // Delete from storage
-      const pathParts = imageUrl.split("/");
-      const fileName = pathParts[pathParts.length - 1];
-      const filePath = `${folderName}/${userId}/${fileName}`;
+      // Call Backend to delete file (Optional, strictly speaking we just need to unlink it from profile)
+      // await axiosInstance.delete("/upload", { data: { url: imageUrl } });
 
-      await supabase.storage.from(bucketName).remove([filePath]);
-
-      // Update database
+      // Update database list
       const newGalleryImages = currentImages.filter((img) => img !== imageUrl);
-      const { error } = await supabase
-        .from("units")
-        .update({ gallery_images: JSON.stringify(newGalleryImages) } as any)
-        .eq("profile_id", userId);
 
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Image deleted successfully",
+      await updateProfileMutation.mutateAsync({
+        galleryImages: newGalleryImages,
       });
 
+      toast({ title: "Success", description: "Image deleted successfully" });
       onSuccess();
     } catch (error: any) {
       console.error("Error deleting gallery image:", error);
       toast({
         title: "Delete failed",
-        description: error.message || "Failed to delete image",
+        description: "Failed to delete image",
         variant: "destructive",
       });
     } finally {
@@ -346,6 +327,7 @@ export const GalleryDialog = ({
       {/* Image Viewer Dialog */}
       <Dialog open={!!viewImage} onOpenChange={() => setViewImage(null)}>
         <DialogContent className="sm:max-w-4xl">
+          {/* Same as your code */}
           <div className="relative">
             <img
               src={viewImage || ""}

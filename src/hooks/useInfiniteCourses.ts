@@ -1,8 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import axiosInstance from "@/config/platform-api";
 
-type Course = Tables<"courses">;
+// Course interface
+export interface Course {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+  [key: string]: any;
+}
 
 interface Filters {
   difficulty: string[];
@@ -21,70 +28,48 @@ export const useInfiniteCourses = (filters: Filters) => {
 
   const fetchCourses = useCallback(async (pageNum: number, currentFilters: Filters) => {
     try {
-      console.log("[useInfiniteCourses] Fetching page:", pageNum, "with filters:", currentFilters);
       setLoading(true);
+      setError(null);
 
-      let query = supabase
-        .from("courses")
-        .select("*", { count: "exact" })
-        .eq("status", "active")
-        .order("created_at", { ascending: false })
-        .range(pageNum * ITEMS_PER_PAGE, (pageNum + 1) * ITEMS_PER_PAGE - 1);
+      // GET /api/courses with query params for filters and pagination
+      const params: any = {
+        page: pageNum,
+        limit: ITEMS_PER_PAGE,
+        status: 'active',
+      };
 
-      // Apply difficulty filter
+      // Add filters to params
       if (currentFilters.difficulty.length > 0) {
-        query = query.in("difficulty_level", currentFilters.difficulty);
+        params.difficulty = currentFilters.difficulty.join(',');
       }
-
-      // Apply posted date filter
       if (currentFilters.postedDate) {
-        const now = new Date();
-        let dateThreshold: Date;
-
-        switch (currentFilters.postedDate) {
-          case "today":
-            dateThreshold = new Date(now.setHours(0, 0, 0, 0));
-            break;
-          case "week":
-            dateThreshold = new Date(now.setDate(now.getDate() - 7));
-            break;
-          case "month":
-            dateThreshold = new Date(now.setMonth(now.getMonth() - 1));
-            break;
-          default:
-            dateThreshold = new Date(0);
-        }
-
-        query = query.gte("created_at", dateThreshold.toISOString());
+        params.posted_date = currentFilters.postedDate;
       }
 
-      const { data, error, count } = await query;
+      const { data } = await axiosInstance.get('/courses', { params });
 
-      if (error) {
-        console.error("[useInfiniteCourses] Error:", error);
-        throw error;
-      }
-
-      console.log("[useInfiniteCourses] Fetched:", data?.length, "courses, total count:", count);
+      const fetchedCourses = Array.isArray(data) ? data : data.courses || [];
+      const totalCount = data?.total || data?.count || 0;
 
       if (pageNum === 0) {
-        setCourses(data || []);
+        setCourses(fetchedCourses);
       } else {
-        setCourses((prev) => [...prev, ...(data || [])]);
+        setCourses((prev) => [...prev, ...fetchedCourses]);
       }
 
-      setHasMore((data?.length || 0) === ITEMS_PER_PAGE && (count || 0) > (pageNum + 1) * ITEMS_PER_PAGE);
-      setError(null);
-    } catch (err) {
+      setHasMore(
+        fetchedCourses.length === ITEMS_PER_PAGE && 
+        totalCount > (pageNum + 1) * ITEMS_PER_PAGE
+      );
+    } catch (err: any) {
       console.error("[useInfiniteCourses] Fetch error:", err);
-      setError("Failed to fetch courses");
+      setError(err.message || "Failed to fetch courses");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    console.log("[useInfiniteCourses] Filters changed, resetting...");
     setPage(0);
     setCourses([]);
     setHasMore(true);
@@ -93,7 +78,6 @@ export const useInfiniteCourses = (filters: Filters) => {
 
   const loadMore = useCallback(() => {
     const nextPage = page + 1;
-    console.log("[useInfiniteCourses] Loading more, next page:", nextPage);
     setPage(nextPage);
     fetchCourses(nextPage, filters);
   }, [page, filters, fetchCourses]);

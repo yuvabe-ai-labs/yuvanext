@@ -1,11 +1,36 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import axiosInstance from "@/config/platform-api";
 
-type Application = Tables<"applications">;
-type Internship = Tables<"internships">;
-type Profile = Tables<"profiles">;
-type StudentProfile = Tables<"student_profiles">;
+// Interfaces (replacing Supabase types)
+export interface Application {
+  id: string;
+  internship_id: string;
+  student_id: string;
+  status: string;
+  applied_date: string;
+  [key: string]: any;
+}
+
+export interface Internship {
+  id: string;
+  title: string;
+  description: string | null;
+  [key: string]: any;
+}
+
+export interface Profile {
+  id: string;
+  full_name: string;
+  email: string;
+  [key: string]: any;
+}
+
+export interface StudentProfile {
+  id: string;
+  profile_id: string;
+  skills: string[] | null;
+  [key: string]: any;
+}
 
 export interface CandidateData {
   application: Application;
@@ -20,60 +45,40 @@ export const useCandidateProfile = (applicationId: string) => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchCandidateData = useCallback(async () => {
+    if (!applicationId) return;
+
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch application details
-      const { data: application, error: appError } = await supabase
-        .from("applications")
-        .select("*")
-        .eq("id", applicationId)
-        .single();
+      // Assumption: GET /api/applications/{id} or /api/applications?application_id={id}
+      // Backend should return application with nested internship, profile, and studentProfile
+      // Run requests in parallel
+      const responseData = await Promise.all([
+        axiosInstance.get("/unit/applications"),
+      ]);
+      // const { data: responseData } = await axiosInstance.get(
+      `unit/applications`;
+      // const { data: responseData } = await axiosInstance.get(
+      //   `/applications/${applicationId}`
+      // );
+      console.log("%%%%%%%%%%%%%%%");
+      console.log(responseData);
 
-      if (appError) throw appError;
-      if (!application) {
+      // Expected response structure:
+      // { application, internship, profile, studentProfile }
+      // or { data: { application, internship, profile, studentProfile } }
+      const candidateData = responseData?.data.data || responseData;
+
+      if (!candidateData?.application) {
         setError("Application not found");
         return;
       }
 
-      // Fetch internship details
-      const { data: internship, error: internshipError } = await supabase
-        .from("internships")
-        .select("*")
-        .eq("id", application.internship_id)
-        .single();
-
-      if (internshipError) throw internshipError;
-
-      // Fetch student profile
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", application.student_id)
-        .single();
-
-      if (profileError) throw profileError;
-
-      // Fetch student details
-      const { data: studentProfile, error: studentProfileError } =
-        await supabase
-          .from("student_profiles")
-          .select("*")
-          .eq("profile_id", application.student_id)
-          .single();
-
-      if (studentProfileError) throw studentProfileError;
-
-      setData({
-        application,
-        internship,
-        profile,
-        studentProfile,
-      });
-    } catch (error) {
-      console.error("Error fetching candidate data:", error);
-      setError("Failed to fetch candidate data");
+      setData(candidateData as CandidateData);
+    } catch (err: any) {
+      console.error("Error fetching candidate data:", err);
+      setError(err.message || "Failed to fetch candidate data");
     } finally {
       setLoading(false);
     }

@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+// import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -18,12 +18,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// Update to CamelCase to match new API style (verify backend requirements for arrays)
 interface ProjectData {
-  project_name: string;
-  client_name: string;
+  projectName: string;
+  clientName: string;
   description: string;
-  status: string; // "Completed" or "Ongoing"
-  completion_date?: string;
+  status: string;
+  completionDate?: string;
 }
 
 interface UnitProjectDialogProps {
@@ -37,22 +38,23 @@ export const UnitProjectDialog: React.FC<UnitProjectDialogProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState<ProjectData>({
-    project_name: "",
-    client_name: "",
+    projectName: "",
+    clientName: "",
     description: "",
     status: "Ongoing",
-    completion_date: "",
+    completionDate: "",
   });
 
   const handleSave = () => {
-    if (!formData.project_name.trim()) return alert("Project name is required");
+    if (!formData.projectName.trim()) return alert("Project name is required");
     onSave(formData);
+    // Reset form
     setFormData({
-      project_name: "",
-      client_name: "",
+      projectName: "",
+      clientName: "",
       description: "",
       status: "Ongoing",
-      completion_date: "",
+      completionDate: "",
     });
     setOpen(false);
   };
@@ -68,30 +70,31 @@ export const UnitProjectDialog: React.FC<UnitProjectDialogProps> = ({
         <div className="space-y-4 mt-4">
           {/* Project Name */}
           <div>
-            <Label htmlFor="project_name">Project Name</Label>
+            <Label htmlFor="projectName">Project Name</Label>
             <Input
-              id="project_name"
+              id="projectName"
               placeholder="Enter project name"
-              value={formData.project_name}
+              value={formData.projectName}
               onChange={(e) =>
-                setFormData({ ...formData, project_name: e.target.value })
+                setFormData({ ...formData, projectName: e.target.value })
               }
             />
           </div>
 
           {/* Client Name */}
           <div>
-            <Label htmlFor="client_name">Client Name</Label>
+            <Label htmlFor="clientName">Client Name</Label>
             <Input
-              id="client_name"
+              id="clientName"
               placeholder="Enter client name"
-              value={formData.client_name}
+              value={formData.clientName}
               onChange={(e) =>
-                setFormData({ ...formData, client_name: e.target.value })
+                setFormData({ ...formData, clientName: e.target.value })
               }
             />
           </div>
 
+          {/* Description (Commented out in your code, keeping it that way) */}
           {/* Description */}
           {/* <div>
             <Label htmlFor="description">Description</Label>
@@ -104,7 +107,6 @@ export const UnitProjectDialog: React.FC<UnitProjectDialogProps> = ({
               }
             />
           </div> */}
-
           {/* Status */}
           <div>
             <Label htmlFor="status">Status</Label>
@@ -127,13 +129,13 @@ export const UnitProjectDialog: React.FC<UnitProjectDialogProps> = ({
           {/* Completion Date (only if completed) */}
           {formData.status === "Completed" && (
             <div>
-              <Label htmlFor="completion_date">Completion Date</Label>
+              <Label htmlFor="completionDate">Completion Date</Label>
               <Input
-                id="completion_date"
+                id="completionDate"
                 type="date"
-                value={formData.completion_date}
+                value={formData.completionDate}
                 onChange={(e) =>
-                  setFormData({ ...formData, completion_date: e.target.value })
+                  setFormData({ ...formData, completionDate: e.target.value })
                 }
               />
             </div>

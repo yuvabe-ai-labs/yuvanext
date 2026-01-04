@@ -1,49 +1,43 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import axiosInstance from '@/config/platform-api';
+import { useSession } from '@/lib/auth-client'; // Better Auth session
 
 export const useApplicationStatus = (internshipId: string) => {
   const [hasApplied, setHasApplied] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const { user } = useAuth();
+  const { data: session, isPending } = useSession();
 
   useEffect(() => {
     const checkApplicationStatus = async () => {
-      if (!user || !internshipId) {
+      if (isPending || !session || !internshipId) {
         setIsLoading(false);
         return;
       }
 
       try {
-        // First, get the profile_id from the profiles table
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
+        // GET /api/applications?internship_id={id}
+        // Backend should filter by authenticated user
+        const { data } = await axiosInstance.get('/applications', {
+          params: { internship_id: internshipId },
+        });
 
-        if (profileError) throw profileError;
-
-        // Then check if application exists with this profile_id
-        const { data, error } = await supabase
-          .from('applications')
-          .select('id')
-          .eq('student_id', profile.id)
-          .eq('internship_id', internshipId)
-          .maybeSingle();
-
-        if (error) throw error;
-        setHasApplied(!!data);
-      } catch (error) {
-        console.error('Error checking application status:', error);
-        setHasApplied(false);
+        const applications = Array.isArray(data) ? data : data.applications || [];
+        setHasApplied(applications.length > 0);
+      } catch (error: any) {
+        // If 404 or no applications, user hasn't applied
+        if (error.response?.status === 404) {
+          setHasApplied(false);
+        } else {
+          console.error('Error checking application status:', error);
+          setHasApplied(false);
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     checkApplicationStatus();
-  }, [user, internshipId]);
+  }, [session, isPending, internshipId]);
 
   const markAsApplied = () => {
     setHasApplied(true);

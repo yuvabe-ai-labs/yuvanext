@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import axiosInstance from "@/config/platform-api";
 import { toast } from "sonner";
 
 export const useUnitProfileData = () => {
-  const { user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
   const [unitProfile, setUnitProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -24,37 +22,26 @@ export const useUnitProfileData = () => {
 
   // Fetch profile and unit profile data
   const fetchProfileData = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
 
-      // Fetch base profile
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
+      // GET /api/profile (from provided endpoints)
+      // Backend should return both base profile and unit profile if role is unit
+      const { data } = await axiosInstance.get("/profile");
 
-      if (profileError) throw profileError;
+      // Expected response structure:
+      // { data: { profile: DatabaseProfile, unitProfile?: UnitProfile } }
+      // or { profile: DatabaseProfile, unitProfile?: UnitProfile }
+      const profileData = data?.data?.profile || data?.profile || data;
+      const unitData = data?.data?.unitProfile || data?.unitProfile;
 
-      setProfile(profileData);
-
-      // Fetch unit profile
-      const { data: unitData, error: unitError } = await supabase
-        .from("units")
-        .select("*")
-        .eq("profile_id", profileData.id)
-        .maybeSingle();
-
-      if (unitError && unitError.code !== "PGRST116") {
-        throw unitError;
+      if (profileData) {
+        setProfile(profileData);
       }
 
-      setUnitProfile(unitData);
+      if (unitData) {
+        setUnitProfile(unitData);
+      }
     } catch (error: any) {
       console.error("Error fetching profile data:", error);
       toast.error("Failed to load profile data");
@@ -68,14 +55,16 @@ export const useUnitProfileData = () => {
     if (!profile) return;
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update(updates)
-        .eq("id", profile.id);
+      // PUT /api/profile (from provided endpoints)
+      const { data } = await axiosInstance.put("/profile", updates);
 
-      if (error) throw error;
+      const updatedProfile = data?.data?.profile || data?.profile || data;
+      if (updatedProfile) {
+        setProfile(updatedProfile);
+      } else {
+        setProfile({ ...profile, ...updates });
+      }
 
-      setProfile({ ...profile, ...updates });
       toast.success("Profile updated successfully");
     } catch (error: any) {
       console.error("Error updating profile:", error);
@@ -88,25 +77,19 @@ export const useUnitProfileData = () => {
     if (!profile) return;
 
     try {
-      if (!unitProfile) {
-        // Create new unit profile
-        const { data, error } = await supabase
-          .from("units")
-          .insert([{ profile_id: profile.id, ...updates }])
-          .select()
-          .single();
+      // PUT /api/profile with unitProfile in body
+      // Backend should handle upserting unit profile
+      const { data } = await axiosInstance.put("/profile", {
+        unitProfile: updates,
+      });
 
-        if (error) throw error;
-        setUnitProfile(data);
+      const updatedUnitProfile =
+        data?.data?.unitProfile || data?.unitProfile;
+      if (updatedUnitProfile) {
+        setUnitProfile(updatedUnitProfile);
       } else {
-        // Update existing unit profile
-        const { error } = await supabase
-          .from("units")
-          .update(updates)
-          .eq("id", unitProfile.id);
-
-        if (error) throw error;
-        setUnitProfile({ ...unitProfile, ...updates });
+        // If backend doesn't return it, update local state optimistically
+        setUnitProfile({ ...(unitProfile || {}), ...updates });
       }
 
       toast.success("Unit profile updated successfully");
@@ -218,7 +201,7 @@ export const useUnitProfileData = () => {
 
   useEffect(() => {
     fetchProfileData();
-  }, [user]);
+  }, []);
 
   return {
     profile,

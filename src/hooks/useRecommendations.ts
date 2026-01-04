@@ -1,8 +1,19 @@
 import { useMemo } from "react";
-import type { Tables } from "@/integrations/supabase/types";
 
-type Internship = Tables<"internships">;
-type Course = Tables<"courses">;
+// Interfaces (replacing Supabase types)
+interface Internship {
+  id: string;
+  title: string;
+  skills_required: string | string[] | null;
+  [key: string]: any;
+}
+
+interface Course {
+  id: string;
+  title: string;
+  category: string | null;
+  [key: string]: any;
+}
 
 interface InternshipWithScore extends Internship {
   job_type: any;

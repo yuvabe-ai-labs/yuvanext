@@ -1,14 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getMyOffers, updateOfferDecision } from "@/services/myOffers.service";
 
-export const useMyOffers = (userId: string | undefined) => {
+export const useMyOffers = () => {
   return useQuery({
-    queryKey: ["myOffers", userId],
-    queryFn: () => {
-      if (!userId) return Promise.resolve({ data: [], error: "No user" });
-      return getMyOffers(userId);
-    },
-    enabled: !!userId,
+    queryKey: ["myOffers"],
+    queryFn: getMyOffers,
   });
 };
 

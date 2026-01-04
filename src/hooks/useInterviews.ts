@@ -1,9 +1,26 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import type { Tables } from "@/integrations/supabase/types";
+import axiosInstance from "@/config/platform-api";
+import { useSession } from "@/lib/auth-client"; // Better Auth session management
 
-type Interview = Tables<"interviews">;
+// Interview interface (replacing Supabase types)
+export interface Interview {
+  id: string;
+  application_id: string;
+  scheduled_date: string;
+  meeting_link: string;
+  title: string;
+  description: string | null;
+  duration_minutes: number;
+  unit_id: string;
+  student_id: string;
+  status: "scheduled" | "completed" | "cancelled" | "no_show";
+  created_at: string;
+  updated_at: string;
+  application?: any;
+  student?: any;
+  unit?: any;
+  [key: string]: any; // For additional fields
+}
 
 interface CreateInterviewParams {
   applicationId: string;
@@ -27,63 +44,33 @@ interface UpdateInterviewParams {
 }
 
 export const useInterviews = () => {
-  const { user } = useAuth();
+  const { data: session, isPending } = useSession(); // Better Auth session
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
+    // Wait for auth to finish loading, then fetch if authenticated
+    if (isPending) return;
+
+    if (!session) {
       setLoading(false);
       return;
     }
 
     fetchInterviews();
-  }, [user?.id]);
+  }, [session, isPending]);
 
   const fetchInterviews = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch profile first to get profile ID
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user?.id)
-        .single();
+      // Assumption: GET /api/interviews
+      // Backend should filter by authenticated user's profile (unit or student)
+      const { data } = await axiosInstance.get("/interviews");
 
-      if (profileError) throw profileError;
-
-      // Fetch interviews where user is either unit (sender) or student (receiver)
-      const { data, error: interviewsError } = await supabase
-        .from("interviews")
-        .select(
-          `
-          *,
-          application:applications (
-            *,
-            internship:internships (
-              title,
-              company_name
-            )
-          ),
-          student:student_id (
-            full_name,
-            email
-          ),
-          unit:unit_id (
-            full_name,
-            email
-          )
-        `
-        )
-        .or(`unit_id.eq.${profileData.id},student_id.eq.${profileData.id}`)
-        .order("scheduled_date", { ascending: true });
-
-      if (interviewsError) throw interviewsError;
-
-      setInterviews(data || []);
+      setInterviews(Array.isArray(data) ? data : data.interviews || []);
     } catch (err: any) {
       console.error("Error fetching interviews:", err);
       setError(err.message || "Failed to fetch interviews");
@@ -96,23 +83,18 @@ export const useInterviews = () => {
     try {
       setError(null);
 
-      const { data, error: insertError } = await supabase
-        .from("interviews")
-        .insert({
-          application_id: params.applicationId,
-          scheduled_date: params.scheduledDate,
-          meeting_link: params.meetingLink,
-          title: params.title,
-          description: params.description || "",
-          duration_minutes: params.durationMinutes || 60,
-          unit_id: params.unitId,
-          student_id: params.studentId,
-          status: "scheduled",
-        })
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
+      // Assumption: POST /api/interviews
+      const { data } = await axiosInstance.post("/interviews", {
+        application_id: params.applicationId,
+        scheduled_date: params.scheduledDate,
+        meeting_link: params.meetingLink,
+        title: params.title,
+        description: params.description || "",
+        duration_minutes: params.durationMinutes || 60,
+        unit_id: params.unitId,
+        student_id: params.studentId,
+        status: "scheduled",
+      });
 
       // Refresh interviews list
       await fetchInterviews();
@@ -140,14 +122,11 @@ export const useInterviews = () => {
         updateData.duration_minutes = params.durationMinutes;
       if (params.status) updateData.status = params.status;
 
-      const { data, error: updateError } = await supabase
-        .from("interviews")
-        .update(updateData)
-        .eq("id", params.id)
-        .select()
-        .single();
-
-      if (updateError) throw updateError;
+      // Assumption: PUT /api/interviews/{id}
+      const { data } = await axiosInstance.put(
+        `/interviews/${params.id}`,
+        updateData
+      );
 
       // Refresh interviews list
       await fetchInterviews();
@@ -164,12 +143,8 @@ export const useInterviews = () => {
     try {
       setError(null);
 
-      const { error: deleteError } = await supabase
-        .from("interviews")
-        .delete()
-        .eq("id", id);
-
-      if (deleteError) throw deleteError;
+      // Assumption: DELETE /api/interviews/{id}
+      await axiosInstance.delete(`/interviews/${id}`);
 
       // Refresh interviews list
       await fetchInterviews();
@@ -230,27 +205,12 @@ export const useApplicationInterviews = (applicationId: string | null) => {
       setLoading(true);
       setError(null);
 
-      const { data, error: interviewsError } = await supabase
-        .from("interviews")
-        .select(
-          `
-          *,
-          student:student_id (
-            full_name,
-            email
-          ),
-          unit:unit_id (
-            full_name,
-            email
-          )
-        `
-        )
-        .eq("application_id", applicationId)
-        .order("scheduled_date", { ascending: true });
+      // Assumption: GET /api/interviews?application_id={id}
+      const { data } = await axiosInstance.get("/interviews", {
+        params: { application_id: applicationId },
+      });
 
-      if (interviewsError) throw interviewsError;
-
-      setInterviews(data || []);
+      setInterviews(Array.isArray(data) ? data : data.interviews || []);
     } catch (err: any) {
       console.error("Error fetching application interviews:", err);
       setError(err.message || "Failed to fetch interviews");

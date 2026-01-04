@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import axiosInstance from "@/config/platform-api";
 import { DatabaseProfile, StudentProfile } from "@/types/profile";
 import { useToast } from "@/hooks/use-toast";
 
 export const useProfileData = () => {
-  const { user } = useAuth();
   const { toast } = useToast();
 
   const [profile, setProfile] = useState<DatabaseProfile | null>(null);
@@ -16,63 +14,31 @@ export const useProfileData = () => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchProfileData = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
       setError(null);
 
-      console.log("Fetching profile for user ID:", user.id);
+      // GET /api/profile (from provided endpoints)
+      // Backend should return both base profile and student profile if role is student
+      const { data } = await axiosInstance.get("/profile");
 
-      // 1. Fetch basic profile by user_id
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      // Expected response structure:
+      // { data: { profile: DatabaseProfile, studentProfile?: StudentProfile } }
+      // or { profile: DatabaseProfile, studentProfile?: StudentProfile }
+      const profileData = data?.data?.profile || data?.profile || data;
+      const studentData = data?.data?.studentProfile || data?.studentProfile;
 
-      if (profileError) throw profileError;
-
-      console.log("Profile data fetched:", profileData);
-      setProfile(profileData as DatabaseProfile);
-
-      // 2. Fetch or create student profile
-      let studentData: StudentProfile | null = null;
-
-      if (profileData?.id) {
-        const { data, error: studentError } = await supabase
-          .from("student_profiles")
-          .select("*")
-          .eq("profile_id", profileData.id)
-          .maybeSingle();
-
-        if (studentError && studentError.code !== "PGRST116") {
-          throw studentError;
-        }
-
-        studentData = data as unknown as StudentProfile | null;
-
-        // Auto-create if missing and role = student
-        if (!studentData && profileData?.role === "student") {
-          console.log("No student profile found, creating one...");
-          const { data: newStudent, error: insertError } = await supabase
-            .from("student_profiles")
-            .insert({
-              profile_id: profileData.id,
-            })
-            .select()
-            .single();
-
-          if (insertError) throw insertError;
-          studentData = newStudent as unknown as StudentProfile;
-        }
+      if (profileData) {
+        setProfile(profileData as DatabaseProfile);
       }
 
-      setStudentProfile(studentData);
-      console.log("Student profile data fetched:", studentData);
+      if (studentData) {
+        setStudentProfile(studentData as StudentProfile);
+      } else if (profileData?.role === "student") {
+        // If student profile doesn't exist, create it via update
+        // Backend should handle this automatically or we can create it
+        setStudentProfile(null); // Will be created on first update
+      }
     } catch (err: any) {
       console.error("Profile fetch error:", err);
       setError(err.message);
@@ -87,22 +53,19 @@ export const useProfileData = () => {
   };
 
   const updateProfile = async (updates: Partial<DatabaseProfile>) => {
-    if (!user || !profile) return;
+    if (!profile) return;
 
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", profile.id)
-        .select()
-        .single();
+      // PUT /api/profile (from provided endpoints)
+      // Backend should handle updating base profile
+      const { data } = await axiosInstance.put("/profile", {
+        ...updates,
+      });
 
-      if (error) throw error;
-
-      setProfile(data as DatabaseProfile);
+      const updatedProfile = data?.data?.profile || data?.profile || data;
+      if (updatedProfile) {
+        setProfile(updatedProfile as DatabaseProfile);
+      }
 
       toast({
         title: "Success",
@@ -122,22 +85,23 @@ export const useProfileData = () => {
     if (!profile?.id) return;
 
     try {
-      const { data, error } = await supabase
-        .from("student_profiles")
-        .upsert(
-          {
-            profile_id: profile.id,
-            ...updates,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "profile_id" }
-        )
-        .select()
-        .single();
+      // PUT /api/profile with studentProfile in body
+      // Backend should handle upserting student profile
+      const { data } = await axiosInstance.put("/profile", {
+        studentProfile: updates,
+      });
 
-      if (error) throw error;
-
-      setStudentProfile(data as unknown as StudentProfile);
+      const updatedStudentProfile =
+        data?.data?.studentProfile || data?.studentProfile;
+      if (updatedStudentProfile) {
+        setStudentProfile(updatedStudentProfile as StudentProfile);
+      } else {
+        // If backend doesn't return it, update local state optimistically
+        setStudentProfile({
+          ...(studentProfile || ({} as StudentProfile)),
+          ...updates,
+        } as StudentProfile);
+      }
 
       toast({
         title: "Success",
@@ -304,7 +268,7 @@ export const useProfileData = () => {
 
   useEffect(() => {
     fetchProfileData();
-  }, [user?.id]);
+  }, []);
 
   return {
     profile,

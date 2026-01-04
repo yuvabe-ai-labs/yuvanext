@@ -22,16 +22,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-// 1. IMPORT AXIOS INSTANCE
-import axiosInstance from "@/config/platform-api";
+import axiosInstance from "@/config/platform-api"; // For AI
 import { useToast } from "@/hooks/use-toast";
 import { X, Sparkles, ChevronDown } from "lucide-react";
+import { format } from "date-fns";
+
+// 1. IMPORT HOOK
+import { useUpdateInternship } from "@/hooks/useInternships";
 
 interface EditInternshipDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  internship: any;
+  internship: any; // Ideally types this with your InternshipResponse interface
 }
 
 interface LanguageProficiency {
@@ -67,12 +70,7 @@ const formSchema = z.object({
   language_requirements: z
     .array(languageSchema)
     .min(1, "At least one language is required"),
-  min_age_required: z.coerce
-    .number({
-      required_error: "Minimum age is required",
-      invalid_type_error: "Minimum age must be a number",
-    })
-    .min(1, "Age is required"),
+  min_age_required: z.coerce.number().min(1, "Age is required"),
   job_type: z.enum(["full_time", "part_time", "both"]),
   application_deadline: z.date({
     required_error: "Application deadline is required",
@@ -108,7 +106,10 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
   internship,
 }) => {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 2. USE MUTATION
+  const updateInternshipMutation = useUpdateInternship();
+
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [languages, setLanguages] = useState<LanguageProficiency[]>([
     { language: "", read: false, write: false, speak: false },
@@ -157,6 +158,7 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
   const jobTitle = watch("title");
   const isJobRoleFilled = jobTitle && jobTitle.trim().length > 0;
 
+  // ... (Date Picker Arrays - months, years) ...
   const months = [
     "January",
     "February",
@@ -171,53 +173,43 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
     "November",
     "December",
   ];
-
   const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
 
-  // Function to check if a date is disabled (in the past)
+  // ... (Date Helper Functions - isDateDisabled, getAvailableDates, etc.) ...
   const isDateDisabled = (date: any, month: any, year: any) => {
     if (!month || !year) return false;
-
     const selectedTimestamp = new Date(
       parseInt(year),
       parseInt(month) - 1,
       parseInt(date)
     ).setHours(0, 0, 0, 0);
-
     const todayTimestamp = new Date().setHours(0, 0, 0, 0);
-
     return selectedTimestamp < todayTimestamp;
   };
 
-  // Get available dates based on selected month and year
   const getAvailableDates = () => {
-    if (!selectedMonth || !selectedYear) {
+    if (!selectedMonth || !selectedYear)
       return Array.from({ length: 31 }, (_, i) => i + 1);
-    }
-
     const year = parseInt(selectedYear);
     const month = parseInt(selectedMonth);
     const daysInMonth = new Date(year, month, 0).getDate();
-
     return Array.from({ length: daysInMonth }, (_, i) => i + 1);
   };
 
-  // Get available months based on selected year
   const getAvailableMonths = () => {
     if (!selectedYear) return months;
-
     const year = parseInt(selectedYear);
     if (year > currentYear) return months;
-
-    // Current year - only show current month onwards
     return months.slice(currentMonth - 1);
   };
 
   const dates = getAvailableDates();
   const availableMonths = getAvailableMonths();
 
+  // 3. POPULATE FORM DATA (Map from Backend CamelCase)
   useEffect(() => {
     if (internship && isOpen) {
+      // Backend uses camelCase: responsibilities, benefits, skillsRequired
       const responsibilitiesText = Array.isArray(internship.responsibilities)
         ? internship.responsibilities.join("\n")
         : internship.responsibilities || "";
@@ -226,18 +218,21 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
         ? internship.benefits.join("\n")
         : internship.benefits || "";
 
-      const skillsText = Array.isArray(internship.skills_required)
-        ? internship.skills_required.join("\n")
-        : internship.skills_required || "";
+      // Correct Mapping: skillsRequired
+      const skillsText = Array.isArray(internship.skillsRequired)
+        ? internship.skillsRequired.join("\n")
+        : internship.skillsRequired || "";
 
-      const languageReqs = Array.isArray(internship.language_requirements)
-        ? internship.language_requirements
+      // Correct Mapping: language
+      const languageReqs = Array.isArray(internship.language)
+        ? internship.language
         : [{ language: "", read: false, write: false, speak: false }];
 
       setLanguages(languageReqs);
 
-      if (internship.application_deadline) {
-        const deadline = new Date(internship.application_deadline);
+      // Correct Mapping: closingDate
+      if (internship.closingDate) {
+        const deadline = new Date(internship.closingDate);
         setSelectedDate(deadline.getDate().toString());
         setSelectedMonth((deadline.getMonth() + 1).toString());
         setSelectedYear(deadline.getFullYear().toString());
@@ -246,23 +241,23 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
       reset({
         title: internship.title || "",
         duration: internship.duration || "",
-        isPaid: internship.is_paid || false,
+        isPaid: internship.isPaid || false,
         payment: internship.payment || "",
         description: internship.description || "",
         responsibilities: responsibilitiesText,
         benefits: benefitsText,
         skills_required: skillsText,
         language_requirements: languageReqs,
-        application_deadline: internship.application_deadline
-          ? new Date(internship.application_deadline)
+        application_deadline: internship.closingDate
+          ? new Date(internship.closingDate)
           : undefined,
-        min_age_required: internship.min_age_required || undefined,
-        job_type: internship.job_type || "full_time",
-      });
+        min_age_required: Number(internship.minAgeRequired) || undefined, // Backend sends string, form needs number
+        jobType: internship.jobType || "full_time",
+      } as any);
     }
   }, [internship, isOpen, reset]);
 
-  // Sync date selection with form
+  // ... (Date Sync Effects remain same) ...
   useEffect(() => {
     if (selectedDate && selectedMonth && selectedYear) {
       const date = new Date(
@@ -270,15 +265,12 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
         parseInt(selectedMonth) - 1,
         parseInt(selectedDate)
       );
-
-      // Check if selected date is in the past
       if (date.setHours(0, 0, 0, 0) >= new Date().setHours(0, 0, 0, 0)) {
         setValue("application_deadline", date, { shouldValidate: true });
       }
     }
   }, [selectedDate, selectedMonth, selectedYear, setValue]);
 
-  // Reset date when month or year changes if it becomes invalid
   useEffect(() => {
     if (selectedDate && selectedMonth && selectedYear) {
       if (isDateDisabled(selectedDate, selectedMonth, selectedYear)) {
@@ -287,6 +279,7 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
     }
   }, [selectedMonth, selectedYear]);
 
+  // ... (Language Handlers remain same) ...
   const handleAddLanguage = () => {
     const newLanguages = [
       ...languages,
@@ -316,60 +309,61 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
   };
 
   const onSubmit = async (data: FormData) => {
-    setIsSubmitting(true);
-    try {
-      const skillsArray = data.skills_required
-        .split("\n")
-        .filter((s) => s.trim());
-      const responsibilitiesArray = data.responsibilities
-        .split("\n")
-        .filter((r) => r.trim());
-      const benefitsArray = data.benefits.split("\n").filter((b) => b.trim());
+    // 4. PREPARE PAYLOAD (Map to Backend CamelCase)
+    const skillsArray = data.skills_required
+      .split("\n")
+      .filter((s) => s.trim());
+    const responsibilitiesArray = data.responsibilities
+      .split("\n")
+      .filter((r) => r.trim());
+    const benefitsArray = data.benefits.split("\n").filter((b) => b.trim());
 
-      let deadlineDate = internship.application_deadline;
-      if (selectedDate && selectedMonth && selectedYear) {
-        deadlineDate = `${selectedYear}-${selectedMonth.padStart(
-          2,
-          "0"
-        )}-${selectedDate.padStart(2, "0")}`;
-      }
+    // Fix Payment: Ensure string, not null
+    const paymentValue = data.isPaid && data.payment ? data.payment : "Unpaid";
 
-      // 2. REFACTORED: Use Axios PUT to update
-      // Endpoint: PUT /api/internships/{id}
-      await axiosInstance.put(`/internships/${internship.id}`, {
+    // Fix Language: Ensure object structure matches strict type
+    const languageArray = data.language_requirements.map((l) => l.language);
+
+    // 5. CALL MUTATION
+    updateInternshipMutation.mutate(
+      {
+        id: internship.id, // ID from prop
         title: data.title,
         duration: data.duration,
-        is_paid: data.isPaid,
-        payment: data.isPaid && data.payment ? data.payment : null,
+        isPaid: data.isPaid,
+        payment: paymentValue,
         description: data.description,
         responsibilities: responsibilitiesArray,
         benefits: benefitsArray,
-        skills_required: skillsArray,
-        language_requirements: data.language_requirements,
-        application_deadline: deadlineDate,
-        min_age_required: data.min_age_required,
-        job_type: data.job_type,
-      });
+        skillsRequired: skillsArray,
+        language: languageArray,
+        closingDate: format(data.application_deadline, "yyyy-MM-dd"),
+        minAgeRequired: data.min_age_required.toString(),
+        jobType: data.job_type,
+      },
+      {
+        onSuccess: () => {
+          onSuccess();
+          onClose();
+        },
+        onError: (error: any) => {
+          console.error("Validation Error Details:", error.response?.data);
+          const firstIssue = error.response?.data?.error?.issues?.[0];
+          const errorMessage = firstIssue
+            ? `${firstIssue.path.join(".")}: ${firstIssue.message}`
+            : "Failed to update internship.";
 
-      toast({
-        title: "Success",
-        description: "Internship updated successfully!",
-      });
-
-      onSuccess();
-      onClose();
-    } catch (error) {
-      console.error("Error updating internship:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update internship. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+          toast({
+            title: "Update Failed",
+            description: errorMessage,
+            variant: "destructive",
+          });
+        },
+      }
+    );
   };
 
+  // ... (AI Assist Logic remains same - using axiosInstance) ...
   const handleAIAssist = async (fieldName: keyof FormData) => {
     console.log("AI Assist triggered for:", fieldName);
     setAiLoading(fieldName as string);
@@ -377,7 +371,6 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
     try {
       const currentValue = watch(fieldName) as string;
       const jobTitle = watch("title") || "this position";
-
       let prompt = "";
 
       switch (fieldName) {
@@ -391,7 +384,6 @@ Return only the paragraph text, no bullet points or titles.${
               : ""
           }`;
           break;
-
         case "responsibilities":
           prompt = `Write 5-7 key responsibilities for a ${jobTitle} internship.
 Each responsibility must be on a new line, without numbering or bullet characters.
@@ -423,11 +415,9 @@ Return only the clean list, one skill per line, no extra text or introduction`;
       ];
       setConversationHistory(updatedHistory);
 
-      // 3. REFACTORED: Use Axios POST for AI
-      // Endpoint: POST /api/chatbot (or your specific AI endpoint)
       const { data: aiResponse } = await axiosInstance.post("/chatbot", {
         message: prompt,
-        history: updatedHistory, // Changed from conversationHistory to history to match backend likely format
+        history: updatedHistory,
         userRole: "jd_generation",
       });
 
@@ -443,30 +433,25 @@ Return only the clean list, one skill per line, no extra text or introduction`;
         if (fieldName === "description") {
           cleanResponse = cleanResponse.split(/\n\s*\n/)[0].trim();
         }
-
-        if (["responsibilities", "benefits"].includes(fieldName)) {
+        if (
+          ["responsibilities", "benefits", "skills_required"].includes(
+            fieldName
+          )
+        ) {
           cleanResponse = cleanResponse
             .split(/\n+/)
             .map((line: string) => line.replace(/^[-•\d.]\s*/, "").trim())
-            .filter((line: string) => line.length > 0)
+            .filter((l: string) => l.length > 0)
             .join("\n");
         }
-
         setValue(fieldName, cleanResponse, { shouldValidate: true });
-
-        setConversationHistory((prevHistory) => [
-          ...prevHistory,
+        setConversationHistory((prev) => [
+          ...prev,
           { role: "ai", content: cleanResponse },
         ]);
-
-        toast({
-          title: "AI Suggestion Applied",
-          description: "The content has been generated successfully!",
-        });
-      } else {
-        throw new Error("Unexpected response from AI");
+        toast({ title: "AI Suggestion Applied" });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("AI Assist error:", error);
       toast({
         title: "AI Assist Failed",
@@ -478,16 +463,18 @@ Return only the clean list, one skill per line, no extra text or introduction`;
     }
   };
 
+  // ... (JSX Return - Form UI - remains same as your provided code, just ensured button disabled logic) ...
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[90vh] p-0">
         <DialogHeader className="px-6 py-3"></DialogHeader>
-
         <ScrollArea className="max-h-[calc(90vh-140px)]">
           <form
             onSubmit={handleSubmit(onSubmit)}
             className="px-6 space-y-6 pb-6"
           >
+            {/* ... Copy Paste your Form Fields here (Inputs, Selects, etc.) ... */}
+            {/* Example: Job/Intern Role Input */}
             <div className="flex items-center justify-between">
               <div>
                 <DialogTitle className="text-xl font-semibold">
@@ -499,7 +486,7 @@ Return only the clean list, one skill per line, no extra text or introduction`;
               </div>
             </div>
 
-            {/* Job/Intern Role */}
+            {/* Title */}
             <div className="space-y-2">
               <Label htmlFor="title" className="text-sm font-medium">
                 Job/Intern Role <span className="text-destructive">*</span>
@@ -982,9 +969,8 @@ Return only the clean list, one skill per line, no extra text or introduction`;
               <label className="block text-sm font-medium text-gray-700">
                 Last date to apply <span className="text-destructive">*</span>
               </label>
-
               <div className="flex gap-3">
-                {/* Year Dropdown */}
+                {/* ... Date Picker Selects ... */}
                 <div className="relative flex-1">
                   <select
                     value={selectedYear}
@@ -1004,8 +990,6 @@ Return only the clean list, one skill per line, no extra text or introduction`;
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                 </div>
-
-                {/* Month Dropdown */}
                 <div className="relative flex-1">
                   <select
                     value={selectedMonth}
@@ -1017,17 +1001,13 @@ Return only the clean list, one skill per line, no extra text or introduction`;
                     className="w-full px-3 py-2 text-sm text-gray-500 border border-gray-300 rounded-full appearance-none bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-9 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Month</option>
-                    {availableMonths.map((month, index) => {
-                      const monthValue =
+                    {availableMonths.map((month, idx) => {
+                      const val =
                         selectedYear && parseInt(selectedYear) === currentYear
-                          ? currentMonth + index
-                          : index + 1;
+                          ? currentMonth + idx
+                          : idx + 1;
                       return (
-                        <option
-                          key={month}
-                          value={monthValue}
-                          className="text-gray-700"
-                        >
+                        <option key={month} value={val}>
                           {month}
                         </option>
                       );
@@ -1035,8 +1015,6 @@ Return only the clean list, one skill per line, no extra text or introduction`;
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                 </div>
-
-                {/* Date Dropdown */}
                 <div className="relative flex-1">
                   <select
                     value={selectedDate}
@@ -1068,14 +1046,11 @@ Return only the clean list, one skill per line, no extra text or introduction`;
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
                 </div>
               </div>
-
-              {/* Display selected date */}
               {selectedDate && selectedMonth && selectedYear && (
                 <p className="text-sm text-gray-600 mt-2">
                   Selected: {selectedDate}/{selectedMonth}/{selectedYear}
                 </p>
               )}
-
               {errors.application_deadline && (
                 <p className="text-sm text-destructive">
                   {errors.application_deadline.message}
@@ -1095,10 +1070,10 @@ Return only the clean list, one skill per line, no extra text or introduction`;
             </Button>
             <Button
               onClick={handleSubmit(onSubmit)}
-              disabled={isSubmitting || !isValid}
+              disabled={updateInternshipMutation.isPending || !isValid}
               className="rounded-3xl bg-primary hover:bg-primary/90"
             >
-              {isSubmitting ? "Updating..." : "Update"}
+              {updateInternshipMutation.isPending ? "Updating..." : "Update"}
             </Button>
           </div>
         </ScrollArea>

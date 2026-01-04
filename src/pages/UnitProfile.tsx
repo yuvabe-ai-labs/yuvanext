@@ -18,9 +18,10 @@ import {
   ChevronRight,
   Camera,
 } from "lucide-react";
-// 1. IMPORT AXIOS & AUTH
-import { useSession } from "@/lib/auth-client";
-import axiosInstance from "@/config/platform-api";
+
+// 1. IMPORT CUSTOM HOOKS
+import { useUnitProfile, useUpdateUnitProfile } from "@/hooks/useUnitProfile";
+import { useSession } from "@/lib/auth-client"; // For checking auth state if needed
 
 // Components
 import { UnitDetailsDialog } from "@/components/unit/UnitDetailsDialog";
@@ -33,17 +34,15 @@ import { CircularProgress } from "@/components/CircularProgress";
 import { ImageUploadDialog } from "@/components/ImageUploadDialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
-import { useEffect, useState, useRef, useCallback } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useRef } from "react";
 
 const UnitProfile = () => {
   const { data: session } = useSession();
   const user = session?.user;
-  const { toast } = useToast();
 
-  // State to replace custom hook
-  const [profileData, setProfileData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // 2. USE REACT QUERY HOOKS
+  const { data: profileData, isLoading, refetch } = useUnitProfile();
+  const updateMutation = useUpdateUnitProfile();
 
   // Dialog States
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
@@ -54,136 +53,52 @@ const UnitProfile = () => {
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // 2. FETCH DATA FUNCTION
-  const fetchProfileData = useCallback(async () => {
-    try {
-      setLoading(true);
-      // GET /api/profile (Returns unified profile + unit data)
-      const { data } = await axiosInstance.get("/profile");
-      setProfileData(data.data || data); // Handle {data: ...} wrapper if present
-    } catch (error) {
-      console.error("Error fetching unit profile:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load profile data",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  // 3. ACTION HANDLERS (Simplified)
 
-  useEffect(() => {
-    if (user) {
-      fetchProfileData();
-    }
-  }, [user, fetchProfileData]);
-
-  // 3. ACTION HANDLERS (Replaces useUnitProfileData functions)
-
-  // Generic update for Unit Profile fields
-  const handleUpdateProfile = async (updates: any) => {
-    try {
-      // PUT /api/profile
-      await axiosInstance.put("/profile", updates);
-      toast({ title: "Success", description: "Profile updated successfully" });
-      fetchProfileData(); // Refresh UI
-    } catch (error) {
-      console.error("Update failed:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update profile",
-        variant: "destructive",
-      });
-    }
+  const handleUpdateProfile = (updates: any) => {
+    updateMutation.mutate(updates);
   };
 
-  // Add Project
-  const handleAddProject = async (projectData: any) => {
-    try {
-      // Assuming backend has: POST /api/profile/projects OR PUT /api/profile with projects array
-      // If your backend expects simple JSON update via PUT /profile:
-      const currentProjects = profileData?.projects || [];
-      const updatedProjects = [
-        ...currentProjects,
-        { ...projectData, id: Date.now().toString() },
-      ]; // Temp ID if backend doesn't generate
-
-      await axiosInstance.put("/profile", { projects: updatedProjects });
-
-      toast({ title: "Success", description: "Project added successfully" });
-      fetchProfileData();
-    } catch (error) {
-      console.error("Add project failed:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add project",
-        variant: "destructive",
-      });
-    }
+  const handleAddProject = (projectData: any) => {
+    const currentProjects = profileData?.projects;
+    const updatedProjects = [
+      ...currentProjects,
+      { ...projectData, id: Date.now().toString() }, // Temp ID if backend doesn't generate
+    ];
+    updateMutation.mutate({ projects: updatedProjects });
   };
 
-  // Remove Project
-  const handleRemoveProject = async (projectId: string) => {
-    try {
-      const currentProjects = profileData?.projects || [];
-      const updatedProjects = currentProjects.filter(
-        (p: any) => p.id !== projectId
-      );
-
-      await axiosInstance.put("/profile", { projects: updatedProjects });
-
-      toast({ title: "Success", description: "Project removed" });
-      fetchProfileData();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to remove project",
-        variant: "destructive",
-      });
-    }
+  const handleRemoveProject = (projectId: string) => {
+    const currentProjects = profileData?.projects || [];
+    const updatedProjects = currentProjects.filter(
+      (p: any) => p.id !== projectId
+    );
+    updateMutation.mutate({ projects: updatedProjects });
   };
 
-  // Update Social Links
-  const handleUpdateSocialLinks = async (links: any[]) => {
-    try {
-      await axiosInstance.put("/profile", { socialLinks: links });
-      toast({ title: "Success", description: "Social links updated" });
-      fetchProfileData();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update links",
-        variant: "destructive",
-      });
-    }
+  const handleUpdateSocialLinks = (links: any[]) => {
+    updateMutation.mutate({ socialLinks: links });
   };
 
-  const handleRemoveSocialLink = async (linkId: string) => {
-    try {
-      const currentLinks = profileData?.socialLinks || [];
-      const updatedLinks = currentLinks.filter((l: any) => l.id !== linkId);
-      await axiosInstance.put("/profile", { socialLinks: updatedLinks });
-      toast({ title: "Success", description: "Link removed" });
-      fetchProfileData();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to remove link",
-        variant: "destructive",
-      });
-    }
+  const handleRemoveSocialLink = (linkId: string) => {
+    const currentLinks = profileData?.socialLinks || [];
+    const updatedLinks = currentLinks.filter((l: any) => l.id !== linkId);
+    updateMutation.mutate({ socialLinks: updatedLinks });
   };
 
-  // 4. DATA MAPPING (CamelCase from API -> Variables)
+  // Callback for image upload dialogs (Use refetch from React Query)
+  const handleImageSuccess = () => {
+    refetch();
+  };
+
+  // 4. DATA MAPPING
   const projects = profileData?.projects || [];
   const galleryImages = profileData?.galleryImages || [];
   const socialLinks = profileData?.socialLinks || [];
-  // JSON says 'galleryVideos' contains the glimpse URL string
   const glimpseUrl = profileData?.galleryVideos || null;
   const profileScore = profileData?.profileScore || 0;
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -243,9 +158,7 @@ const UnitProfile = () => {
                   strokeWidth={3}
                 >
                   <Avatar className="h-20 w-20">
-                    <AvatarImage
-                      src={profileData?.avatarUrl || profileData?.logoUrl}
-                    />
+                    <AvatarImage src={profileData?.avatarUrl} />
                     <AvatarFallback className="text-lg bg-primary text-primary-foreground">
                       {profileData?.name?.charAt(0) || "U"}
                     </AvatarFallback>
@@ -264,10 +177,9 @@ const UnitProfile = () => {
                   <h1 className="text-xl sm:text-2xl font-bold">
                     {profileData?.name || "Unit Name"}
                   </h1>
-                  {/* Reuse UnitDetailsDialog if it accepts loose types or adapt it */}
                   <UnitDetailsDialog
-                    profile={profileData} // Passing unified data
-                    unitProfile={profileData} // Passing unified data
+                    profile={profileData}
+                    unitProfile={profileData}
                     onUpdate={handleUpdateProfile}
                     onUpdateUnit={handleUpdateProfile}
                   >
@@ -507,11 +419,13 @@ const UnitProfile = () => {
                             <h4 className="font-semibold text-sm sm:text-base text-foreground">
                               {project.project_name || "Untitled Project"}
                             </h4>
+
                             {project.client_name && (
                               <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                                 {project.client_name}
                               </p>
                             )}
+
                             <p className="text-xs text-muted-foreground mt-2">
                               {project.status === "Completed" &&
                               project.completion_date ? (
@@ -528,6 +442,7 @@ const UnitProfile = () => {
                               )}
                             </p>
                           </div>
+
                           <Button
                             variant="ghost"
                             size="sm"
@@ -777,18 +692,18 @@ const UnitProfile = () => {
         </div>
       </div>
 
-      {/* Dialogs */}
+      {/* All Dialogs */}
       {profileData && (
         <>
           <ImageUploadDialog
             isOpen={isAvatarDialogOpen}
             onClose={() => setIsAvatarDialogOpen(false)}
-            currentImageUrl={profileData.avatarUrl || profileData.logoUrl}
+            currentImageUrl={profileData.avatarUrl}
             userId={profileData.id}
             userName={profileData.name}
             imageType="avatar"
             entityType="unit"
-            onSuccess={fetchProfileData}
+            onSuccess={handleImageSuccess}
           />
 
           <ImageUploadDialog
@@ -799,7 +714,7 @@ const UnitProfile = () => {
             userName={profileData.name}
             imageType="banner"
             entityType="unit"
-            onSuccess={fetchProfileData}
+            onSuccess={handleImageSuccess}
           />
 
           <GalleryDialog
@@ -807,7 +722,7 @@ const UnitProfile = () => {
             onClose={() => setIsGalleryDialogOpen(false)}
             userId={profileData.id}
             currentImages={galleryImages}
-            onSuccess={fetchProfileData}
+            onSuccess={handleImageSuccess}
           />
 
           <GlimpseDialog
@@ -815,12 +730,12 @@ const UnitProfile = () => {
             onClose={() => setIsGlimpseDialogOpen(false)}
             userId={profileData.id}
             currentGlimpseUrl={glimpseUrl}
-            onSuccess={fetchProfileData}
+            onSuccess={handleImageSuccess}
           />
         </>
       )}
 
-      {/* Image Viewer */}
+      {/* Image Viewer Dialog */}
       <Dialog open={!!viewImage} onOpenChange={() => setViewImage(null)}>
         <DialogContent className="sm:max-w-4xl">
           <div className="relative">

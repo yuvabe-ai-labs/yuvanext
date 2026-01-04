@@ -1,303 +1,371 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+// import { useState, useEffect, useCallback } from "react";
+// import { authClient } from "@/lib/auth-client";
+// import axiosInstance from "@/config/platform-api";
 
-export interface WeeklyData {
-  day: string;
-  previousWeek: number;
-  thisWeek: number;
-}
+// export interface WeeklyData {
+//   day: string;
+//   previousWeek: number;
+//   thisWeek: number;
+// }
 
-export interface MonthlyData {
-  month: string;
-  applications: number;
-}
+// export interface MonthlyData {
+//   month: string;
+//   applications: number;
+// }
 
-export interface ReportStats {
-  totalApplications: number;
-  hiredCandidates: number;
-  interviewRate: number;
-  averageMatchScore: number;
-  totalInternships: number;
-  activeInternships: number;
-}
+// export interface ReportStats {
+//   totalApplications: number;
+//   hiredCandidates: number;
+//   interviewRate: number;
+//   averageMatchScore: number;
+//   totalInternships: number;
+//   activeInternships: number;
+// }
+
+// export const useUnitReports = () => {
+//   const { data: session } = authClient.useSession();
+//   const user = session?.user;
+
+//   const [weeklyData, setWeeklyData] = useState<WeeklyData[]>([]);
+//   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+//   const [stats, setStats] = useState<ReportStats>({
+//     totalApplications: 0,
+//     hiredCandidates: 0,
+//     interviewRate: 0,
+//     averageMatchScore: 0,
+//     totalInternships: 0,
+//     activeInternships: 0,
+//   });
+//   const [loading, setLoading] = useState(true);
+//   const [selectedMonth, setSelectedMonth] = useState<string>("current");
+
+//   // Helper: Process Weekly Data
+//   const processWeeklyData = (applications: any[]): WeeklyData[] => {
+//     const days = ["Mon", "Tues", "Wed", "Thurs", "Fri", "Sat", "Sun"];
+//     const weeklyData: WeeklyData[] = [];
+
+//     const now = new Date();
+//     // Start of current week (Monday)
+//     const currentWeekStart = new Date(now);
+//     const day = currentWeekStart.getDay() || 7;
+//     if (day !== 1) currentWeekStart.setHours(-24 * (day - 1));
+//     currentWeekStart.setHours(0, 0, 0, 0);
+
+//     const previousWeekStart = new Date(currentWeekStart);
+//     previousWeekStart.setDate(previousWeekStart.getDate() - 7);
+
+//     for (let i = 0; i < 7; i++) {
+//       const currentDay = new Date(currentWeekStart);
+//       currentDay.setDate(currentWeekStart.getDate() + i);
+//       const currentDayEnd = new Date(currentDay);
+//       currentDayEnd.setHours(23, 59, 59, 999);
+
+//       const previousDay = new Date(previousWeekStart);
+//       previousDay.setDate(previousWeekStart.getDate() + i);
+//       const previousDayEnd = new Date(previousDay);
+//       previousDayEnd.setHours(23, 59, 59, 999);
+
+//       // Check application.createdAt
+//       const thisWeekCount = applications.filter((item) => {
+//         const date = new Date(item.application.createdAt);
+//         return date >= currentDay && date <= currentDayEnd;
+//       }).length;
+
+//       const prevWeekCount = applications.filter((item) => {
+//         const date = new Date(item.application.createdAt);
+//         return date >= previousDay && date <= previousDayEnd;
+//       }).length;
+
+//       weeklyData.push({
+//         day: days[i],
+//         previousWeek: prevWeekCount,
+//         thisWeek: thisWeekCount,
+//       });
+//     }
+//     return weeklyData;
+//   };
+
+//   // Helper: Process Monthly Data
+//   const processMonthlyData = (applications: any[]): MonthlyData[] => {
+//     const months = [
+//       "Jan",
+//       "Feb",
+//       "Mar",
+//       "Apr",
+//       "May",
+//       "Jun",
+//       "Jul",
+//       "Aug",
+//       "Sep",
+//       "Oct",
+//       "Nov",
+//       "Dec",
+//     ];
+//     const monthlyData: MonthlyData[] = [];
+//     const currentYear = new Date().getFullYear();
+
+//     for (let i = 5; i >= 0; i--) {
+//       const date = new Date();
+//       date.setMonth(date.getMonth() - i);
+//       const monthIndex = date.getMonth();
+//       const monthName = months[monthIndex];
+
+//       const count = applications.filter((item) => {
+//         const appDate = new Date(item.application.createdAt);
+//         return (
+//           appDate.getMonth() === monthIndex &&
+//           appDate.getFullYear() === currentYear
+//         );
+//       }).length;
+
+//       monthlyData.push({
+//         month: monthName,
+//         applications: count,
+//       });
+//     }
+//     return monthlyData;
+//   };
+
+//   const fetchReportsData = useCallback(async () => {
+//     if (!user) return;
+
+//     try {
+//       setLoading(true);
+
+//       // Parallel Fetch
+//       const [statsRes, appsRes] = await Promise.all([
+//         axiosInstance.get("/internships/stats"),
+//         axiosInstance.get("/unit/applications"),
+//       ]);
+
+//       // 1. Process Stats from /internships/stats
+//       const backendStats = statsRes.data?.data || {};
+//       const allApplications = appsRes.data?.data || [];
+
+//       // Calculate missing stats from the list if needed
+//       const hiredCount = allApplications.filter(
+//         (item: any) => item.application.status === "hired"
+//       ).length;
+
+//       // Calculate Interview Rate
+//       const interviewedCount = allApplications.filter(
+//         (item: any) => item.application.status === "interviewed"
+//       ).length;
+//       const totalApps =
+//         backendStats.totalApplications || allApplications.length;
+//       const interviewRate =
+//         totalApps > 0 ? Math.round((interviewedCount / totalApps) * 100) : 0;
+
+//       // Calculate Average Match Score
+//       const appsWithScore = allApplications.filter(
+//         (item: any) => item.application.profileScore !== null
+//       );
+//       const avgScore =
+//         appsWithScore.length > 0
+//           ? Math.round(
+//               appsWithScore.reduce(
+//                 (sum: number, item: any) =>
+//                   sum + (item.application.profileScore || 0),
+//                 0
+//               ) / appsWithScore.length
+//             )
+//           : 0;
+
+//       // Combine backend stats + client-side calculations
+//       setStats({
+//         totalApplications: backendStats.totalApplications || 0,
+//         hiredCandidates: hiredCount, // Total hired (vs backend 'hiredThisMonth')
+//         totalInternships: backendStats.totalInternships || 0,
+//         // Assuming backend doesn't give 'active' count in stats, we might default to 0 or check if internships endpoint needed
+//         activeInternships: 0,
+//         interviewRate,
+//         averageMatchScore: avgScore,
+//       });
+
+//       // 2. Process Charts from /unit/applications
+//       setWeeklyData(processWeeklyData(allApplications));
+//       setMonthlyData(processMonthlyData(allApplications));
+//     } catch (error) {
+//       console.error("Error fetching reports data:", error);
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [user]);
+
+//   useEffect(() => {
+//     fetchReportsData();
+//   }, [fetchReportsData]);
+
+//   return {
+//     weeklyData,
+//     monthlyData,
+//     stats,
+//     loading,
+//     selectedMonth,
+//     setSelectedMonth,
+//     refetch: fetchReportsData,
+//   };
+// };
+import { useQuery } from "@tanstack/react-query";
+import { getUnitApplications, getUnitStats } from "@/services/unit.service";
+import type {
+  UnitApplication,
+  WeeklyData,
+  MonthlyData,
+  ReportStats,
+} from "@/types/unit.types";
+
+// --- Helpers to Process Chart Data ---
+
+const processWeeklyData = (applications: UnitApplication[]): WeeklyData[] => {
+  const days = ["Mon", "Tues", "Wed", "Thurs", "Fri", "Sat", "Sun"];
+  const weeklyData: WeeklyData[] = [];
+
+  const now = new Date();
+  // Calculate start of current week (Monday)
+  const currentWeekStart = new Date(now);
+  const day = currentWeekStart.getDay() || 7;
+  if (day !== 1) currentWeekStart.setHours(-24 * (day - 1));
+  currentWeekStart.setHours(0, 0, 0, 0);
+
+  const previousWeekStart = new Date(currentWeekStart);
+  previousWeekStart.setDate(previousWeekStart.getDate() - 7);
+
+  for (let i = 0; i < 7; i++) {
+    const currentDay = new Date(currentWeekStart);
+    currentDay.setDate(currentWeekStart.getDate() + i);
+    const currentDayEnd = new Date(currentDay);
+    currentDayEnd.setHours(23, 59, 59, 999);
+
+    const previousDay = new Date(previousWeekStart);
+    previousDay.setDate(previousWeekStart.getDate() + i);
+    const previousDayEnd = new Date(previousDay);
+    previousDayEnd.setHours(23, 59, 59, 999);
+
+    const thisWeekCount = applications.filter((item) => {
+      const date = new Date(item.application.createdAt);
+      return date >= currentDay && date <= currentDayEnd;
+    }).length;
+
+    const prevWeekCount = applications.filter((item) => {
+      const date = new Date(item.application.createdAt);
+      return date >= previousDay && date <= previousDayEnd;
+    }).length;
+
+    weeklyData.push({
+      day: days[i],
+      previousWeek: prevWeekCount,
+      thisWeek: thisWeekCount,
+    });
+  }
+  return weeklyData;
+};
+
+const processMonthlyData = (applications: UnitApplication[]): MonthlyData[] => {
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const monthlyData: MonthlyData[] = [];
+  const currentYear = new Date().getFullYear();
+
+  for (let i = 5; i >= 0; i--) {
+    const date = new Date();
+    date.setMonth(date.getMonth() - i);
+    const monthIndex = date.getMonth();
+    const monthName = months[monthIndex];
+
+    const count = applications.filter((item) => {
+      const appDate = new Date(item.application.createdAt);
+      return (
+        appDate.getMonth() === monthIndex &&
+        appDate.getFullYear() === currentYear
+      );
+    }).length;
+
+    monthlyData.push({
+      month: monthName,
+      applications: count,
+    });
+  }
+  return monthlyData;
+};
+
+// --- Main Hook ---
 
 export const useUnitReports = () => {
-  const { user } = useAuth();
-  const [weeklyData, setWeeklyData] = useState<WeeklyData[]>([]);
-  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
-  const [stats, setStats] = useState<ReportStats>({
-    totalApplications: 0,
-    hiredCandidates: 0,
-    interviewRate: 0,
-    averageMatchScore: 0,
-    totalInternships: 0,
-    activeInternships: 0,
+  // 1. Fetch Stats (Parallel)
+  const statsQuery = useQuery({
+    queryKey: ["unitStats"],
+    queryFn: getUnitStats,
   });
-  const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState<string>("current");
 
-  const fetchReportsData = async () => {
-    if (!user) return;
+  // 2. Fetch Applications (Parallel)
+  const appsQuery = useQuery({
+    queryKey: ["unitApplications"],
+    queryFn: getUnitApplications,
+  });
 
-    try {
-      setLoading(true);
+  // 3. Derive Data safely
+  const applications = appsQuery.data || [];
+  const backendStats = statsQuery.data;
 
-      // Fetch profile first
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
+  // Calculate derived stats
+  const totalApps = applications.length;
+  const hiredCount = applications.filter(
+    (a) => a.application.status === "hired"
+  ).length;
+  const interviewedCount = applications.filter(
+    (a) => a.application.status === "interviewed"
+  ).length;
 
-      if (profileError) throw profileError;
+  const interviewRate =
+    totalApps > 0 ? Math.round((interviewedCount / totalApps) * 100) : 0;
 
-      const profileId = profileData.id;
-
-      // Fetch weekly applications data
-      const weeklyApplications = await fetchWeeklyApplications(profileId);
-      setWeeklyData(weeklyApplications);
-
-      // Fetch monthly applications data
-      const monthlyApplications = await fetchMonthlyApplications(profileId);
-      setMonthlyData(monthlyApplications);
-
-      // Fetch report statistics
-      const reportStats = await fetchReportStats(profileId);
-      setStats(reportStats);
-    } catch (error) {
-      console.error("Error fetching reports data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchWeeklyApplications = async (
-    profileId: string
-  ): Promise<WeeklyData[]> => {
-    const days = ["Mon", "Tues", "Wed", "Thurs", "Fri", "Sat", "Sun"];
-    const weeklyData: WeeklyData[] = [];
-
-    // Get date ranges for previous week and current week
-    const now = new Date();
-    const currentWeekStart = new Date(now);
-    currentWeekStart.setDate(now.getDate() - now.getDay() + 1); // Start from Monday
-    const previousWeekStart = new Date(currentWeekStart);
-    previousWeekStart.setDate(previousWeekStart.getDate() - 7);
-
-    for (let i = 0; i < 7; i++) {
-      const currentDay = new Date(currentWeekStart);
-      currentDay.setDate(currentWeekStart.getDate() + i);
-
-      const previousDay = new Date(previousWeekStart);
-      previousDay.setDate(previousWeekStart.getDate() + i);
-
-      // Format dates for query
-      const currentDayStr = currentDay.toISOString().split("T")[0];
-      const previousDayStr = previousDay.toISOString().split("T")[0];
-
-      // Fetch applications for current day (this week) - Join with internships to filter by created_by
-      const { data: currentData, error: currentError } = await supabase
-        .from("applications")
-        .select(
-          `
-          id,
-          internships!inner(created_by)
-        `
-        )
-        .eq("internships.created_by", profileId)
-        .gte("applied_date", `${currentDayStr}T00:00:00Z`)
-        .lt("applied_date", `${currentDayStr}T23:59:59Z`);
-
-      if (currentError) throw currentError;
-
-      // Fetch applications for previous day (previous week) - Join with internships to filter by created_by
-      const { data: previousData, error: previousError } = await supabase
-        .from("applications")
-        .select(
-          `
-          id,
-          internships!inner(created_by)
-        `
-        )
-        .eq("internships.created_by", profileId)
-        .gte("applied_date", `${previousDayStr}T00:00:00Z`)
-        .lt("applied_date", `${previousDayStr}T23:59:59Z`);
-
-      if (previousError) throw previousError;
-
-      weeklyData.push({
-        day: days[i],
-        previousWeek: previousData?.length || 0,
-        thisWeek: currentData?.length || 0,
-      });
-    }
-
-    return weeklyData;
-  };
-
-  const fetchMonthlyApplications = async (
-    profileId: string
-  ): Promise<MonthlyData[]> => {
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    const monthlyData: MonthlyData[] = [];
-
-    const currentYear = new Date().getFullYear();
-
-    // Get last 6 months including current month
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      const monthIndex = date.getMonth();
-      const monthName = months[monthIndex];
-
-      const monthStart = new Date(currentYear, monthIndex, 1);
-      const monthEnd = new Date(currentYear, monthIndex + 1, 0);
-
-      const { data, error } = await supabase
-        .from("applications")
-        .select(
-          `
-          id,
-          internships!inner(created_by)
-        `
-        )
-        .eq("internships.created_by", profileId)
-        .gte("applied_date", monthStart.toISOString())
-        .lt("applied_date", monthEnd.toISOString());
-
-      if (error) throw error;
-
-      monthlyData.push({
-        month: monthName,
-        applications: data?.length || 0,
-      });
-    }
-
-    return monthlyData;
-  };
-
-  const fetchReportStats = async (profileId: string): Promise<ReportStats> => {
-    // Total applications - Join with internships to filter by created_by
-    const { data: totalData, error: totalError } = await supabase
-      .from("applications")
-      .select(
-        `
-        id,
-        internships!inner(created_by)
-      `
-      )
-      .eq("internships.created_by", profileId);
-
-    if (totalError) throw totalError;
-
-    // Hired candidates - Join with internships to filter by created_by
-    const { data: hiredData, error: hiredError } = await supabase
-      .from("applications")
-      .select(
-        `
-        id,
-        internships!inner(created_by)
-      `
-      )
-      .eq("internships.created_by", profileId)
-      .eq("status", "hired");
-
-    if (hiredError) throw hiredError;
-
-    // Interviewed candidates - Join with internships to filter by created_by
-    const { data: interviewedData, error: interviewedError } = await supabase
-      .from("applications")
-      .select(
-        `
-        id,
-        internships!inner(created_by)
-      `
-      )
-      .eq("internships.created_by", profileId)
-      .eq("status", "interviewed");
-
-    if (interviewedError) throw interviewedError;
-
-    // Average match score - Join with internships to filter by created_by
-    const { data: scoreData, error: scoreError } = await supabase
-      .from("applications")
-      .select(
-        `
-        profile_match_score,
-        internships!inner(created_by)
-      `
-      )
-      .eq("internships.created_by", profileId)
-      .not("profile_match_score", "is", null);
-
-    if (scoreError) throw scoreError;
-
-    // Total internships created by this unit
-    const { data: internshipsData, error: internshipsError } = await supabase
-      .from("internships")
-      .select("id, status")
-      .eq("created_by", profileId);
-
-    if (internshipsError) throw internshipsError;
-
-    // Active internships
-    const activeInternships =
-      internshipsData?.filter((internship) => internship.status === "active")
-        .length || 0;
-
-    const totalApplications = totalData?.length || 0;
-    const hiredCandidates = hiredData?.length || 0;
-    const interviewedCandidates = interviewedData?.length || 0;
-    const totalInternships = internshipsData?.length || 0;
-
-    const averageMatchScore =
-      scoreData && scoreData.length > 0
-        ? scoreData.reduce(
-            (sum, app) => sum + (app.profile_match_score || 0),
+  const appsWithScore = applications.filter(
+    (a) => a.application.profileScore !== null
+  );
+  const avgScore =
+    appsWithScore.length > 0
+      ? Math.round(
+          appsWithScore.reduce(
+            (sum, item) => sum + (item.application.profileScore || 0),
             0
-          ) / scoreData.length
-        : 0;
+          ) / appsWithScore.length
+        )
+      : 0;
 
-    const interviewRate =
-      totalApplications > 0
-        ? (interviewedCandidates / totalApplications) * 100
-        : 0;
-
-    return {
-      totalApplications,
-      hiredCandidates,
-      interviewRate,
-      averageMatchScore,
-      totalInternships,
-      activeInternships,
-    };
+  const stats: ReportStats = {
+    totalApplications: backendStats?.totalApplications || totalApps,
+    hiredCandidates: hiredCount, // Prefer calculated count to ensure consistency with apps list
+    totalInternships: backendStats?.totalInternships || 0,
+    activeInternships: 0, // Needs separate internship fetch if you want this accurate
+    interviewRate,
+    averageMatchScore: avgScore,
   };
 
-  useEffect(() => {
-    fetchReportsData();
-  }, [user]);
+  const weeklyData = processWeeklyData(applications);
+  const monthlyData = processMonthlyData(applications);
 
   return {
     weeklyData,
     monthlyData,
     stats,
-    loading,
-    selectedMonth,
-    setSelectedMonth,
-    refetch: fetchReportsData,
+    loading: statsQuery.isLoading || appsQuery.isLoading,
+    error: statsQuery.error || appsQuery.error,
+    refetch: () => {
+      statsQuery.refetch();
+      appsQuery.refetch();
+    },
   };
 };

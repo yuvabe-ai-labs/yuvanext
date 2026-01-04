@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 interface UnitDescriptionDialogProps {
   description: string;
-  onSave: (description: string) => Promise<void>;
+  onSave: (description: string) => void; // Removed Promise<void> constraint for flexibility
   title?: string;
   children: React.ReactNode;
 }
@@ -25,9 +25,14 @@ export const UnitDescriptionDialog = ({
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(description);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Sync state if prop changes
+  useEffect(() => {
+    setValue(description || "");
+  }, [description]);
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    await onSave(value);
+    onSave(value);
     setOpen(false);
   };
 
@@ -42,7 +47,7 @@ export const UnitDescriptionDialog = ({
           <Textarea
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="Enter description..."
+            placeholder="Enter details..."
             rows={8}
             className="resize-none"
           />

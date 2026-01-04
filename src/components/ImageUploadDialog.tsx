@@ -7,9 +7,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Camera, Loader2, Image as ImageIcon } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import axiosInstance from "@/config/platform-api";
+import { useUpdateUnitProfile } from "@/hooks/useUnitProfile";
 
 type ImageType = "avatar" | "banner";
 type EntityType = "student" | "unit";
@@ -41,13 +42,8 @@ export const ImageUploadDialog = ({
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const updateProfileMutation = useUpdateUnitProfile();
 
-  // ✅ Use a single bucket with folders
-  const bucketName = "user-media";
-  const folderName = imageType === "avatar" ? "avatars" : "banners";
-
-  const tableName = entityType === "student" ? "student_profiles" : "units";
-  const columnName = imageType === "avatar" ? "avatar_url" : "banner_url";
   const maxSize = imageType === "avatar" ? 2097152 : 5242880; // 2MB or 5MB
   const aspectRatio = imageType === "avatar" ? "1:1" : "16:9";
 
@@ -95,41 +91,26 @@ export const ImageUploadDialog = ({
     try {
       setUploading(true);
 
-      // Delete old image if exists
-      if (currentImageUrl) {
-        const oldPath = currentImageUrl.split("/").pop();
-        if (oldPath) {
-          await supabase.storage
-            .from(bucketName)
-            .remove([`${folderName}/${userId}/${oldPath}`]);
-        }
-      }
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", imageType); // 'avatar' or 'banner'
+      formData.append("userId", userId);
 
-      // Upload new image
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${imageType}_${Math.random()}.${fileExt}`;
-      const filePath = `${folderName}/${userId}/${fileName}`;
+      // POST /api/upload
+      const response = await axiosInstance.post("/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
-      const { error: uploadError } = await supabase.storage
-        .from(bucketName)
-        .upload(filePath, file);
+      const publicUrl = response.data.url;
 
-      if (uploadError) throw uploadError;
+      // Update profile
+      // Determine which field to update based on imageType
+      const updatePayload =
+        imageType === "avatar"
+          ? { avatarUrl: publicUrl }
+          : { bannerUrl: publicUrl };
 
-      // Get public URL
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from(bucketName).getPublicUrl(filePath);
-
-      // Update profile table
-      const updateColumn =
-        entityType === "student" ? "profile_id" : "profile_id";
-      const { error: updateError } = await supabase
-        .from(tableName)
-        .update({ [columnName]: publicUrl })
-        .eq(updateColumn, userId);
-
-      if (updateError) throw updateError;
+      await updateProfileMutation.mutateAsync(updatePayload);
 
       toast({
         title: "Success",
@@ -144,7 +125,8 @@ export const ImageUploadDialog = ({
       console.error(`Error uploading ${imageType}:`, error);
       toast({
         title: "Upload failed",
-        description: error.message || `Failed to upload ${imageType}`,
+        description:
+          error.response?.data?.message || `Failed to upload ${imageType}`,
         variant: "destructive",
       });
     } finally {
@@ -153,28 +135,14 @@ export const ImageUploadDialog = ({
   };
 
   const handleDelete = async () => {
-    if (!currentImageUrl) return;
-
     try {
       setUploading(true);
 
-      // Delete from storage
-      const oldPath = currentImageUrl.split("/").pop();
-      if (oldPath) {
-        await supabase.storage
-          .from(bucketName)
-          .remove([`${folderName}/${userId}/${oldPath}`]);
-      }
+      // Update profile to remove the URL
+      const updatePayload =
+        imageType === "avatar" ? { avatarUrl: null } : { bannerUrl: null };
 
-      // Update database
-      const updateColumn =
-        entityType === "student" ? "profile_id" : "profile_id";
-      const { error } = await supabase
-        .from(tableName)
-        .update({ [columnName]: null })
-        .eq(updateColumn, userId);
-
-      if (error) throw error;
+      await updateProfileMutation.mutateAsync(updatePayload);
 
       toast({
         title: "Success",
@@ -189,7 +157,7 @@ export const ImageUploadDialog = ({
       console.error(`Error deleting ${imageType}:`, error);
       toast({
         title: "Delete failed",
-        description: error.message || `Failed to delete ${imageType}`,
+        description: `Failed to delete ${imageType}`,
         variant: "destructive",
       });
     } finally {
@@ -198,6 +166,7 @@ export const ImageUploadDialog = ({
   };
 
   return (
+    // ... JSX remains exactly the same as provided ...
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

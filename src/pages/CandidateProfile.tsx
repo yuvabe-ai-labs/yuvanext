@@ -30,7 +30,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import { useCandidateProfile } from "@/hooks/useCandidateProfile";
-import { supabase } from "@/integrations/supabase/client";
+// 1. IMPORT AXIOS
+import axiosInstance from "@/config/platform-api";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import {
@@ -67,11 +68,15 @@ const CandidateProfile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data, loading, error, refetch } = useCandidateProfile(id || "");
+  console.log("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&77");
+  console.log(data, id);
+
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isDownloaded, setIsDownloaded] = useState(false);
 
   type StatusType =
@@ -81,6 +86,7 @@ const CandidateProfile = () => {
     | "interviewed"
     | "hired";
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const statusOptions: { value: StatusType; label: string; icon: any }[] = [
     { value: "shortlisted", label: "Shortlisted", icon: Heart },
     { value: "applied", label: "Not Shortlisted", icon: Ban },
@@ -89,9 +95,7 @@ const CandidateProfile = () => {
     { value: "interviewed", label: "Schedule Interview", icon: User },
   ];
 
-  const [pendingStatus, setPendingStatus] = useState<
-    "applied" | "shortlisted" | "rejected" | "interviewed" | "hired" | null
-  >(null);
+  const [pendingStatus, setPendingStatus] = useState<StatusType | null>(null);
 
   const getStatusLabel = (status: string) => {
     const statusMap: Record<string, string> = {
@@ -122,38 +126,42 @@ const CandidateProfile = () => {
   };
 
   const getDialogContent = (status: string) => {
+    // Determine name safely
+    const candidateName =
+      data?.candidate?.name || data?.profile?.full_name || "Candidate";
+
     switch (status) {
       case "shortlisted":
         return {
           title: "Shortlist Candidate?",
-          description: `Are you sure you want to shortlist ${data?.profile.full_name}? This will move them to the next stage of the hiring process.`,
+          description: `Are you sure you want to shortlist ${candidateName}? This will move them to the next stage of the hiring process.`,
           icon: <Heart className="w-6 h-6 text-green-500" />,
         };
       case "applied":
         return {
           title: "Not Shortlist Candidate?",
-          description: `Are you sure you want to mark ${data?.profile.full_name} as not shortlisted? You can change this status later if needed.`,
+          description: `Are you sure you want to mark ${candidateName} as not shortlisted? You can change this status later if needed.`,
           icon: <Ban className="w-6 h-6 text-red-500" />,
         };
       case "hired":
         return {
           title: "Select Candidate?",
-          description: `Are you sure you want to select ${data?.profile.full_name} for this position? This will mark them as hired.`,
+          description: `Are you sure you want to select ${candidateName} for this position? This will mark them as hired.`,
           icon: <CopyCheck className="w-6 h-6 text-blue-500" />,
         };
       default:
         return {
           title: "Update Status?",
-          description: `Are you sure you want to update the status for ${data?.profile.full_name}?`,
+          description: `Are you sure you want to update the status for ${candidateName}?`,
           icon: <User className="w-6 h-6" />,
         };
     }
   };
 
-  const handleStatusChange = async (
-    newStatus: "applied" | "shortlisted" | "rejected" | "interviewed" | "hired"
-  ) => {
-    if (!data?.application.id) return;
+  const handleStatusChange = async (newStatus: StatusType) => {
+    // Ensure we have an application ID
+    const appId = data?.application?.id || data?.id; // Fallback if data root is application
+    if (!appId) return;
 
     // If status is "interviewed", open the schedule dialog instead
     if (newStatus === "interviewed") {
@@ -167,7 +175,8 @@ const CandidateProfile = () => {
   };
 
   const handleConfirmStatusChange = async () => {
-    if (!data?.application.id || !pendingStatus) return;
+    const appId = data?.application?.id || data?.id;
+    if (!appId || !pendingStatus) return;
 
     setIsUpdatingStatus(true);
     setShowConfirmDialog(false);
@@ -175,58 +184,18 @@ const CandidateProfile = () => {
     try {
       console.log("Updating application status to:", pendingStatus);
 
-      // Step 1: Update application status in database
-      const { data: updateData, error: updateError } = await supabase
-        .from("applications")
-        .update({ status: pendingStatus })
-        .eq("id", data.application.id)
-        .select();
+      // 2. CALL HONO BACKEND (Replaces Supabase Update + Edge Function)
+      // Endpoint: PUT /api/applications/{id}/status
+      // Or PUT /api/unit/applications/{id}
+      await axiosInstance.put(`/unit/applications/${appId}`, {
+        status: pendingStatus,
+        // Backend should handle email notifications internally based on this change
+      });
 
-      if (updateError) {
-        console.error("Database update error:", updateError);
-        throw updateError;
-      }
+      console.log("✅ Status updated successfully");
 
-      console.log("✅ Status updated in database:", updateData);
-
-      // Step 2: The database trigger will automatically handle in-app notifications
-      // based on user preferences
-
-      // Step 3: Call edge function to send email notification (if user has it enabled)
-      try {
-        console.log("📧 Calling email notification edge function...");
-
-        const { data: emailData, error: emailError } =
-          await supabase.functions.invoke("update-application-status", {
-            body: {
-              applicationId: data.application.id,
-              action: pendingStatus,
-              candidateEmail: data.profile.email,
-              candidateName: data.profile.full_name,
-              internshipTitle: data.internship.title,
-            },
-          });
-
-        if (emailError) {
-          console.error("❌ Email notification error:", emailError);
-        } else {
-          console.log("✅ Email notification response:", emailData);
-          if (emailData?.emailSent) {
-            console.log("📬 Email successfully sent to candidate");
-          } else {
-            console.log("📭 Email not sent (user preferences or no template)");
-          }
-        }
-      } catch (emailError: any) {
-        // Email sending failed but status was updated successfully
-        console.error("❌ Email notification exception:", emailError);
-        // Don't throw - the status update succeeded and that's what matters most
-      }
-
-      // Step 4: Refresh the data to show updated status
       await refetch();
 
-      // Step 5: Show success toast
       toast({
         title: "Status Updated",
         description: `Application status changed to ${getStatusLabel(
@@ -272,6 +241,9 @@ const CandidateProfile = () => {
   }
 
   if (error || !data) {
+    {
+      console.log(error, data);
+    }
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -288,56 +260,49 @@ const CandidateProfile = () => {
     );
   }
 
-  const skills = safeParse(data.studentProfile.skills, []);
-  const interests = safeParse(data.studentProfile.interests, []);
-  const achievements = safeParse(data.studentProfile.achievements, []);
-  const projects = safeParse(data.studentProfile.projects, []);
-  const internships = safeParse(data.studentProfile.internships, []);
-  const courses = safeParse(data.studentProfile.completed_courses, []);
-  const education = safeParse(data.studentProfile.education, []);
-  const links = safeParse(data.studentProfile.links, []);
+  // DATA MAPPING
+  // Adjust based on your Hono API Response
+  const candidate = data.candidate || data.studentProfile || {};
+  const internship = data.internship || {};
+  const application = data.application || data; // Fallback if data root is application
 
-  const matchScore = data.application.profile_match_score || 0;
+  const skills = safeParse(candidate.skills, []);
+  const interests = safeParse(candidate.interests, []);
+  const achievements = safeParse(candidate.achievements, []);
+  const projects = safeParse(candidate.projects, []);
+  const internshipsList = safeParse(candidate.internships, []);
+  const courses = safeParse(
+    candidate.completed_courses || candidate.course,
+    []
+  ); // Hono might return 'course'
+  const education = safeParse(candidate.education, []);
+  const links = safeParse(candidate.socialLinks, []);
 
+  const matchScore =
+    application.profile_match_score || application.profileScore || 0;
   const dialogContent = pendingStatus ? getDialogContent(pendingStatus) : null;
 
   const handleGeneratePDF = async () => {
     if (!profileRef.current) return;
+    setIsLoading(true);
 
-    const element = profileRef.current;
+    try {
+      const element = profileRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 1.2,
+        useCORS: true,
+        allowTaint: true,
+      });
 
-    const canvas = await html2canvas(element, {
-      scale: 1.2,
-      useCORS: true,
-      allowTaint: true,
-    });
+      const imgData = canvas.toDataURL("image/jpeg", 2.8);
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-    const imgData = canvas.toDataURL("image/jpeg", 2.8);
+      let heightLeft = imgHeight;
+      let position = 0;
 
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-
-    const imgProps = pdf.getImageProperties(imgData);
-    const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-    let heightLeft = imgHeight;
-    let position = 0;
-
-    pdf.addImage(
-      imgData,
-      "JPEG",
-      0,
-      position,
-      pdfWidth,
-      imgHeight,
-      undefined,
-      "FAST"
-    );
-    heightLeft -= pdf.internal.pageSize.getHeight();
-
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
       pdf.addImage(
         imgData,
         "JPEG",
@@ -349,9 +314,35 @@ const CandidateProfile = () => {
         "FAST"
       );
       heightLeft -= pdf.internal.pageSize.getHeight();
-    }
 
-    pdf.save(`${data.profile.full_name}-Profile.pdf`);
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(
+          imgData,
+          "JPEG",
+          0,
+          position,
+          pdfWidth,
+          imgHeight,
+          undefined,
+          "FAST"
+        );
+        heightLeft -= pdf.internal.pageSize.getHeight();
+      }
+
+      pdf.save(`${candidate.name || "Candidate"}-Profile.pdf`);
+      setIsDownloaded(true);
+    } catch (e) {
+      console.error("PDF Generation failed", e);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -373,7 +364,7 @@ const CandidateProfile = () => {
 
           {/* Center Title */}
           <h1 className="text-2xl font-bold text-center flex-1">
-            Applied for "{data.internship.title}"
+            Applied for "{internship.title || "Internship"}"
           </h1>
 
           {/* Profile Match Section */}
@@ -416,46 +407,46 @@ const CandidateProfile = () => {
               <div className="flex items-start gap-6">
                 <Avatar className="w-24 h-24">
                   <AvatarImage
-                    src={data.studentProfile.avatar_url || undefined}
-                    alt={data.profile.full_name}
+                    src={candidate.avatarUrl || undefined}
+                    alt={candidate.name}
                   />
                   <AvatarFallback className="text-2xl">
-                    {data.profile.full_name
+                    {(candidate.name || "U")
                       .split(" ")
-                      .map((n) => n[0])
+                      .map((n: string) => n[0])
                       .join("")}
                   </AvatarFallback>
                 </Avatar>
 
                 <div className="flex-1">
                   <h2 className="text-2xl font-bold mb-2">
-                    {data.profile.full_name}
+                    {candidate.name || "Unknown"}
                   </h2>
                   <p className="text-muted-foreground mb-4">
-                    {typeof data.studentProfile.bio === "string"
-                      ? data.studentProfile.bio
-                      : Array.isArray(data.studentProfile.bio)
-                      ? data.studentProfile.bio.join(" ")
+                    {typeof candidate.profileSummary === "string"
+                      ? candidate.profileSummary
+                      : Array.isArray(candidate.profileSummary)
+                      ? candidate.profileSummary.join(" ")
                       : "Passionate professional with experience creating meaningful impact."}
                   </p>
 
                   <div className="flex flex-row gap-4 text-sm text-muted-foreground mb-6">
-                    {data.profile.email && (
+                    {candidate.email && (
                       <div className="flex items-center gap-2 leading-none">
                         <Mail className="w-4 h-4" />
-                        <span>{data.profile.email}</span>
+                        <span>{candidate.email}</span>
                       </div>
                     )}
-                    {data.profile.phone && (
+                    {candidate.phone && (
                       <div className="flex items-center gap-2 leading-none">
                         <Phone className="w-4 h-4" />
-                        <span>{data.profile.phone}</span>
+                        <span>{candidate.phone}</span>
                       </div>
                     )}
-                    {data.studentProfile.location && (
+                    {candidate.location && (
                       <div className="flex items-center gap-2 leading-none">
                         <MapPin className="w-4 h-4" />
-                        <span>{data.studentProfile.location}</span>
+                        <span>{candidate.location}</span>
                       </div>
                     )}
                   </div>
@@ -495,17 +486,16 @@ const CandidateProfile = () => {
                         </>
                       ) : (
                         <>
-                          <Download className="w-4 h-4" />
-                          Download Profile
+                          <Download className="w-4 h-4" /> Download Profile
                         </>
                       )}
                     </Button>
 
                     <Select
                       value={
-                        data.application.status === "applied"
+                        application.status === "applied"
                           ? ""
-                          : data.application.status
+                          : application.status
                       }
                       onValueChange={handleStatusChange}
                       disabled={isUpdatingStatus}
@@ -513,7 +503,7 @@ const CandidateProfile = () => {
                       {/* Trigger with dynamic background */}
                       <SelectTrigger
                         className={`w-52 rounded-full px-3 py-1.5 text-sm ${getStatusBg(
-                          data.application.status
+                          application.status
                         )}`}
                       >
                         <SelectValue placeholder="Select Status" />
@@ -581,9 +571,6 @@ const CandidateProfile = () => {
                             className="flex items-center justify-between"
                           >
                             <span className="font-medium">{skillName}</span>
-                            {/* <Badge variant="secondary" className="bg-muted">
-                              {skillLevel}
-                            </Badge> */}
                           </div>
                         );
                       })
@@ -595,6 +582,9 @@ const CandidateProfile = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Internships - Check if data exists in Hono response */}
+              {/* ... (Existing internship mapping logic, if candidate.internships exists) ... */}
 
               {/* Internships */}
               <Card className="rounded-3xl">
@@ -676,7 +666,6 @@ const CandidateProfile = () => {
                   </div>
                 </CardContent>
               </Card>
-
               {/* Completed Courses */}
               <Card className="rounded-3xl">
                 <CardContent className="p-6">
@@ -796,7 +785,6 @@ const CandidateProfile = () => {
                   )}
                 </CardContent>
               </Card>
-
               {/* Education */}
               <Card className="rounded-3xl">
                 <CardContent className="p-6">
@@ -865,9 +853,9 @@ const CandidateProfile = () => {
               <Card className="rounded-3xl">
                 <CardContent className="p-6">
                   <h3 className="text-2xl font-bold mb-4">Links</h3>
-
                   <div className="flex flex-wrap gap-3 items-center">
                     {(() => {
+                      // 1. Define Helper Function
                       const getSocialIcon = (link: any) => {
                         const url = (link.url || "").toLowerCase();
                         const platform = (link.platform || "").toLowerCase();
@@ -912,6 +900,7 @@ const CandidateProfile = () => {
                         return Globe;
                       };
 
+                      // 2. Handle Empty State
                       if (!links || links.length === 0) {
                         return (
                           <p className="text-sm text-muted-foreground">
@@ -920,6 +909,7 @@ const CandidateProfile = () => {
                         );
                       }
 
+                      // 3. Render List
                       return (
                         <div className="flex flex-wrap gap-3">
                           {links.map((link: any, idx: number) => {
@@ -946,6 +936,35 @@ const CandidateProfile = () => {
                       );
                     })()}
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Projects */}
+              <Card className="rounded-3xl">
+                <CardContent className="p-6">
+                  <h3 className="text-2xl font-bold mb-4">Projects</h3>
+                  {projects.length > 0 ? (
+                    <ul className="space-y-4">
+                      {projects.map((project: any, idx: number) => (
+                        <li key={idx} className="text-base">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-lg">
+                              {project.title || project.name}
+                            </span>
+                          </div>
+                          {project.description && (
+                            <p className="text-muted-foreground text-[15px] leading-relaxed mt-1">
+                              {project.description}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-base text-muted-foreground">
+                      No projects listed
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -996,14 +1015,13 @@ const CandidateProfile = () => {
       <ScheduleInterviewDialog
         open={showScheduleDialog}
         onOpenChange={setShowScheduleDialog}
-        candidateName={data.profile.full_name}
-        candidateEmail={data.profile.email}
-        applicationId={data.application.id}
+        candidateName={candidate.name}
+        candidateEmail={candidate.email}
+        applicationId={application.id}
         onSuccess={refetch}
-        candidateProfileId={data.profile.id}
+        candidateProfileId={candidate.id} // Ensure candidate ID is passed
       />
     </div>
   );
 };
-
 export default CandidateProfile;

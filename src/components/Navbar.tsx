@@ -1,13 +1,11 @@
 import {
   Search,
-  Menu,
   CircleUserRound,
-  FileText,
   MessageSquare,
   HelpCircle,
   Settings,
   LogOut,
-  X,
+  Disc,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,26 +17,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/hooks/useAuth";
+// 1. IMPORT BETTER AUTH & AXIOS
+import { authClient } from "@/lib/auth-client";
+import axiosInstance from "@/config/platform-api";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
 import logo from "@/assets/YuvaNext.svg";
 import logoName from "@/assets/YuvaNext_name.svg";
-import { Disc } from "@/components/ui/custom-icons";
 
 const Navbar = () => {
-  const { user, signOut } = useAuth();
+  // 2. USE SESSION HOOK
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
+
   const navigate = useNavigate();
   const location = useLocation();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [profileId, setProfileId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
-  // Fetch user role and profile data
+  // 3. FETCH PROFILE DATA FROM BACKEND
   useEffect(() => {
     const fetchUserData = async () => {
       if (!user) {
@@ -49,48 +51,17 @@ const Navbar = () => {
       }
 
       try {
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("id, role")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        // Fetch from Hono Backend
+        const response = await axiosInstance.get("/profile");
 
-        if (profileError) {
-          console.error("Error fetching user profile:", profileError);
-          return;
-        }
+        // Based on your JSON: { "data": { "role": "unit", "avatarUrl": "..." } }
+        const profileData = response.data?.data;
 
-        if (!profileData) return;
-
-        setUserRole(profileData.role);
-        setProfileId(profileData.id);
-
-        if (profileData.role === "student") {
-          const { data: studentData, error: studentError } = await supabase
-            .from("student_profiles")
-            .select("avatar_url")
-            .eq("profile_id", profileData.id)
-            .maybeSingle();
-
-          if (studentError) {
-            console.error("Error fetching student avatar:", studentError);
-            return;
-          }
-
-          setAvatarUrl(studentData?.avatar_url || null);
-        } else if (profileData.role === "unit") {
-          const { data: unitData, error: unitError } = await supabase
-            .from("units")
-            .select("avatar_url")
-            .eq("profile_id", profileData.id)
-            .maybeSingle();
-
-          if (unitError) {
-            console.error("Error fetching unit avatar:", unitError);
-            return;
-          }
-
-          setAvatarUrl(unitData?.avatar_url || null);
+        if (profileData) {
+          setUserRole(profileData.role); // "unit" or "candidate"
+          setProfileId(profileData.id);
+          // Note: Backend returns 'avatarUrl' (camelCase), not 'avatar_url'
+          setAvatarUrl(profileData.avatarUrl);
         }
       } catch (error) {
         console.error("Failed to fetch user data:", error);
@@ -109,16 +80,21 @@ const Navbar = () => {
   const navItems = userRole === "unit" ? [] : allNavItems;
   const isActive = (path: string) => location.pathname === path;
 
+  // 4. UPDATED SIGN OUT
   const handleSignOut = async () => {
-    await signOut();
-
-    if (userRole === "unit") {
-      navigate("/auth/unit/signin");
-    } else {
-      navigate("/auth/candidate/signin");
-    }
-
-    setMobileMenuOpen(false);
+    await authClient.signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          // Redirect based on the role we had stored
+          if (userRole === "unit") {
+            navigate("/auth/unit/signin");
+          } else {
+            navigate("/auth/candidate/signin");
+          }
+          setMobileMenuOpen(false);
+        },
+      },
+    });
   };
 
   const handleProfileClick = () => {
@@ -135,7 +111,7 @@ const Navbar = () => {
     setMobileMenuOpen(false);
   };
 
-  // ✅ Dynamic dashboard link based on role
+  // Dynamic dashboard link
   const dashboardLink = userRole === "unit" ? "/unit-dashboard" : "/dashboard";
 
   return (
@@ -161,7 +137,7 @@ const Navbar = () => {
               </Button>
             </div>
 
-            {/* ✅ Updated link based on userRole */}
+            {/* Link based on userRole */}
             <a href={dashboardLink}>
               {/* Mobile Logo */}
               <img
@@ -218,6 +194,7 @@ const Navbar = () => {
                       <AvatarImage
                         src={avatarUrl || undefined}
                         alt={user?.email || "User"}
+                        className="object-cover" // Added object-cover for better image fitting
                       />
                       <AvatarFallback className="text-sm bg-[#F8F6F2] text-gray-800">
                         {user?.email?.charAt(0).toUpperCase() ?? "U"}
@@ -233,7 +210,9 @@ const Navbar = () => {
                     <CircleUserRound className="mr-2 h-4 w-4" />
                     <span>My Profile</span>
                   </DropdownMenuItem>
-                  {userRole === "student" && (
+
+                  {/* Updated check to "candidate" instead of "student" */}
+                  {userRole === "candidate" && (
                     <DropdownMenuItem
                       onClick={() => navigate("/candidate-tasks")}
                       className="cursor-pointer hover:!text-blue-500 hover:bg-transparent focus:bg-transparent transition-colors [&_svg]:hover:!text-blue-500"
@@ -310,6 +289,7 @@ const Navbar = () => {
                     <AvatarImage
                       src={avatarUrl || undefined}
                       alt={user?.email || "User"}
+                      className="object-cover"
                     />
                     <AvatarFallback className="text-sm bg-[#F8F6F2] text-gray-800">
                       {user?.email?.charAt(0).toUpperCase() ?? "U"}

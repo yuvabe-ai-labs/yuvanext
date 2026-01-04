@@ -1,60 +1,43 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import type { Tables } from '@/integrations/supabase/types';
+import axiosInstance from '@/config/platform-api';
 
-type Internship = Tables<'internships'>;
+// Internship interface (replacing Supabase types)
+export interface Internship {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  created_by: string;
+  application_deadline: string;
+  created_at: string;
+  updated_at: string;
+  [key: string]: any; // For additional fields
+}
+
+export interface AppliedInternship extends Internship {
+  applied_at: string;
+}
 
 export const useAppliedInternships = () => {
-  const [appliedInternships, setAppliedInternships] = useState<(Internship & { applied_at: string })[]>([]);
+  const [appliedInternships, setAppliedInternships] = useState<AppliedInternship[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAppliedInternships = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      setError(null);
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
+      // Assumption: GET /api/internships/applied or /api/applications?include=internship
+      // Backend should return internships with applied_date for the authenticated user
+      const { data } = await axiosInstance.get('/internships/applied');
 
-      if (!profile) throw new Error('Profile not found');
-
-      const { data, error: fetchError } = await supabase
-        .from('applications')
-        .select('internship_id, applied_date')
-        .eq('student_id', profile.id);
-
-      if (fetchError) throw fetchError;
-
-      if (!data || data.length === 0) {
-        setAppliedInternships([]);
-        return;
-      }
-
-      const internshipIds = data.map(item => item.internship_id);
-      const { data: internships, error: internshipsError } = await supabase
-        .from('internships')
-        .select('*')
-        .in('id', internshipIds);
-
-      if (internshipsError) throw internshipsError;
-
-      const internshipsWithAppliedDate = internships?.map(internship => {
-        const appliedRecord = data.find(item => item.internship_id === internship.id);
-        return {
-          ...internship,
-          applied_at: appliedRecord?.applied_date || internship.created_at
-        };
-      }) || [];
-
-      setAppliedInternships(internshipsWithAppliedDate);
+      setAppliedInternships(
+        Array.isArray(data) ? data : data.internships || []
+      );
     } catch (err: any) {
       console.error('Error fetching applied internships:', err);
-      setError(err.message);
+      setError(err.message || 'Failed to fetch applied internships');
     } finally {
       setLoading(false);
     }

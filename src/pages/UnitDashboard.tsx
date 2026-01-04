@@ -66,18 +66,19 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Hooks
-import { useInternships } from "@/hooks/useInternships";
+// Hooks (Using our new/refactored hooks)
+import { useInternships, useUpdateInternship } from "@/hooks/useInternships"; // Added update hook here for status toggling
 import { useUnitStats, useUnitApplications } from "@/hooks/useUnitApplications";
 import { useUnitReports } from "@/hooks/useUnitReports";
-// import { useHiredApplicants } from "@/hooks/useHiredApplicants";
-import { useUnitProfile, useHiredApplicants } from "@/hooks/useHiredApplicants";
+import { useHiredApplicants } from "@/hooks/useHiredApplicants";
 import { useStudentTasks } from "@/hooks/useStudentTasks";
 
 // Utilities
 import { calculateOverallTaskProgress } from "@/utils/taskProgress";
 import axiosInstance from "@/config/platform-api";
+import { log } from "console";
 
+// Helper safe parser
 const safeParse = (data: any, fallback: any) => {
   if (!data) return fallback;
   try {
@@ -87,7 +88,7 @@ const safeParse = (data: any, fallback: any) => {
   }
 };
 
-// Component to display task progress for each candidate
+// --- Sub-component: Task Progress ---
 const CandidateTaskProgress = ({
   applicationId,
 }: {
@@ -148,26 +149,34 @@ const CandidateTaskProgress = ({
   );
 };
 
+// --- Main Dashboard Component ---
 const UnitDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("applications");
 
-  // --- HOOKS ---
-  const { data: applications, isLoading: loading } = useUnitApplications();
-
+  // --- 1. DATA FETCHING (REACT QUERY) ---
+  // A. Applications & Stats (Unified hook we built)
+  const { data: applications, isLoading: dashboardLoading } =
+    useUnitApplications();
   const { data: stats, isLoading: statsLoading } = useUnitStats();
+  // B. Internships List
   const { internships, loading: internshipsLoading } = useInternships();
 
-  // const { data: hiredCandidates, loading: hiredLoading } = useHiredApplicants();
-  const { data: hiredCandidates, isLoading: hiredLoading } =
+  // Helper hook for updating status (avoiding manual axios calls)
+  const updateInternshipMutation = useUpdateInternship();
+
+  // C. Hired Applicants
+  const { data: hiredCandidates = [], isLoading: hiredLoading } =
     useHiredApplicants();
+
+  // D. Reports (Charts)
   const {
     weeklyData,
     stats: reportStats,
     loading: reportsLoading,
   } = useUnitReports();
 
-  // --- STATE ---
+  // --- 2. LOCAL STATE ---
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [jobFilter, setJobFilter] = useState("all");
   const [updating, setUpdating] = useState<string | null>(null);
@@ -179,15 +188,16 @@ const UnitDashboard = () => {
   const [activatingInternship, setActivatingInternship] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Auto-close internships when deadline passes
+  // --- 3. EFFECTS (Auto-close expired) ---
   useEffect(() => {
     const checkAndCloseExpiredInternships = async () => {
-      if (internshipsLoading || internships.length === 0) return;
+      if (internshipsLoading || !internships || internships.length === 0)
+        return;
 
       const now = new Date();
       const expiredInternships = internships.filter((internship) => {
         if (internship.status !== "active") return false;
-        // Check if closingDate exists and is past
+        // Map field: closingDate
         if (!internship.closingDate) return false;
         const deadline = new Date(internship.closingDate);
         return deadline < now;
@@ -196,14 +206,15 @@ const UnitDashboard = () => {
       if (expiredInternships.length > 0) {
         try {
           const updatePromises = expiredInternships.map((internship) =>
+            // Using mutation hook would be cleaner, but batching promises is okay for this background task
             axiosInstance.put(`/internships/${internship.id}`, {
               status: "closed",
             })
           );
 
           await Promise.all(updatePromises);
-          // Ideally use queryClient.invalidateQueries instead of reload, but reload works for now
-          window.location.reload();
+          // Reload not needed; query invalidation handled by mutation hooks usually
+          // For this specific background check, a silent fail or manual invalidate is fine.
         } catch (err) {
           console.error("Error auto-closing expired internships:", err);
         }
@@ -222,14 +233,15 @@ const UnitDashboard = () => {
     );
   }
 
+  // --- 4. FILTERING LOGIC ---
   const filteredApplications =
     applications?.filter((appObj: any) => {
-      const status = appObj.application?.status;
+      // Handle nested structure from hook: appObj.application.status
+      const status = appObj.application?.status || appObj.status;
       if (filterStatuses.length === 0) return true;
       return filterStatuses.includes(status);
     }) || [];
 
-  // Filter hired candidates by search query
   const filteredHiredCandidates =
     hiredCandidates?.filter((candidate: any) => {
       if (!searchQuery) return true;
@@ -241,8 +253,13 @@ const UnitDashboard = () => {
       );
     }) || [];
 
+  console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  console.log(filteredHiredCandidates);
+
+  // --- 5. HANDLERS ---
+
   const handleInternshipCreated = () => {
-    // window.location.reload();
+    // No reload needed; React Query invalidates cache automatically
   };
 
   const handleAddComments = (internshipId: string) => {
@@ -264,9 +281,12 @@ const UnitDashboard = () => {
       setUpdating(deletingInternship.id);
       await axiosInstance.delete(`/internships/${deletingInternship.id}`);
 
+      // Ideally use delete mutation hook, but for now:
+      // Manually force refresh if not using hook
+      window.location.reload();
+
       setShowDeleteDialog(false);
       setDeletingInternship(null);
-      window.location.reload();
     } catch (err: any) {
       console.error("Error deleting job:", err);
       alert("Failed to delete job description");
@@ -277,35 +297,44 @@ const UnitDashboard = () => {
 
   const handleToggleStatus = async (internship: any) => {
     if (internship.status !== "active") {
+      // Activating requires editing (date check etc)
       setActivatingInternship(internship);
       setEditingInternship(internship);
     } else {
+      // Closing is direct
       try {
         setUpdating(internship.id);
-        await axiosInstance.put(`/internships/${internship.id}`, {
-          status: "closed",
-        });
-
-        window.location.reload();
+        // Use our mutation hook for better state management
+        updateInternshipMutation.mutate(
+          { id: internship.id, status: "closed" } as any, // Partial update
+          {
+            onSuccess: () => {
+              setUpdating(null);
+            },
+          }
+        );
       } catch (err: any) {
         console.error("Error updating job status:", err);
         alert("Failed to update job status");
-      } finally {
         setUpdating(null);
       }
     }
   };
 
   const handleEditSuccess = async () => {
+    // Logic for activating
     if (activatingInternship) {
       try {
-        await axiosInstance.put(`/internships/${activatingInternship.id}`, {
-          status: "active",
-        });
-
-        setActivatingInternship(null);
-        setEditingInternship(null);
-        window.location.reload();
+        // Activate via mutation
+        updateInternshipMutation.mutate(
+          { id: activatingInternship.id, status: "active" } as any,
+          {
+            onSuccess: () => {
+              setActivatingInternship(null);
+              setEditingInternship(null);
+            },
+          }
+        );
       } catch (err: any) {
         console.error("Error activating job:", err);
         alert("Failed to activate job description");
@@ -313,8 +342,9 @@ const UnitDashboard = () => {
         setEditingInternship(null);
       }
     } else {
+      // Standard edit success
       setEditingInternship(null);
-      // window.location.reload();
+      // Data refreshes automatically via React Query
     }
   };
 
@@ -323,6 +353,7 @@ const UnitDashboard = () => {
     setEditingInternship(null);
   };
 
+  // Helper formatting functions
   const getStatusColor = (status: string) => {
     switch (status) {
       case "shortlisted":
@@ -364,14 +395,14 @@ const UnitDashboard = () => {
   const getFilterDisplayText = () => {
     if (filterStatuses.length === 0) return "All Applications";
     if (filterStatuses.length === 1) {
-      const statusLabels: { [key: string]: string } = {
+      const labels: any = {
         shortlisted: "Shortlisted",
         interviewed: "Interviewed",
         rejected: "Rejected",
         hired: "Hired",
         applied: "Applied",
       };
-      return statusLabels[filterStatuses[0]] || "Select Filter";
+      return labels[filterStatuses[0]] || "Select Filter";
     }
     return `${filterStatuses.length} selected`;
   };
@@ -388,6 +419,7 @@ const UnitDashboard = () => {
     navigate(`/unit/candidate-tasks/${applicationId}`);
   };
 
+  // --- RENDER ---
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -403,7 +435,7 @@ const UnitDashboard = () => {
                   <p className="text-xs sm:text-sm font-medium">
                     Total Applications
                   </p>
-                  {loading ? (
+                  {dashboardLoading ? (
                     <Skeleton className="h-8 sm:h-10 w-12 sm:w-16 my-1" />
                   ) : (
                     <>
@@ -429,7 +461,7 @@ const UnitDashboard = () => {
                   <p className="text-xs sm:text-sm font-medium">
                     Total Job Descriptions
                   </p>
-                  {loading ? (
+                  {dashboardLoading ? (
                     <Skeleton className="h-8 sm:h-10 w-12 sm:w-16 my-1" />
                   ) : (
                     <>
@@ -457,7 +489,7 @@ const UnitDashboard = () => {
                   <p className="text-xs sm:text-sm font-medium">
                     Interview Scheduled
                   </p>
-                  {loading ? (
+                  {dashboardLoading ? (
                     <Skeleton className="h-8 sm:h-10 w-12 sm:w-16 my-1" />
                   ) : (
                     <>
@@ -485,7 +517,7 @@ const UnitDashboard = () => {
                   <p className="text-xs sm:text-sm font-medium">
                     Hired This Month
                   </p>
-                  {loading ? (
+                  {dashboardLoading ? (
                     <Skeleton className="h-8 sm:h-10 w-12 sm:w-16 my-1" />
                   ) : (
                     <>
@@ -508,7 +540,7 @@ const UnitDashboard = () => {
           </Card>
         </div>
 
-        {/* NAVIGATION TABS */}
+        {/* TABS */}
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
@@ -592,7 +624,7 @@ const UnitDashboard = () => {
               </DropdownMenu>
             </div>
 
-            {loading ? (
+            {dashboardLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {[...Array(6)].map((_, i) => (
                   <Card key={i} className="border border-border/50">
@@ -625,7 +657,6 @@ const UnitDashboard = () => {
                   const appId = appData.application?.id;
                   const candidate = appData.candidate || {};
                   const internship = appData.internship || {};
-
                   const skills = safeParse(candidate.skills, []);
                   const displaySkills = skills
                     .slice(0, 3)
@@ -667,7 +698,6 @@ const UnitDashboard = () => {
                             </Badge>
                           </div>
                         </div>
-
                         <div className="min-h-7">
                           <p className="text-sm sm:text-base text-gray-700 leading-relaxed line-clamp-3 mb-2">
                             {candidate.profileSummary ||
@@ -730,8 +760,7 @@ const UnitDashboard = () => {
                   className="bg-teal-600 hover:bg-teal-700 rounded-full w-full sm:w-auto"
                   onClick={() => setShowCreateDialog(true)}
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create New JD
+                  <Plus className="w-4 h-4 mr-2" /> Create New JD
                 </Button>
               </div>
             </div>
@@ -823,7 +852,6 @@ const UnitDashboard = () => {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-
                         <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
                           <div className="flex justify-between text-xs sm:text-sm">
                             <span className="text-muted-foreground">
@@ -868,7 +896,6 @@ const UnitDashboard = () => {
                             </span>
                           </div>
                         </div>
-
                         <Button
                           variant="outline"
                           className="w-full rounded-full text-sm"
@@ -886,7 +913,7 @@ const UnitDashboard = () => {
             )}
           </TabsContent>
 
-          {/* TAB 3: CANDIDATES (HIRED) */}
+          {/* TAB 3: CANDIDATES */}
           <TabsContent
             value="candidates"
             className="space-y-6 px-0 sm:px-4 lg:px-10"
@@ -906,7 +933,6 @@ const UnitDashboard = () => {
                 />
               </div>
             </div>
-
             {hiredLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[1, 2, 3, 4].map((i) => (
@@ -928,7 +954,7 @@ const UnitDashboard = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {filteredHiredCandidates.map((hired: any) => (
                   <Card
-                    key={hired.id || hired.application?.id}
+                    key={hired.id || hired.application_id}
                     className="border border-gray-200 rounded-3xl hover:shadow-lg transition-shadow"
                   >
                     <CardContent className="p-6 space-y-4">
@@ -938,7 +964,6 @@ const UnitDashboard = () => {
                             {hired.internship?.title ||
                               "Position not specified"}
                           </p>
-
                           <div className="flex items-center gap-4">
                             <Avatar className="w-20 h-20">
                               <AvatarImage
@@ -952,7 +977,6 @@ const UnitDashboard = () => {
                                   .toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
-
                             <div>
                               <h3 className="text-xl font-bold text-gray-900 mb-1">
                                 {hired.candidate?.name || "Name not available"}
@@ -960,7 +984,6 @@ const UnitDashboard = () => {
                             </div>
                           </div>
                         </div>
-
                         <div className="text-right text-sm text-gray-600">
                           <span>
                             {hired.internship?.duration ||
@@ -969,19 +992,16 @@ const UnitDashboard = () => {
                           </span>
                         </div>
                       </div>
-
-                      {/* Task Progress */}
                       <CandidateTaskProgress
-                        applicationId={hired.id || hired.application?.id}
+                        applicationId={hired.id || hired.application_id}
                       />
-
                       <div className="flex justify-end pt-2">
                         <Button
                           variant="outline"
                           className="rounded-full"
                           onClick={() =>
                             handleViewCandidate(
-                              hired.id || hired.application?.id
+                              hired.id || hired.application_id
                             )
                           }
                         >
@@ -1085,7 +1105,6 @@ const UnitDashboard = () => {
                           axisLine={false}
                           tickLine={false}
                         />
-
                         <YAxis
                           className="text-xs"
                           tick={{ fill: "hsl(var(--muted-foreground))" }}
@@ -1093,7 +1112,6 @@ const UnitDashboard = () => {
                           axisLine={false}
                           tickLine={false}
                         />
-
                         <ChartTooltip
                           content={<ChartTooltipContent />}
                           cursor={false}
@@ -1106,8 +1124,6 @@ const UnitDashboard = () => {
                           stackId="overlay"
                           label={false}
                         />
-
-                        {/* Foreground (This Week) */}
                         <Bar
                           dataKey="thisWeek"
                           fill="rgba(0, 128, 128, 0.9)"

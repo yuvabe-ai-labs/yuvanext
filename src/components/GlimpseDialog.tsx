@@ -7,9 +7,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Upload, Trash2 } from "lucide-react";
-import { useGlimpse } from "@/hooks/useGlimpse";
+import { Upload, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import axiosInstance from "@/config/platform-api";
+import { useUpdateUnitProfile } from "@/hooks/useUnitProfile";
 
 interface GlimpseDialogProps {
   isOpen: boolean;
@@ -28,12 +29,11 @@ export const GlimpseDialog = ({
 }: GlimpseDialogProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { uploading, uploadGlimpse, deleteGlimpse } = useGlimpse(
-    userId,
-    currentGlimpseUrl
-  );
   const { toast } = useToast();
+
+  const updateProfileMutation = useUpdateUnitProfile();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -64,25 +64,56 @@ export const GlimpseDialog = ({
   const handleUpload = async () => {
     if (!selectedFile) return;
 
-    const url = await uploadGlimpse(selectedFile);
-    if (url) {
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("type", "glimpse");
+      formData.append("userId", userId);
+
+      const response = await axiosInstance.post("/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      const publicUrl = response.data.url;
+
+      // Update Profile
+      await updateProfileMutation.mutateAsync({ galleryVideos: publicUrl });
+
       setSelectedFile(null);
       setPreviewUrl(null);
       onSuccess();
       onClose();
+    } catch (error: any) {
+      console.error("Upload failed", error);
+      toast({
+        title: "Error",
+        description: "Failed to upload video",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
     }
   };
 
   const handleDelete = async () => {
-    // Directly delete — no browser popup
-    const success = await deleteGlimpse();
-    if (success) {
-      toast({
-        title: "Deleted",
-        description: "Glimpse video deleted successfully.",
-      });
+    try {
+      setUploading(true);
+      // await axiosInstance.delete("/upload", { data: { url: currentGlimpseUrl } }); // Optional
+
+      await updateProfileMutation.mutateAsync({ galleryVideos: null });
+
+      toast({ title: "Deleted", description: "Glimpse video deleted." });
       onSuccess();
       onClose();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete video",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -100,7 +131,6 @@ export const GlimpseDialog = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Current or Preview Video */}
           {(previewUrl || currentGlimpseUrl) && (
             <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
               <video
@@ -123,7 +153,6 @@ export const GlimpseDialog = ({
             </div>
           )}
 
-          {/* Upload Section */}
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
             <input
               type="file"

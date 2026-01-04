@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import axiosInstance from "@/config/platform-api";
 import { useToast } from "@/hooks/use-toast";
 
 export interface NotificationPreferences {
@@ -15,7 +15,6 @@ export function useNotificationPreferences() {
   const [preferences, setPreferences] =
     useState<NotificationPreferences | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPreferences();
@@ -25,44 +24,39 @@ export function useNotificationPreferences() {
     try {
       setLoading(true);
 
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      // Assumption: GET /api/notification-preferences or /api/profile/notification-preferences
+      // Backend should return preferences for authenticated user
+      const { data } = await axiosInstance.get("/notification-preferences");
 
-      if (userError) throw userError;
-      if (!user) return;
-
-      setUserId(user.id);
-
-      const { data, error } = await supabase
-        .from("notification_preferences")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
-
-      if (error) {
-        if (error.code === "PGRST116") {
-          const { data: created } = await supabase
-            .from("notification_preferences")
-            .insert({ user_id: user.id })
-            .select()
-            .single();
-
-          setPreferences(created);
-        } else {
-          throw error;
-        }
+      const prefs = data?.data || data;
+      if (prefs) {
+        setPreferences(prefs);
       } else {
-        setPreferences(data);
+        // If no preferences exist, create default ones
+        const defaultPrefs: NotificationPreferences = {
+          allow_all: true,
+          application_status_in_app: true,
+          application_status_email: true,
+        };
+        setPreferences(defaultPrefs);
       }
-    } catch (err) {
-      console.error(err);
-      toast({
-        title: "Error",
-        description: "Failed to load notification preferences",
-        variant: "destructive",
-      });
+    } catch (err: any) {
+      // If 404, create default preferences
+      if (err.response?.status === 404) {
+        const defaultPrefs: NotificationPreferences = {
+          allow_all: true,
+          application_status_in_app: true,
+          application_status_email: true,
+        };
+        setPreferences(defaultPrefs);
+      } else {
+        console.error(err);
+        toast({
+          title: "Error",
+          description: "Failed to load notification preferences",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -71,26 +65,25 @@ export function useNotificationPreferences() {
   const updatePreferences = async (
     updates: Partial<NotificationPreferences>
   ) => {
-    if (!userId) return;
+    try {
+      // Assumption: PUT /api/notification-preferences
+      const { data } = await axiosInstance.put("/notification-preferences", updates);
 
-    const { data, error } = await supabase
-      .from("notification_preferences")
-      .update(updates)
-      .eq("user_id", userId)
-      .select()
-      .single();
-
-    if (error) {
+      const updatedPrefs = data?.data || data;
+      if (updatedPrefs) {
+        setPreferences(updatedPrefs);
+      } else {
+        setPreferences({ ...preferences, ...updates } as NotificationPreferences);
+      }
+      return updatedPrefs || preferences;
+    } catch (err: any) {
       toast({
         title: "Error",
         description: "Failed to update preferences",
         variant: "destructive",
       });
-      throw error;
+      throw err;
     }
-
-    setPreferences(data);
-    return data;
   };
 
   return {

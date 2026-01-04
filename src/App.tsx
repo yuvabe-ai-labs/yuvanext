@@ -10,8 +10,10 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-// 1. IMPORT BETTER AUTH CLIENT
+// 1. IMPORT USE SESSION
 import { useSession } from "@/lib/auth-client";
+// 2. IMPORT YOUR AXIOS INSTANCE
+import axiosInstance from "@/config/platform-api";
 import { useState, useEffect } from "react";
 import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
@@ -33,7 +35,7 @@ import InternshipDetail from "./pages/InternshipDetail";
 import AuthCallback from "@/hooks/AuthCallback";
 import RecommendedInternships from "./pages/RecommendedInternships";
 import ForgotPassword from "./pages/ForgotPassword";
-import CheckEmail from "./components/CheckEmail";
+// import CheckEmail from "./components/CheckEmail"; // This is likely inside ForgotPassword now?
 import ResetPassword from "./pages/ResetPassword";
 import CandidateTasks from "./pages/CandidateTasks";
 import MyTasks from "./pages/MyTasks";
@@ -41,11 +43,11 @@ import UnitCandidateTasks from "./pages/UnitCandidateTasks";
 import Settings from "./pages/Settings";
 import ScrollToTop from "@/components/ScrollToTop";
 import { NuqsAdapter } from "nuqs/adapters/react-router";
+
 const queryClient = new QueryClient();
 
 // Protected Route component with role-based routing (onboarding redirect removed)
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  // 2. CHECK SESSION STATUS
   const { data: session, isPending: isAuthPending } = useSession();
 
   const [profileLoading, setProfileLoading] = useState(true);
@@ -64,25 +66,16 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       }
 
       try {
-        // 3. FETCH PROFILE DATA FROM YOUR BACKEND (Hono)
-        const response = await fetch("http://localhost:9999/api/profile", {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          // CRITICAL: Send cookies to backend so it knows who we are
-          credentials: "include",
-        });
+        // 3. REFACTORED: Use Axios Instance
+        // Base URL is handled by the instance (e.g. /api is appended if config has it)
+        // Adjust path if your axios baseURL already includes /api
+        const { data: profile } = await axiosInstance.get("/profile");
 
-        if (!response.ok) {
-          console.error("Failed to fetch profile");
-          setProfileLoading(false);
-          return;
-        }
-
-        const profile = await response.json();
-        const role = profile?.role;
-
-        // Only handle role-based dashboard redirects
+        // Note: Check your API structure.
+        // If your Hono backend returns { data: { role: ... } } use profile.data.role
+        // If it returns { role: ... } directly, use profile.role
+        const role = profile?.data?.role;
+        // Role-based dashboard redirects
         if (role === "candidate" && location.pathname === "/unit-dashboard") {
           navigate("/dashboard", { replace: true });
         } else if (role === "unit" && location.pathname === "/dashboard") {
@@ -106,7 +99,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  // If not authenticated, redirect to Landing
   return session ? <>{children}</> : <Navigate to="/" replace />;
 };
 
@@ -117,7 +109,6 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ScrollToTop />
-        {/* 4. REMOVED AuthProvider (Better Auth manages its own state) */}
         <NuqsAdapter>
           <Routes>
             <Route path="/auth/callback" element={<AuthCallback />} />
@@ -135,6 +126,8 @@ const App = () => (
             <Route path="/auth/:role/signup" element={<SignUp />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+
+            {/* ... All your other Protected Routes ... */}
 
             <Route
               path="/internships/:id"

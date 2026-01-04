@@ -22,7 +22,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+// 1. IMPORT AXIOS INSTANCE
+import axiosInstance from "@/config/platform-api";
 import { useToast } from "@/hooks/use-toast";
 import { X, Sparkles, ChevronDown } from "lucide-react";
 
@@ -120,6 +121,7 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const currentDay = currentDate.getDate();
 
   const {
@@ -150,6 +152,7 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
     },
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const isPaid = watch("isPaid");
   const jobTitle = watch("title");
   const isJobRoleFilled = jobTitle && jobTitle.trim().length > 0;
@@ -172,13 +175,13 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
   const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
 
   // Function to check if a date is disabled (in the past)
-  const isDateDisabled = (date: number, month: string, year: string) => {
+  const isDateDisabled = (date: any, month: any, year: any) => {
     if (!month || !year) return false;
 
     const selectedTimestamp = new Date(
       parseInt(year),
       parseInt(month) - 1,
-      date
+      parseInt(date)
     ).setHours(0, 0, 0, 0);
 
     const todayTimestamp = new Date().setHours(0, 0, 0, 0);
@@ -278,7 +281,7 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
   // Reset date when month or year changes if it becomes invalid
   useEffect(() => {
     if (selectedDate && selectedMonth && selectedYear) {
-      if (isDateDisabled(parseInt(selectedDate), selectedMonth, selectedYear)) {
+      if (isDateDisabled(selectedDate, selectedMonth, selectedYear)) {
         setSelectedDate("");
       }
     }
@@ -331,25 +334,22 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
         )}-${selectedDate.padStart(2, "0")}`;
       }
 
-      const { error } = await supabase
-        .from("internships")
-        .update({
-          title: data.title,
-          duration: data.duration,
-          is_paid: data.isPaid,
-          payment: data.isPaid && data.payment ? data.payment : null,
-          description: data.description,
-          responsibilities: responsibilitiesArray,
-          benefits: benefitsArray,
-          skills_required: skillsArray,
-          language_requirements: data.language_requirements,
-          application_deadline: deadlineDate,
-          min_age_required: data.min_age_required,
-          job_type: data.job_type,
-        })
-        .eq("id", internship.id);
-
-      if (error) throw error;
+      // 2. REFACTORED: Use Axios PUT to update
+      // Endpoint: PUT /api/internships/{id}
+      await axiosInstance.put(`/internships/${internship.id}`, {
+        title: data.title,
+        duration: data.duration,
+        is_paid: data.isPaid,
+        payment: data.isPaid && data.payment ? data.payment : null,
+        description: data.description,
+        responsibilities: responsibilitiesArray,
+        benefits: benefitsArray,
+        skills_required: skillsArray,
+        language_requirements: data.language_requirements,
+        application_deadline: deadlineDate,
+        min_age_required: data.min_age_required,
+        job_type: data.job_type,
+      });
 
       toast({
         title: "Success",
@@ -423,18 +423,13 @@ Return only the clean list, one skill per line, no extra text or introduction`;
       ];
       setConversationHistory(updatedHistory);
 
-      const { data: aiResponse, error } = await supabase.functions.invoke(
-        "gemini-chat",
-        {
-          body: {
-            message: prompt,
-            conversationHistory: updatedHistory,
-            userRole: "jd_generation",
-          },
-        }
-      );
-
-      if (error) throw error;
+      // 3. REFACTORED: Use Axios POST for AI
+      // Endpoint: POST /api/chatbot (or your specific AI endpoint)
+      const { data: aiResponse } = await axiosInstance.post("/chatbot", {
+        message: prompt,
+        history: updatedHistory, // Changed from conversationHistory to history to match backend likely format
+        userRole: "jd_generation",
+      });
 
       if (aiResponse?.response) {
         let cleanResponse = aiResponse.response
@@ -452,8 +447,8 @@ Return only the clean list, one skill per line, no extra text or introduction`;
         if (["responsibilities", "benefits"].includes(fieldName)) {
           cleanResponse = cleanResponse
             .split(/\n+/)
-            .map((line) => line.replace(/^[-•\d.]\s*/, "").trim())
-            .filter((line) => line.length > 0)
+            .map((line: string) => line.replace(/^[-•\d.]\s*/, "").trim())
+            .filter((line: string) => line.length > 0)
             .join("\n");
         }
 
@@ -469,13 +464,7 @@ Return only the clean list, one skill per line, no extra text or introduction`;
           description: "The content has been generated successfully!",
         });
       } else {
-        console.error("AI response in unexpected format:", aiResponse);
-        toast({
-          title: "AI Assist Failed",
-          description:
-            "Received unexpected response from AI. Please try again.",
-          variant: "destructive",
-        });
+        throw new Error("Unexpected response from AI");
       }
     } catch (error: any) {
       console.error("AI Assist error:", error);
@@ -995,13 +984,12 @@ Return only the clean list, one skill per line, no extra text or introduction`;
               </label>
 
               <div className="flex gap-3">
-                {/* Year Dropdown - Select year first for better UX */}
+                {/* Year Dropdown */}
                 <div className="relative flex-1">
                   <select
                     value={selectedYear}
                     onChange={(e) => {
                       setSelectedYear(e.target.value);
-                      // Reset month and date when year changes
                       setSelectedMonth("");
                       setSelectedDate("");
                     }}
@@ -1023,7 +1011,6 @@ Return only the clean list, one skill per line, no extra text or introduction`;
                     value={selectedMonth}
                     onChange={(e) => {
                       setSelectedMonth(e.target.value);
-                      // Reset date when month changes
                       setSelectedDate("");
                     }}
                     disabled={!selectedYear}

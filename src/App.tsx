@@ -41,6 +41,8 @@ import UnitCandidateTasks from "./pages/UnitCandidateTasks";
 import Settings from "./pages/Settings";
 import ScrollToTop from "@/components/ScrollToTop";
 import { NuqsAdapter } from "nuqs/adapters/react-router";
+import axiosInstance from "@/config/platform-api";
+
 const queryClient = new QueryClient();
 
 // Protected Route component with role-based routing (onboarding redirect removed)
@@ -64,31 +66,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       }
 
       try {
-        // 3. FETCH PROFILE DATA FROM YOUR BACKEND (Hono)
-        const response = await fetch(
-          `${import.meta.env.VITE_BETTER_AUTH_URL}/api/profile`,
-          {
-            headers: {
-              "Content-Type": "application/json",
-            },
-            // CRITICAL: Send cookies to backend so it knows who we are
-            credentials: "include",
-          }
-        );
-
-        if (!response.ok) {
-          console.error("Failed to fetch profile");
-          setProfileLoading(false);
-          return;
-        }
-
-        const profile = await response.json();
+        // 3. USE AXIOS INSTANCE INSTEAD OF FETCH
+        const response = await axiosInstance.get("/profile");
+        const profile = response.data;
         const role = profile?.role;
 
         // Only handle role-based dashboard redirects
-        if (role === "candidate" && location.pathname === "/unit-dashboard") {
+        if (role === "candidate") {
           navigate("/dashboard", { replace: true });
-        } else if (role === "unit" && location.pathname === "/dashboard") {
+        } else if (role === "unit") {
           navigate("/unit-dashboard", { replace: true });
         }
       } catch (error) {

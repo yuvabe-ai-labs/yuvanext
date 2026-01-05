@@ -4,6 +4,7 @@ import type {
   SavedInternships,
   AppliedInternships,
   SavedAndAppliedCount,
+  AppliedInternshipStatus,
 } from "@/types/internships.types";
 import { handleApiResponse, handleApiError } from "@/lib/api-handler";
 
@@ -31,9 +32,28 @@ export const getInternshipById = async (id: string): Promise<Internship> => {
 
 // Get recommended internships
 
+// export const getRemommendedInternships = async (): Promise<Internship[]> => {
+//   try {
+//     const response = await axiosInstance.get("/internships/recommended");
+//     return handleApiResponse<Internship[]>(response, []);
+//   } catch (error) {
+//     return handleApiError(error, "Failed to fetch recommended internships");
+//   }
+// };
+
 export const getRemommendedInternships = async (): Promise<Internship[]> => {
   try {
     const response = await axiosInstance.get("/internships/recommended");
+
+    // Handle the nested structure: data.data.internships
+    const apiData = response.data;
+
+    // If the response has the expected structure
+    if (apiData?.data?.internships && Array.isArray(apiData.data.internships)) {
+      return apiData.data.internships;
+    }
+
+    // Fallback to handleApiResponse for other structures
     return handleApiResponse<Internship[]>(response, []);
   } catch (error) {
     return handleApiError(error, "Failed to fetch recommended internships");
@@ -76,5 +96,68 @@ export const getSaveAndAppliedCount =
       );
     } catch (error) {
       return handleApiError(error, "Failed to fetch internships count");
+    }
+  };
+
+// Save internship
+export const saveInternship = async (
+  internshipId: string
+): Promise<boolean> => {
+  try {
+    const response = await axiosInstance.post(
+      `/candidate/internship/${internshipId}/save`
+    );
+
+    return handleApiResponse<boolean>(response, false);
+  } catch (error) {
+    return handleApiError(error, "Failed to save internship");
+  }
+};
+
+// Remove saved internship
+export const removeSavedInternship = async (
+  internshipId: string
+): Promise<boolean> => {
+  try {
+    const response = await axiosInstance.delete(
+      `/candidate/internship/${internshipId}/save`
+    );
+
+    return handleApiResponse<boolean>(response, false);
+  } catch (error) {
+    return handleApiError(error, "Failed to remove saved internship");
+  }
+};
+
+// Generate share link for internship
+export const getInternshipShareLink = async (
+  internshipId: string
+): Promise<string> => {
+  try {
+    const response = await axiosInstance.get(
+      `/candidate/internship/share/${internshipId}`
+    );
+
+    return handleApiResponse<string>(response, "");
+  } catch (error) {
+    return handleApiError(error, "Failed to generate share link");
+  }
+};
+
+// Get intership status
+
+export const getAppliedInternshipStatus =
+  async (): Promise<AppliedInternshipStatus> => {
+    try {
+      const response = await axiosInstance.get(
+        "/candidate/internship/application-status"
+      );
+
+      return handleApiResponse<AppliedInternshipStatus>(
+        response,
+        {} as AppliedInternshipStatus
+      );
+    } catch (error) {
+      return handleApiError(error, "Failed to fetch applied internship status");
     }
   };

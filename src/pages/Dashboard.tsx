@@ -9,24 +9,26 @@ import {
   BookmarkCheck,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
-  getRemommendedInternships,
-  getSavedInternships,
-  getAppliedInternships,
-} from "@/services/internships.service";
-import { getCourses } from "@/services/courses.service";
+  useRemommendedInternships,
+  useSavedInternships,
+  useAppliedInternships,
+} from "@/hooks/useInternships";
+import { useCourses } from "@/hooks/useCourses";
 import type {
   Internship,
   SavedInternships,
   AppliedInternships,
 } from "@/types/internships.types";
+import type { Course } from "@/types/courses.types";
 import {
   differenceInDays,
   differenceInHours,
   differenceInMinutes,
   formatDistanceToNow,
 } from "date-fns";
+import ProfileSidebar from "@/components/ProfileSidebar";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -38,91 +40,27 @@ const Dashboard = () => {
   );
   const [currentActivityIndex, setCurrentActivityIndex] = useState(0);
 
-  // Data states
-  const [recommendedInternships, setRecommendedInternships] = useState<
-    Internship[]
-  >([]);
-  const [recommendedCourses, setRecommendedCourses] = useState<any[]>([]);
-  const [savedInternships, setSavedInternships] = useState<SavedInternships[]>(
-    []
-  );
-  const [appliedInternships, setAppliedInternships] = useState<
-    AppliedInternships[]
-  >([]);
+  // Fetch data using React Query hooks
+  const { data: internshipsData, isLoading: internshipsLoading } =
+    useRemommendedInternships();
+  const { data: coursesData, isLoading: coursesLoading } = useCourses();
+  const { data: savedData, isLoading: savedLoading } = useSavedInternships();
+  const { data: appliedData, isLoading: appliedLoading } =
+    useAppliedInternships();
 
-  // Loading states
-  const [internshipsLoading, setInternshipsLoading] = useState(true);
-  const [coursesLoading, setCoursesLoading] = useState(true);
-  const [savedLoading, setSavedLoading] = useState(true);
-  const [appliedLoading, setAppliedLoading] = useState(true);
-
-  // Fetch recommended internships
-  useEffect(() => {
-    const fetchRecommendedInternships = async () => {
-      try {
-        setInternshipsLoading(true);
-        const data = await getRemommendedInternships();
-        setRecommendedInternships(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error fetching recommended internships:", error);
-        setRecommendedInternships([]);
-      } finally {
-        setInternshipsLoading(false);
-      }
-    };
-    fetchRecommendedInternships();
-  }, []);
-
-  // Fetch recommended courses
-  useEffect(() => {
-    const fetchRecommendedCourses = async () => {
-      try {
-        setCoursesLoading(true);
-        const data = await getCourses();
-        setRecommendedCourses(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error fetching recommended courses:", error);
-        setRecommendedCourses([]);
-      } finally {
-        setCoursesLoading(false);
-      }
-    };
-    fetchRecommendedCourses();
-  }, []);
-
-  // Fetch saved internships
-  useEffect(() => {
-    const fetchSavedInternships = async () => {
-      try {
-        setSavedLoading(true);
-        const data = await getSavedInternships();
-        setSavedInternships(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error fetching saved internships:", error);
-        setSavedInternships([]);
-      } finally {
-        setSavedLoading(false);
-      }
-    };
-    fetchSavedInternships();
-  }, []);
-
-  // Fetch applied internships
-  useEffect(() => {
-    const fetchAppliedInternships = async () => {
-      try {
-        setAppliedLoading(true);
-        const data = await getAppliedInternships();
-        setAppliedInternships(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error fetching applied internships:", error);
-        setAppliedInternships([]);
-      } finally {
-        setAppliedLoading(false);
-      }
-    };
-    fetchAppliedInternships();
-  }, []);
+  // Ensure data is always an array
+  const recommendedInternships: Internship[] = Array.isArray(internshipsData)
+    ? internshipsData
+    : [];
+  const recommendedCourses: Course[] = Array.isArray(coursesData)
+    ? coursesData
+    : [];
+  const savedInternships: SavedInternships[] = Array.isArray(savedData)
+    ? savedData
+    : [];
+  const appliedInternships: AppliedInternships[] = Array.isArray(appliedData)
+    ? appliedData
+    : [];
 
   const nextActivity = (activities: any[]) => {
     setCurrentActivityIndex((prev) =>
@@ -164,9 +102,15 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <div className="container px-4 sm:px-6 lg:px-[7.5rem] py-4 lg:py-10">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-2.5">
+          {/* Left Sidebar - Profile - Fixed */}
+          <div className="hidden md:block lg:col-span-1 mb-4 lg:mb-0">
+            <div className="lg:sticky lg:top-8">
+              <ProfileSidebar savedCount={savedInternships.length} />
+            </div>
+          </div>
           {/* Main Content */}
           <div
-            className="lg:col-span-4 space-y-2.5 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-2"
+            className="lg:col-span-3 space-y-2.5 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-2"
             style={{ scrollbarWidth: "thin" }}
           >
             {/* Recommended Internships */}
@@ -220,7 +164,7 @@ const Dashboard = () => {
                             ];
                             const colorClass = colors[idx % colors.length];
                             const initial =
-                              internship.companyName?.charAt(0) || "C";
+                              internship.createdBy?.name?.charAt(0) || "C";
                             const daysAgo = Math.floor(
                               (Date.now() -
                                 new Date(internship.createdAt).getTime()) /
@@ -238,18 +182,16 @@ const Dashboard = () => {
                                 key={internship.id}
                                 className={`${colorClass} shadow-sm hover:shadow-md transition-shadow cursor-pointer rounded-xl min-w-[60vw] snap-center md:w-auto md:min-w-0 lg:flex-1`}
                                 onClick={() =>
-                                  navigate(
-                                    `/recommended-internships?id=${internship.id}`
-                                  )
+                                  navigate(`/internships/${internship.id}`)
                                 }
                               >
                                 <CardHeader className="pb-2.5">
                                   <div className="flex justify-between items-start mb-2">
                                     <div className="w-8 h-8 bg-foreground rounded-full flex items-center justify-center text-background font-bold text-sm">
-                                      {internship.companyLogo ? (
+                                      {internship.createdBy?.avatarUrl ? (
                                         <img
-                                          src={internship.companyLogo}
-                                          alt={internship.companyName}
+                                          src={internship.createdBy.avatarUrl}
+                                          alt={internship.createdBy.name}
                                           className="w-full h-full rounded-full object-cover"
                                         />
                                       ) : (
@@ -353,9 +295,9 @@ const Dashboard = () => {
                                 <div
                                   className={`h-32 relative ${gradientClass} max-h-28 flex items-center justify-center`}
                                 >
-                                  {course.imageUrl ? (
+                                  {course.bannerUrl ? (
                                     <img
-                                      src={course.imageUrl}
+                                      src={course.bannerUrl}
                                       alt={course.title}
                                       className="w-full h-full object-cover"
                                     />
@@ -492,10 +434,7 @@ const Dashboard = () => {
                         )
                           .slice(currentActivityIndex, currentActivityIndex + 3)
                           .map((internship) => {
-                            const dateToUse =
-                              activityView === "saved"
-                                ? internship.savedAt || internship.createdAt
-                                : internship.appliedAt || internship.createdAt;
+                            const dateToUse = internship.createdAt;
 
                             const getShortTimeAgo = (date: string | Date) => {
                               const now = new Date();
@@ -527,15 +466,16 @@ const Dashboard = () => {
                               >
                                 <div className="space-y-2">
                                   <div className="flex items-start justify-between">
-                                    <div className="w-8 h-8 bg-foreground rounded-full flex items-center justify-center text-background font-bold">
-                                      {internship.companyLogo ? (
+                                    <div className="w-8 h-8 bg-foreground rounded-full flex items-center justify-center text-background font-bold text-sm">
+                                      {internship.createdBy?.avatarUrl ? (
                                         <img
-                                          src={internship.companyLogo}
-                                          alt={internship.companyName}
+                                          src={internship.createdBy.avatarUrl}
+                                          alt={internship.createdBy.name}
                                           className="w-full h-full rounded-full object-cover"
                                         />
                                       ) : (
-                                        internship.companyName?.charAt(0) || "C"
+                                        internship.createdBy?.name?.charAt(0) ||
+                                        "C"
                                       )}
                                     </div>
                                     <Badge className="bg-primary text-primary-foreground">
@@ -554,14 +494,6 @@ const Dashboard = () => {
                                     {internship.internshipDescription ||
                                       "No description available"}
                                   </p>
-                                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                                    <div className="flex items-center gap-1">
-                                      <Clock className="w-4 h-4" />
-                                      <span>
-                                        {internship.duration || "Not specified"}
-                                      </span>
-                                    </div>
-                                  </div>
                                 </div>
                               </Card>
                             );

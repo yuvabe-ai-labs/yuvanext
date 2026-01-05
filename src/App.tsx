@@ -65,13 +65,16 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
       try {
         // 3. FETCH PROFILE DATA FROM YOUR BACKEND (Hono)
-        const response = await fetch("http://localhost:9999/api/profile", {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          // CRITICAL: Send cookies to backend so it knows who we are
-          credentials: "include",
-        });
+        const response = await fetch(
+          `${import.meta.env.VITE_BETTER_AUTH_URL}/api/profile`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+            // CRITICAL: Send cookies to backend so it knows who we are
+            credentials: "include",
+          }
+        );
 
         if (!response.ok) {
           console.error("Failed to fetch profile");

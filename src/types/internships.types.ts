@@ -3,6 +3,24 @@ export enum InternshipStatus {
   ACTIVE = "active",
 }
 
+export enum CandidateDecision {
+  ACCEPT = "accept",
+  REJECT = "reject",
+  PENDING = "pending",
+}
+
+export enum UnitDecision {
+  SELECT = "select",
+  REJECT = "reject",
+  PENDING = "pending",
+}
+
+export enum UnitDecision {
+  A = "full_time",
+  PART_TIME = "part_time",
+  BOTH = "both",
+}
+
 export enum JobType {
   FULL_TIME = "full_time",
   PART_TIME = "part_time",
@@ -53,9 +71,9 @@ export interface SavedInternships {
   id: string;
   internshipId: string;
   createdAt: string;
-  internshipTitle: string | null;
-  internshipDescription: string | null;
-  internshipCreatedBy: string | null;
+  internshipTitle: string;
+  internshipDescription: string;
+  createdBy: CreatedBy;
 }
 
 export interface AppliedInternships {
@@ -64,12 +82,24 @@ export interface AppliedInternships {
   status: InternshipApplicationStatus;
   includedSections: string[];
   createdAt: string;
-  internshipTitle: string | null;
-  internshipDescription: string | null;
-  internshipCreatedBy: string | null;
+  internshipTitle: string;
+  internshipDescription: string;
+  createdBy: CreatedBy;
 }
 
 export interface SavedAndAppliedCount {
   savedCount: number;
   appliedCount: number;
+}
+
+export interface AppliedInternshipStatus {
+  id: string;
+  applicationTitle: string;
+  status: InternshipApplicationStatus;
+  candidateOfferDecision: CandidateDecision | null;
+  unitOfferDecision: InternshipStatus | null;
+  unitName: string;
+  avatarUrl: string;
+  createdAt: string;
+  updatedAt: string;
 }

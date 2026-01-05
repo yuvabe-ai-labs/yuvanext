@@ -16,12 +16,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChevronRight, CalendarIcon, Search, ChevronLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { useUnits } from "@/hooks/useUnits";
+import { useUnit } from "@/hooks/useUnits";
+import { useSession } from "@/lib/auth-client";
 import { formatDistanceToNow } from "date-fns";
+import type { Unit } from "@/types/units.types";
 
 const Units = () => {
   const navigate = useNavigate();
-  const { units, loading, error } = useUnits();
+  const { data: session } = useSession();
+  const { data: unitsData, isLoading, error } = useUnit();
+
+  // Convert the data to array format
+  const units: Unit[] = unitsData || [];
 
   const [filters, setFilters] = useState({
     units: [] as string[],
@@ -58,30 +64,26 @@ const Units = () => {
     s = s
       .replace(" ", "T")
       .replace(/\.(\d{3})\d+/, ".$1")
-      .replace(/\+00:00?$|Z$/i, "Z");
+      .replace(/\+00:00?|Z$/i, "Z");
     if (!/[zZ]|[+\-]\d{2}:?\d{2}$/.test(s)) s = s + "Z";
     return new Date(s);
   };
 
   const uniqueUnits = [
-    ...new Set(units.map((u) => u.unit_name).filter(Boolean)),
-  ];
+    ...new Set(units.map((u) => u.name).filter(Boolean)),
+  ] as string[];
+
   const uniqueIndustries = [
     ...new Set(units.map((u) => u.industry).filter(Boolean)),
-  ];
+  ] as string[];
+
   const uniqueDepartments = [
-    ...new Set(units.flatMap((u) => u.skills_offered).filter(Boolean)),
-  ];
+    ...new Set(units.flatMap((u) => u.skillsOffered || []).filter(Boolean)),
+  ] as string[];
 
   const interestAreas = [
-    ...new Set(
-      units.flatMap((u) =>
-        typeof u.focus_areas === "object" && u.focus_areas
-          ? Object.values(u.focus_areas)
-          : []
-      )
-    ),
-  ];
+    ...new Set(units.flatMap((u) => u.focusAreas || [])),
+  ] as string[];
 
   const toggleFilter = (category: keyof typeof filters, value: string) => {
     if (category === "postingDate") return;
@@ -123,31 +125,31 @@ const Units = () => {
   };
 
   const filteredUnits = units.filter((unit) => {
-    if (filters.units.length && !filters.units.includes(unit.unit_name))
+    if (filters.units.length && !filters.units.includes(unit.name || ""))
       return false;
+
     if (filters.industries.length) {
       const ind = unit.industry;
       if (!ind || !filters.industries.includes(ind)) return false;
     }
+
     if (
       filters.departments.length &&
       !filters.departments.some((skill) =>
-        Array.isArray(unit.skills_offered)
-          ? unit.skills_offered.includes(skill)
+        Array.isArray(unit.skillsOffered)
+          ? unit.skillsOffered.includes(skill)
           : false
       )
     )
       return false;
 
     if (filters.interestAreas.length) {
-      const areas: string[] = [];
-      if (typeof unit.focus_areas === "object" && unit.focus_areas)
-        areas.push(...Object.values(unit.focus_areas).map(String));
+      const areas = unit.focusAreas || [];
       if (!filters.interestAreas.some((a) => areas.includes(a))) return false;
     }
 
     if (filters.postingDate.from || filters.postingDate.to) {
-      const unitDate = parsePgTimestamp(unit.created_at).getTime();
+      const unitDate = parsePgTimestamp(unit.createdAt).getTime();
       const from = filters.postingDate.from
         ? new Date(filters.postingDate.from).getTime()
         : -Infinity;
@@ -175,7 +177,7 @@ const Units = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      {/* <Navbar /> */}
       <div className="container px-4 lg:px-[7.5rem] lg:py-10">
         <div className="flex gap-5">
           {/* Sidebar Filters */}
@@ -228,31 +230,9 @@ const Units = () => {
                 onSelectDate={(range) => DateRange(range)}
                 onDateChange={setFilters}
               />
-
-              {/* <div>
-              <Label className="text-sm font-semibold text-muted-foreground mb-3 block">
-                Interest Areas
-              </Label>
-              <div className="flex flex-wrap gap-2">
-                {interestAreas.slice(0, 10).map((a) => (
-                  <Button
-                    key={String(a)}
-                    variant={
-                      filters.interestAreas.includes(String(a))
-                        ? "default"
-                        : "outline"
-                    }
-                    size="sm"
-                    className="rounded-full"
-                    onClick={() => toggleFilter("interestAreas", String(a))}
-                  >
-                    {String(a)}
-                  </Button>
-                ))}
-              </div>
-            </div> */}
             </div>
           </div>
+
           {showMobileFilters && (
             <>
               {/* Overlay */}
@@ -277,7 +257,7 @@ const Units = () => {
                   </button>
                 </div>
 
-                {/* Ubnit Providers */}
+                {/* Unit Providers */}
                 <FilterSection
                   label="Units"
                   searchValue={searchUnits}
@@ -318,7 +298,7 @@ const Units = () => {
             </>
           )}
 
-          {/* Main content remains unchanged */}
+          {/* Main content */}
           <div className="flex-1 w-full">
             <div className="flex pt-4 items-center justify-between mb-4 lg:hidden w-full">
               {/* Left group: Back + Title */}
@@ -344,15 +324,19 @@ const Units = () => {
                 <img src={FilterIcon} alt="Filter" className="w-6 h-6" />
               </button>
             </div>
-            <div className="hidden lg:blockmb-6">
-              <h1 className="text-2xl text-gray-600 font-medium ">
+            <div className="hidden lg:block mb-6">
+              <h1 className="text-2xl text-gray-600 font-medium">
                 Explore {filteredUnits.length} Units
               </h1>
             </div>
 
             {error ? (
-              <p className="text-destructive">{error}</p>
-            ) : loading ? (
+              <p className="text-destructive">
+                {error instanceof Error
+                  ? error.message
+                  : "Failed to load units"}
+              </p>
+            ) : isLoading ? (
               <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <Card key={i} className="overflow-hidden rounded-3xl">
@@ -384,16 +368,15 @@ const Units = () => {
 
                   return (
                     <Card
-                      key={unit.id}
+                      key={unit.userId}
                       className="relative overflow-hidden rounded-[20px] border border-[#C94100] bg-white shadow-sm transition-all duration-300 hover:shadow-md w-[256px] h-[300px] p-1.5"
                     >
                       {/* Banner */}
                       <div className="relative w-full h-[100px] rounded-t-[18px] overflow-visible bg-blue-500">
-                        {unit.banner_url ? (
+                        {unit.bannerUrl ? (
                           <img
                             src={
-                              unit.banner_url ||
-                              "/assets/banner-placeholder.jpg"
+                              unit.bannerUrl || "/assets/banner-placeholder.jpg"
                             }
                             alt=""
                             className="h-full w-full object-cover rounded-[18px]"
@@ -403,22 +386,22 @@ const Units = () => {
                         )}
                         {/* Avatar */}
                         <div className="absolute bottom-0 left-5 translate-y-1/6 w-[56px] h-[56px] flex items-center justify-center z-20 rounded-full bg-black text-white">
-                          {unit.avatar_url ? (
+                          {unit.avatarUrl ? (
                             <img
-                              src={unit.avatar_url}
-                              alt={`${unit.unit_name} logo`}
-                              className="w-[54px] h-[54px] object-cover rounded-full "
+                              src={unit.avatarUrl}
+                              alt={`${unit.name} logo`}
+                              className="w-[54px] h-[54px] object-cover rounded-full"
                             />
                           ) : (
-                            unit.unit_name?.charAt(0) || "C"
+                            unit.name?.charAt(0) || "C"
                           )}
                         </div>
                       </div>
 
-                      {/* Content (overlap look via negative margin on container below banner) */}
+                      {/* Content */}
                       <div className="-mt-[28px] bg-white rounded-[18px] pt-[40px] pb-[20px] px-[16px] z-10 relative">
                         <h3 className="text-[20px] font-semibold text-black leading-tight text-left">
-                          {unit.unit_name}
+                          {unit.name}
                         </h3>
                         <p className="text-[14px] text-black mt-1 line-clamp-3 text-left">
                           {unit.description}
@@ -429,7 +412,7 @@ const Units = () => {
                             className="text-[#0B5FFF] font-medium p-0"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/units/${unit.id}`);
+                              navigate(`/units/${unit.userId}`);
                             }}
                           >
                             View Openings
@@ -438,73 +421,6 @@ const Units = () => {
                       </div>
                     </Card>
                   );
-
-                  // return (
-                  //   <Card
-                  //     key={unit.id}
-                  //     className="overflow-hidden border-gray-200 rounded-3xl hover:shadow-lg transition-all"
-                  //   >
-                  //     {/* Card Header with Gradient */}
-                  //     <div
-                  //       className={`${gradient} rounded-3xl h-48 m-1 relative flex flex-col items-center justify-center text-white`}
-                  //     >
-                  //       {unit.avatar_url ? (
-                  //         <img
-                  //           src={unit.banner_url}
-                  //           alt={unit.unit_name}
-                  //           className="w-full h-full object-cover rounded-3xl"
-                  //         />
-                  //       ) : (
-                  //         <div className="text-white text-center">
-                  //           <h3 className="text-2xl font-bold">
-                  //             {unit.unit_name.toUpperCase()}
-                  //           </h3>
-                  //         </div>
-                  //       )}
-                  //       <Badge className="absolute top-3 left-3 bg-white/60 text-foreground hover:bg-white/60">
-                  //         {formatDistanceToNow(new Date(unit.created_at), {
-                  //           addSuffix: true,
-                  //         })}
-                  //       </Badge>
-                  //     </div>
-
-                  //     {/* Card Content with Logo */}
-                  //     {/* <CardContent className="p-4">
-                  //       <div className="flex items-center justify-between">
-                  //         <div className="flex items-center space-x-3">
-                  //           <div className="w-10 h-10 rounded-full overflow-hidden border flex items-center justify-center bg-black">
-                  //             {unit.avatar_url ? (
-                  //               <img
-                  //                 src={unit.avatar_url}
-                  //                 alt={`${unit.unit_name} logo`}
-                  //                 className="w-full h-full object-cover" // key change
-                  //               />
-                  //             ) : (
-                  //               <span className="text-xs text-white font-bold">
-                  //                 {unit.unit_name[0]?.toUpperCase()}
-                  //               </span>
-                  //             )}
-                  //           </div>
-                  //           <div>
-                  //             <p className="text-sm font-semibold line-clamp-1">
-                  //               {unit.unit_name}
-                  //             </p>
-                  //           </div>
-                  //         </div>
-                  //         <Button
-                  //           size="sm"
-                  //           className="bg-gradient-to-br from-[#C94100] to-[#FFB592] hover:bg-orange-600 text-white rounded-3xl px-3"
-                  //           onClick={(e) => {
-                  //             e.stopPropagation();
-                  //             navigate(`/units/${unit.id}`);
-                  //           }}
-                  //         >
-                  //           View
-                  //         </Button>
-                  //       </div>
-                  //     </CardContent> */}
-                  //   </Card>
-                  // );
                 })}
               </div>
             )}
@@ -515,7 +431,7 @@ const Units = () => {
   );
 };
 
-/* ------------------ UPDATED FilterSection ------------------ */
+/* FilterSection Component */
 const FilterSection = ({
   label,
   searchValue,
@@ -559,7 +475,7 @@ const FilterSection = ({
         {label}
       </Label>
 
-      {/* ✅ Single Search Input */}
+      {/* Single Search Input */}
       <div className="relative mb-3">
         <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
         <Input
@@ -571,7 +487,7 @@ const FilterSection = ({
         />
       </div>
 
-      {/* ✅ Search Dropdown (filtered results) */}
+      {/* Search Dropdown */}
       {showDropdown && filteredSearchResults.length > 0 && (
         <div
           ref={dropdownRef}
@@ -600,7 +516,7 @@ const FilterSection = ({
         </div>
       )}
 
-      {/* ✅ Always visible checkbox list below */}
+      {/* Always visible checkbox list */}
       <div className="space-y-3 mt-3">
         {(showAll ? list : list.slice(0, 4)).map((item: string) => (
           <div key={item} className="flex items-center space-x-2">
@@ -625,7 +541,7 @@ const FilterSection = ({
   );
 };
 
-/* ------------------ PostingDateFilter unchanged ------------------ */
+/* PostingDateFilter Component */
 const PostingDateFilter = ({
   filters,
   activeDateRange,

@@ -97,7 +97,7 @@ export interface AppliedInternshipStatus {
   applicationTitle: string;
   status: InternshipApplicationStatus;
   candidateOfferDecision: CandidateDecision | null;
-  unitOfferDecision: InternshipStatus | null;
+  unitOfferDecision: UnitDecision | null;
   unitName: string;
   avatarUrl: string;
   createdAt: string;

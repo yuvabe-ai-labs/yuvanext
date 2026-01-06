@@ -144,8 +144,7 @@ export const getInternshipShareLink = async (
   }
 };
 
-// Get intership status
-
+// Get applied internship status
 export const getAppliedInternshipStatus =
   async (): Promise<AppliedInternshipStatus> => {
     try {
@@ -161,3 +160,17 @@ export const getAppliedInternshipStatus =
       return handleApiError(error, "Failed to fetch applied internship status");
     }
   };
+
+export const updateOfferDecision = async (
+  applicationId: string
+): Promise<string> => {
+  try {
+    const response = await axiosInstance.post(
+      `/candidate/internship/application/${applicationId}/accept-offer`
+    );
+
+    return handleApiResponse<string>(response, "");
+  } catch (error) {
+    return handleApiError(error, "Failed to generate share link");
+  }
+};

@@ -41,7 +41,7 @@ import UnitCandidateTasks from "./pages/UnitCandidateTasks";
 import Settings from "./pages/Settings";
 import ScrollToTop from "@/components/ScrollToTop";
 import { NuqsAdapter } from "nuqs/adapters/react-router";
-import axiosInstance from "@/config/platform-api";
+import { useProfile } from "@/hooks/useProfile";
 
 const queryClient = new QueryClient();
 
@@ -49,8 +49,8 @@ const queryClient = new QueryClient();
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   // 2. CHECK SESSION STATUS
   const { data: session, isPending: isAuthPending } = useSession();
+  const { data: profile, isLoading: profileLoading } = useProfile();
 
-  const [profileLoading, setProfileLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -61,14 +61,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
       // If no session, the render will handle the redirect to "/"
       if (!session) {
-        setProfileLoading(false);
         return;
       }
 
-      try {
-        // 3. USE AXIOS INSTANCE INSTEAD OF FETCH
-        const response = await axiosInstance.get("/profile");
-        const profile = response.data;
+      // If profile is still loading, wait
+      if (profileLoading) return;
+
+      // If profile is loaded, handle role-based redirects
+      if (profile) {
         const role = profile?.role;
 
         // Only handle role-based dashboard redirects
@@ -77,15 +77,18 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         } else if (role === "unit") {
           navigate("/unit-dashboard", { replace: true });
         }
-      } catch (error) {
-        console.error("Error checking profile:", error);
-      } finally {
-        setProfileLoading(false);
       }
     };
 
     checkProfileAndRedirect();
-  }, [session, isAuthPending, location.pathname, navigate]);
+  }, [
+    session,
+    isAuthPending,
+    profile,
+    profileLoading,
+    location.pathname,
+    navigate,
+  ]);
 
   if (isAuthPending || (session && profileLoading)) {
     return (

@@ -1,25 +1,18 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Mail, Phone, MapPin, TriangleAlert } from "lucide-react";
-import type { Tables } from "@/integrations/supabase/types";
+import { useProfile } from "@/hooks/useProfile";
+import { useApplyToInternship } from "@/hooks/useInternships";
 
 interface ProfileSummaryDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  internship: Tables<"internships">;
+  internship: any;
   onSuccess: () => void;
-}
-
-interface CompleteProfileData {
-  profile: any;
-  studentProfile: any;
-  // education: any[];
 }
 
 const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
@@ -28,142 +21,67 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
   internship,
   onSuccess,
 }) => {
-  const { user } = useAuth();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [profileData, setProfileData] = useState<CompleteProfileData | null>(
-    null
-  );
+
+  // Fetch profile data using useProfile hook
+  const { data: profileData, isLoading } = useProfile();
+
+  // Use the apply internship hook
+  const { mutate: applyToInternship, isPending: isSubmitting } =
+    useApplyToInternship();
 
   // Checkbox states - first 6 are disabled and checked, last 2 are optional
   const [sections, setSections] = useState({
     personal_details: true,
     profile_summary: true,
     courses: true,
-    key_skills: true,
+    skills: true,
     education: true,
     interests: true,
     projects: false,
     internship: false,
   });
 
-  // Fetch complete profile data
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      if (!user || !isOpen) return;
+  const handleSubmit = () => {
+    if (!profileData || !internship?.id) return;
 
-      setIsLoading(true);
-      try {
-        // Fetch basic profile data
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("user_id", user.id)
-          .single();
+    // Get included sections
+    const includedSections = Object.entries(sections)
+      .filter(([_, checked]) => checked)
+      .map(([section]) => section);
 
-        if (profileError) throw profileError;
-
-        // Fetch student profile data
-        const { data: studentProfile, error: studentError } = await supabase
-          .from("student_profiles")
-          .select("*")
-          .eq("profile_id", profile.id)
-          .maybeSingle();
-
-        if (studentError && studentError.code !== "PGRST116")
-          throw studentError;
-
-        // Fetch education records
-        // const { data: education, error: educationError } = await supabase
-        //   .from("student_education")
-        //   .select("*")
-        //   .eq("profile_id", profile.id)
-        //   .order("end_year", { ascending: false });
-
-        // if (educationError) throw educationError;
-
-        setProfileData({
-          profile,
-          studentProfile: studentProfile || {},
-          // education: education || [],
-        });
-      } catch (error) {
-        console.error("Error fetching profile data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load your profile data. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProfileData();
-  }, [user, isOpen, toast]);
-
-  const handleSubmit = async () => {
-    if (!user || !profileData) return;
-
-    setIsSubmitting(true);
-    try {
-      // Get included sections
-      const includedSections = Object.entries(sections)
-        .filter(([_, checked]) => checked)
-        .map(([section]) => section);
-
-      // Calculate match score (comprehensive)
-      const { calculateComprehensiveMatchScore } = await import(
-        "@/utils/matchScore"
-      );
-      const matchScore = calculateComprehensiveMatchScore(
-        {
-          studentProfile: profileData.studentProfile,
-          // education: profileData.education,
-          internships: internships,
-          profile: profileData.profile,
+    // Apply using the hook
+    applyToInternship(
+      {
+        internshipId: internship.id,
+        data: {
+          includedSections,
         },
-        internship
-      );
-      console.log("Match score calculated (comprehensive):", matchScore);
-
-      // Create application record
-      const applicationData = {
-        student_id: profileData.profile.id, // Use profile.id, not auth user.id
-        internship_id: internship.id,
-        status: "applied" as const,
-        cover_letter: profileData.studentProfile?.cover_letter || "",
-        included_sections: includedSections,
-        profile_match_score: matchScore,
-      };
-
-      const { error } = await supabase
-        .from("applications")
-        .insert(applicationData);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Your application has been submitted successfully!",
-      });
-
-      onSuccess();
-      onClose();
-    } catch (error) {
-      console.error("Error submitting application:", error);
-      toast({
-        title: "Error",
-        description: "Failed to submit your application. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+      },
+      {
+        onSuccess: (response) => {
+          toast({
+            title: "Success",
+            description: "Your application has been submitted successfully!",
+          });
+          onSuccess();
+          onClose();
+        },
+        onError: (error: any) => {
+          console.error("Error submitting application:", error);
+          toast({
+            title: "Error",
+            description:
+              error.message ||
+              "Failed to submit your application. Please try again.",
+            variant: "destructive",
+          });
+        },
+      }
+    );
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
     if (!dateString) return "Not provided";
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
@@ -184,18 +102,12 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
     return Array.isArray(field) ? field : defaultValue;
   };
 
-  const skills = parseJsonField(profileData?.studentProfile?.skills, []);
-  const education = parseJsonField(profileData?.studentProfile?.education, []);
-  const courses = parseJsonField(
-    profileData?.studentProfile?.completed_courses,
-    []
-  );
-  const interests = parseJsonField(profileData?.studentProfile?.interests, []);
-  const projects = parseJsonField(profileData?.studentProfile?.projects, []);
-  const internships = parseJsonField(
-    profileData?.studentProfile?.internships,
-    []
-  );
+  const skills = parseJsonField(profileData?.skills, []);
+  const education = parseJsonField(profileData?.education, []);
+  const courses = parseJsonField(profileData?.course, []);
+  const interests = parseJsonField(profileData?.interests, []);
+  const projects = parseJsonField(profileData?.projects, []);
+  const internships = parseJsonField(profileData?.internship, []);
 
   // Validation: Check if sections are complete
   const sectionValidation = useMemo(() => {
@@ -203,14 +115,13 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
 
     return {
       personal_details: !!(
-        profileData.profile.full_name &&
-        profileData.profile.email &&
-        profileData.profile.phone &&
-        profileData.profile.date_of_birth
+        profileData.name &&
+        profileData.email &&
+        profileData.phone &&
+        profileData.dateOfBirth
       ),
       profile_summary: !!(
-        profileData.studentProfile?.cover_letter &&
-        profileData.studentProfile.cover_letter.length >= 10
+        profileData.profileSummary && profileData.profileSummary.length >= 10
       ),
       courses: courses.length > 0,
       key_skills: skills.length > 0,
@@ -316,7 +227,7 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
               </div>
               <div className="flex items-center gap-3">
                 <Checkbox
-                  checked={sections.key_skills}
+                  checked={sections.skills}
                   disabled
                   className="data-[state=checked]:bg-gray-400 data-[state=checked]:border-gray-400"
                 />
@@ -414,38 +325,38 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
                   {/* Header Card */}
                   <div className="bg-white rounded-[20px] p-[20px] shadow-sm border border-gray-200">
                     <div className="flex items-start gap-4">
-                      <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                        {profileData.profile.full_name
-                          ?.charAt(0)
-                          ?.toUpperCase() || "U"}
+                      <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
+                        {profileData.avatarUrl || profileData.image ? (
+                          <img
+                            src={
+                              profileData.avatarUrl || profileData.image || ""
+                            }
+                            alt={profileData.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          profileData.name?.charAt(0)?.toUpperCase() || "U"
+                        )}
                       </div>
                       <div className="flex-1">
                         <h3 className="text-2xl font-bold text-gray-900 mb-1">
-                          {profileData.profile.full_name || "Not provided"}
+                          {profileData.name || "Not provided"}
                         </h3>
-                        {/* <p className="text-gray-600 mb-3">
-                          {profileData.studentProfile?.bio?.map(
-                            (v) => `${v} ${profileData.studentProfile?.bio[-1] !== v ? "|" : ""} `,
-                          ) || "No bio available"}
-                        </p> */}
                         <p className="text-gray-600 mb-3">
-                          {profileData.studentProfile?.headline ||
-                            "No bio available"}
+                          {profileData.type || "No bio available"}
                         </p>
                         <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                           <div className="flex items-center gap-1">
                             <Mail className="w-4 h-4" />
-                            {profileData.profile.email || "Not provided"}
+                            {profileData.email || "Not provided"}
                           </div>
                           <div className="flex items-center gap-1">
                             <Phone className="w-4 h-4" />
-                            {profileData.profile.phone || "Not provided"}
+                            {profileData.phone || "Not provided"}
                           </div>
                           <div className="flex items-center gap-1">
                             <MapPin className="w-4 h-4" />
-                            {profileData.studentProfile?.location ||
-                              profileData.profile.address ||
-                              "Not provided"}
+                            {profileData.location || "Not provided"}
                           </div>
                         </div>
                       </div>
@@ -462,9 +373,8 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
                         <div>
                           <p className="text-sm text-gray-500 mb-1">Personal</p>
                           <p className="text-gray-900">
-                            {profileData.profile.gender || "Not specified"},{" "}
-                            {profileData.profile.marital_status ||
-                              "Single/ Unmarried"}
+                            {profileData.gender || "Not specified"},{" "}
+                            {profileData.maritalStatus || "Single/ Unmarried"}
                           </p>
                         </div>
                         <div>
@@ -472,9 +382,7 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
                             Graduated
                           </p>
                           <p className="text-gray-900">
-                            {profileData.studentProfile.education?.some(
-                              (edu: any) => !edu.end_year
-                            )
+                            {education?.some((edu: any) => !edu.end_year)
                               ? "No"
                               : "Yes"}
                           </p>
@@ -484,7 +392,7 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
                             Date Of Birth
                           </p>
                           <p className="text-gray-900">
-                            {formatDate(profileData.profile.date_of_birth)}
+                            {formatDate(profileData.dateOfBirth)}
                           </p>
                         </div>
                         <div>
@@ -492,15 +400,13 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
                             Differently Abled
                           </p>
                           <p className="text-gray-900">
-                            {profileData.profile.differently_abled
-                              ? "Yes"
-                              : "No"}
+                            {profileData.isDifferentlyAbled ? "Yes" : "No"}
                           </p>
                         </div>
                         <div className="col-span-2">
                           <p className="text-sm text-gray-500 mb-1">Address</p>
                           <p className="text-gray-900">
-                            {profileData.profile.address || "Not provided"}
+                            {profileData.location || "Not provided"}
                           </p>
                         </div>
                       </div>
@@ -514,7 +420,7 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
                         Profile Summary
                       </h3>
                       <p className="text-gray-700 leading-relaxed">
-                        {profileData.studentProfile?.cover_letter ||
+                        {profileData.profileSummary ||
                           "No profile summary available"}
                       </p>
                     </div>
@@ -547,7 +453,7 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
                   )}
 
                   {/* Key Skills */}
-                  {sections.key_skills && skills.length > 0 && (
+                  {sections.skills && skills.length > 0 && (
                     <div className="bg-white rounded-[20px] p-6 shadow-sm border border-gray-200">
                       <h3 className="text-xl font-bold text-gray-900 mb-4">
                         Key Skills
@@ -574,8 +480,8 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
                         Education
                       </h3>
                       <div className="space-y-4">
-                        {education.map((edu: any) => (
-                          <div key={edu.id}>
+                        {education.map((edu: any, index: number) => (
+                          <div key={edu.id || index}>
                             <h4 className="font-semibold text-gray-900">
                               {edu.degree}
                             </h4>

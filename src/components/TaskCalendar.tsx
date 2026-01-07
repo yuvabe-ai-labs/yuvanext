@@ -10,14 +10,14 @@ import {
   endOfWeek,
   startOfDay,
 } from "date-fns";
-import type { StudentTask } from "@/types/studentTasks.types";
+import type { Task } from "@/types/candidateTasks.types";
 
 interface TaskCalendarProps {
-  tasks: StudentTask[];
+  tasks: Task[];
   currentDate: Date;
   onDateChange: (date: Date) => void;
   viewMode: "month" | "week";
-  onTaskClick: (task: StudentTask) => void;
+  onTaskClick: (task: Task) => void;
   onAddTaskClick: () => void;
   hideAddButton?: boolean;
 }
@@ -67,10 +67,10 @@ export default function TaskCalendar({
     }
 
     return tasks.filter((task) => {
-      if (!task.start_date || !task.end_date) return false;
+      if (!task.startDate || !task.endDate) return false;
 
-      const taskStart = startOfDay(new Date(task.start_date));
-      const taskEnd = startOfDay(new Date(task.end_date));
+      const taskStart = startOfDay(new Date(task.startDate));
+      const taskEnd = startOfDay(new Date(task.endDate));
       const dayToCheck = startOfDay(day);
 
       return (
@@ -92,15 +92,11 @@ export default function TaskCalendar({
     }
   };
 
-  const renderTaskBar = (
-    task: StudentTask,
-    day: Date,
-    dayTasks: StudentTask[]
-  ) => {
-    if (!task.start_date || !task.end_date) return null;
+  const renderTaskBar = (task: Task, day: Date, dayTasks: Task[]) => {
+    if (!task.startDate || !task.endDate) return null;
 
-    const taskStart = startOfDay(new Date(task.start_date));
-    const taskEnd = startOfDay(new Date(task.end_date));
+    const taskStart = startOfDay(new Date(task.startDate));
+    const taskEnd = startOfDay(new Date(task.endDate));
     const currentDay = startOfDay(day);
 
     const isStartDay = currentDay.getTime() === taskStart.getTime();
@@ -113,29 +109,28 @@ export default function TaskCalendar({
 
     const taskIndex = dayTasks.findIndex((t) => t.id === task.id);
 
-    // Calculate positioning based on time (kept for layout)
+    // Calculate positioning based on time
     let leftOffset = 0;
     let rightOffset = 0;
     let borderRadius = "";
 
     if (isStartDay && isEndDay) {
-      leftOffset = timeToPercentage(task.start_time);
-      rightOffset = 100 - timeToPercentage(task.end_time);
+      leftOffset = timeToPercentage(task.startTime);
+      rightOffset = 100 - timeToPercentage(task.endTime);
       borderRadius = "rounded-full";
     } else if (isStartDay) {
-      leftOffset = timeToPercentage(task.start_time);
+      leftOffset = timeToPercentage(task.startTime);
       rightOffset = 0;
       borderRadius = "rounded-l-full";
     } else if (isEndDay) {
       leftOffset = 0;
-      rightOffset = 100 - timeToPercentage(task.end_time);
+      rightOffset = 100 - timeToPercentage(task.endTime);
       borderRadius = "rounded-r-full";
     } else {
       leftOffset = 0;
       rightOffset = 0;
     }
 
-    // Tooltip only shows task title now
     return (
       <div
         key={task.id}

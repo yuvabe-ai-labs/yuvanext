@@ -8,7 +8,7 @@ import {
 import type {
   CreateTaskInput,
   UpdateTaskInput,
-} from "@/types/studentTasks.types";
+} from "@/types/candidateTasks.types";
 
 export const useStudentTasks = (applicationId: string | undefined) => {
   return useQuery({

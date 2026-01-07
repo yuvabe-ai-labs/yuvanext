@@ -9,24 +9,42 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus } from "lucide-react";
-import { StudentProfile } from "@/types/profile";
+import { X } from "lucide-react";
+import { useUpdateProfile } from "@/hooks/useProfile";
+import { useToast } from "@/hooks/use-toast";
+import { Profile } from "@/types/profiles.types";
 
 interface SkillsDialogProps {
-  studentProfile: StudentProfile | null;
-  onUpdate: (updates: Partial<StudentProfile>) => Promise<void>;
+  profile: Profile | null | undefined;
+  onUpdate?: () => void;
   children: React.ReactNode;
 }
 
 export const SkillsDialog = ({
-  studentProfile,
+  profile,
   onUpdate,
   children,
 }: SkillsDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [skills, setSkills] = useState<string[]>(studentProfile?.skills || []);
+  const { toast } = useToast();
+  const { mutateAsync: updateProfile, isPending } = useUpdateProfile();
+
+  const parseJsonField = (field: any, defaultValue: any = []) => {
+    if (!field) return defaultValue;
+    if (typeof field === "string") {
+      try {
+        return JSON.parse(field);
+      } catch {
+        return defaultValue;
+      }
+    }
+    return Array.isArray(field) ? field : defaultValue;
+  };
+
+  const [skills, setSkills] = useState<string[]>(
+    parseJsonField(profile?.skills, [])
+  );
   const [newSkill, setNewSkill] = useState("");
-  const [loading, setLoading] = useState(false);
 
   const addSkill = () => {
     if (newSkill.trim() && !skills.includes(newSkill.trim())) {
@@ -40,14 +58,26 @@ export const SkillsDialog = ({
   };
 
   const handleSave = async () => {
-    setLoading(true);
     try {
-      await onUpdate({ skills });
+      await updateProfile({ skills });
+
+      toast({
+        title: "Success",
+        description: "Skills updated successfully",
+      });
+
       setOpen(false);
+
+      if (onUpdate) {
+        onUpdate();
+      }
     } catch (error) {
       console.error("Error updating skills:", error);
-    } finally {
-      setLoading(false);
+      toast({
+        title: "Error",
+        description: "Failed to update skills",
+        variant: "destructive",
+      });
     }
   };
 
@@ -72,10 +102,10 @@ export const SkillsDialog = ({
               value={newSkill}
               onChange={(e) => setNewSkill(e.target.value)}
               onKeyPress={handleKeyPress}
-              className="rounded-full "
+              className="rounded-full"
             />
 
-            <Button type="button" onClick={addSkill} className="rounded-full ">
+            <Button type="button" onClick={addSkill} className="rounded-full">
               Add
             </Button>
           </div>
@@ -108,10 +138,10 @@ export const SkillsDialog = ({
             </Button>
             <Button
               onClick={handleSave}
-              disabled={loading}
+              disabled={isPending}
               className="rounded-full"
             >
-              {loading ? "Saving..." : "Save Changes"}
+              {isPending ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </div>

@@ -1,5 +1,11 @@
 import React from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +13,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { CourseEntry } from "@/types/profile";
+import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
 
 const courseSchema = z.object({
   title: z.string().min(1, "Course title is required"),
@@ -18,20 +24,32 @@ const courseSchema = z.object({
 
 type CourseFormData = z.infer<typeof courseSchema>;
 
+interface CourseEntry {
+  title: string;
+  provider: string;
+  completion_date: string;
+  certificate_url?: string | null;
+}
+
 interface CourseDialogProps {
   children: React.ReactNode;
   course?: CourseEntry;
-  onSave: (course: Omit<CourseEntry, "id">) => Promise<void>;
 }
 
-export const CourseDialog: React.FC<CourseDialogProps> = ({ children, course, onSave }) => {
+export const CourseDialog: React.FC<CourseDialogProps> = ({
+  children,
+  course,
+}) => {
   const [open, setOpen] = React.useState(false);
   const { toast } = useToast();
+  const { data: profileData } = useProfile();
+  const { mutateAsync: updateProfile } = useUpdateProfile();
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    reset,
   } = useForm<CourseFormData>({
     resolver: zodResolver(courseSchema),
     defaultValues: {
@@ -42,20 +60,46 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({ children, course, on
     },
   });
 
+  const parseJsonField = (field: any, defaultValue: any = []) => {
+    if (!field) return defaultValue;
+    if (typeof field === "string") {
+      try {
+        return JSON.parse(field);
+      } catch {
+        return defaultValue;
+      }
+    }
+    return Array.isArray(field) ? field : defaultValue;
+  };
+
   const onSubmit = async (data: CourseFormData) => {
     try {
-      await onSave({
-        title: data.title!,
-        provider: data.provider!,
-        completion_date: data.completion_date!,
-        certificate_url: data.certificate_url || null,
-      } as Omit<CourseEntry, "id">);
+      const existingCourses = parseJsonField(profileData?.course, []);
+
+      let updatedCourses;
+      if (course) {
+        // Update existing course
+        updatedCourses = existingCourses.map((c: CourseEntry) =>
+          c.title === course.title && c.provider === course.provider ? data : c
+        );
+      } else {
+        // Add new course
+        updatedCourses = [...existingCourses, data];
+      }
+
+      await updateProfile({
+        course: updatedCourses,
+      });
+
       toast({
         title: "Success",
         description: `Course ${course ? "updated" : "added"} successfully`,
       });
+
       setOpen(false);
+      reset();
     } catch (error) {
+      console.error("Error saving course:", error);
       toast({
         title: "Error",
         description: "Failed to save course",
@@ -69,7 +113,9 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({ children, course, on
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{course ? "Edit Course" : "Add Completed Course"}</DialogTitle>
+          <DialogTitle>
+            {course ? "Edit Course" : "Add Completed Course"}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
@@ -80,7 +126,11 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({ children, course, on
               placeholder="e.g. React Development Course"
               className="rounded-full"
             />
-            {errors.title && <p className="text-sm text-destructive mt-1">{errors.title.message}</p>}
+            {errors.title && (
+              <p className="text-sm text-destructive mt-1">
+                {errors.title.message}
+              </p>
+            )}
           </div>
 
           <div>
@@ -91,14 +141,25 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({ children, course, on
               placeholder="e.g. Coursera, Udemy, University"
               className="rounded-full"
             />
-            {errors.provider && <p className="text-sm text-destructive mt-1">{errors.provider.message}</p>}
+            {errors.provider && (
+              <p className="text-sm text-destructive mt-1">
+                {errors.provider.message}
+              </p>
+            )}
           </div>
 
           <div>
             <Label htmlFor="completion_date">Completion Date *</Label>
-            <Input id="completion_date" type="date" {...register("completion_date")} className="rounded-full" />
+            <Input
+              id="completion_date"
+              type="date"
+              {...register("completion_date")}
+              className="rounded-full"
+            />
             {errors.completion_date && (
-              <p className="text-sm text-destructive mt-1">{errors.completion_date.message}</p>
+              <p className="text-sm text-destructive mt-1">
+                {errors.completion_date.message}
+              </p>
             )}
           </div>
 
@@ -112,15 +173,26 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({ children, course, on
               className="rounded-full"
             />
             {errors.certificate_url && (
-              <p className="text-sm text-destructive mt-1">{errors.certificate_url.message}</p>
+              <p className="text-sm text-destructive mt-1">
+                {errors.certificate_url.message}
+              </p>
             )}
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="rounded-full">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              className="rounded-full"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="rounded-full">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-full"
+            >
               {isSubmitting ? "Saving..." : course ? "Update" : "Add"}
             </Button>
           </div>

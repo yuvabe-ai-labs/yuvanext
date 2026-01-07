@@ -4,7 +4,7 @@ import type {
   CreateTaskInput,
   UpdateTaskInput,
   StudentTasksResponse,
-} from "@/types/studentTasks.types";
+} from "@/types/candidateTasks.types";
 
 export const getStudentTasks = async (
   applicationId: string

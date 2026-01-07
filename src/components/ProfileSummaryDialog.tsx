@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Mail, Phone, MapPin, TriangleAlert } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
-import axiosInstance from "@/config/platform-api";
+import { useApplyToInternship } from "@/hooks/useInternships";
 
 interface ProfileSummaryDialogProps {
   isOpen: boolean;
@@ -22,66 +22,63 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
   onSuccess,
 }) => {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch profile data using useProfile hook
   const { data: profileData, isLoading } = useProfile();
+
+  // Use the apply internship hook
+  const { mutate: applyToInternship, isPending: isSubmitting } =
+    useApplyToInternship();
 
   // Checkbox states - first 6 are disabled and checked, last 2 are optional
   const [sections, setSections] = useState({
     personal_details: true,
     profile_summary: true,
     courses: true,
-    key_skills: true,
+    skills: true,
     education: true,
     interests: true,
     projects: false,
     internship: false,
   });
 
-  const handleSubmit = async () => {
-    if (!profileData) return;
+  const handleSubmit = () => {
+    if (!profileData || !internship?.id) return;
 
-    setIsSubmitting(true);
-    try {
-      // Get included sections
-      const includedSections = Object.entries(sections)
-        .filter(([_, checked]) => checked)
-        .map(([section]) => section);
+    // Get included sections
+    const includedSections = Object.entries(sections)
+      .filter(([_, checked]) => checked)
+      .map(([section]) => section);
 
-      // Create application record
-      const applicationData = {
-        internship_id: internship.id,
-        status: "applied" as const,
-        included_sections: includedSections,
-      };
-
-      const response = await axiosInstance.post(
-        "/candidate/internship/apply",
-        applicationData
-      );
-
-      if (response.status !== 200 && response.status !== 201) {
-        throw new Error("Failed to submit application");
+    // Apply using the hook
+    applyToInternship(
+      {
+        internshipId: internship.id,
+        data: {
+          includedSections,
+        },
+      },
+      {
+        onSuccess: (response) => {
+          toast({
+            title: "Success",
+            description: "Your application has been submitted successfully!",
+          });
+          onSuccess();
+          onClose();
+        },
+        onError: (error: any) => {
+          console.error("Error submitting application:", error);
+          toast({
+            title: "Error",
+            description:
+              error.message ||
+              "Failed to submit your application. Please try again.",
+            variant: "destructive",
+          });
+        },
       }
-
-      toast({
-        title: "Success",
-        description: "Your application has been submitted successfully!",
-      });
-
-      onSuccess();
-      onClose();
-    } catch (error) {
-      console.error("Error submitting application:", error);
-      toast({
-        title: "Error",
-        description: "Failed to submit your application. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    );
   };
 
   const formatDate = (dateString: string | null) => {
@@ -230,7 +227,7 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
               </div>
               <div className="flex items-center gap-3">
                 <Checkbox
-                  checked={sections.key_skills}
+                  checked={sections.skills}
                   disabled
                   className="data-[state=checked]:bg-gray-400 data-[state=checked]:border-gray-400"
                 />
@@ -456,7 +453,7 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
                   )}
 
                   {/* Key Skills */}
-                  {sections.key_skills && skills.length > 0 && (
+                  {sections.skills && skills.length > 0 && (
                     <div className="bg-white rounded-[20px] p-6 shadow-sm border border-gray-200">
                       <h3 className="text-xl font-bold text-gray-900 mb-4">
                         Key Skills

@@ -14,6 +14,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import AIIcon from "../ui/custom-icons";
+import { useUpdateProfile } from "@/hooks/useProfile";
 
 const summarySchema = z.object({
   cover_letter: z
@@ -27,7 +28,7 @@ type SummaryFormData = z.infer<typeof summarySchema>;
 interface ProfileSummaryDialogProps {
   children: React.ReactNode;
   summary: string;
-  onSave: (summary: string) => Promise<void>;
+  onSave?: () => void;
 }
 
 export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
@@ -39,6 +40,7 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [generatedText, setGeneratedText] = React.useState("");
   const { toast } = useToast();
+  const { mutateAsync: updateProfile } = useUpdateProfile();
 
   const {
     register,
@@ -83,7 +85,6 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
 
       if (error) throw error;
 
-      // 🧠 Fix: handle different possible return formats
       const enhancedText =
         data?.response ||
         data?.text ||
@@ -117,13 +118,25 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
   const onSubmit = async (data: SummaryFormData) => {
     try {
       const textToSave = generatedText || data.cover_letter;
-      await onSave(textToSave);
+
+      // Use updateProfile mutation
+      await updateProfile({
+        profileSummary: textToSave,
+      });
+
       toast({
         title: "Success",
         description: "Profile summary updated successfully",
       });
+
       setOpen(false);
+
+      // Call optional callback
+      if (onSave) {
+        onSave();
+      }
     } catch (error) {
+      console.error("Error updating profile summary:", error);
       toast({
         title: "Error",
         description: "Failed to update profile summary",
@@ -159,7 +172,6 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
               />
             </div>
 
-            {/* Create Button  */}
             <Button
               type="button"
               variant="outline"

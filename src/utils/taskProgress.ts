@@ -1,4 +1,4 @@
-import { StudentTask } from "@/types/studentTasks.types";
+import { StudentTask } from "@/types/candidateTasks.types";
 
 export const calculateOverallTaskProgress = (tasks: StudentTask[]): number => {
   if (tasks.length === 0) return 0;

@@ -6,7 +6,7 @@ import Navbar from "@/components/Navbar";
 import { useStudentTasks } from "@/hooks/useStudentTasks";
 import TaskCalendar from "@/components/TaskCalendar";
 import ViewTaskModal from "@/components/ViewTaskModal";
-import type { StudentTask } from "@/types/studentTasks.types";
+import type { StudentTask } from "@/types/candidateTasks.types";
 import { Badge } from "@/components/ui/badge";
 import CandidateInfoCard from "@/components/CandidateInfoCard";
 

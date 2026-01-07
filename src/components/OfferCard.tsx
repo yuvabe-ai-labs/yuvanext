@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import type { AppliedInternshipStatus } from "@/types/internships.types";
 import { CandidateDecision } from "@/types/internships.types";
 import { useStudentTasks } from "@/hooks/useStudentTasks";
+import { useUpdateCandidateDecision } from "@/hooks/useInternships";
 import { calculateOverallTaskProgress } from "@/utils/taskProgress";
 import { useState } from "react";
 
@@ -14,6 +15,7 @@ interface OfferCardProps {
 export default function OfferCard({ application }: OfferCardProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const navigate = useNavigate();
+  const updateDecision = useUpdateCandidateDecision();
 
   const { data: tasksData } = useStudentTasks(application.id);
   const tasks = tasksData?.data || [];
@@ -23,15 +25,15 @@ export default function OfferCard({ application }: OfferCardProps) {
     ? format(new Date(application.createdAt), "MMM dd, yyyy")
     : "Unknown";
 
-  const handleDecision = async (decision: "accept" | "reject") => {
+  const handleDecision = async (
+    decision: CandidateDecision.ACCEPT | CandidateDecision.REJECT
+  ) => {
     setIsProcessing(true);
     try {
-      // TODO: Implement API call to update candidate decision
-      // await updateDecision.mutateAsync({
-      //   applicationId: application.id,
-      //   decision,
-      // });
-      console.log("Update decision:", decision);
+      await updateDecision.mutateAsync({
+        applicationId: application.id,
+        decision,
+      });
     } catch (error) {
       console.error("Error updating decision:", error);
     } finally {
@@ -155,7 +157,7 @@ export default function OfferCard({ application }: OfferCardProps) {
       {isPending && (
         <div className="flex justify-end gap-3 mt-3">
           <button
-            onClick={() => handleDecision("reject")}
+            onClick={() => handleDecision(CandidateDecision.REJECT)}
             disabled={isProcessing}
             className="px-4 py-2 border-[1.5px] border-red-500 text-red-600 text-sm font-medium rounded-full hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -163,7 +165,7 @@ export default function OfferCard({ application }: OfferCardProps) {
           </button>
 
           <button
-            onClick={() => handleDecision("accept")}
+            onClick={() => handleDecision(CandidateDecision.ACCEPT)}
             disabled={isProcessing}
             className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >

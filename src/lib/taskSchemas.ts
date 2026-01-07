@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { TaskStatus } from "@/types/studentTasks.types";
+import type { TaskStatus } from "@/types/candidateTasks.types";
 
 // Add Task Schema
 export const addTaskSchema = z

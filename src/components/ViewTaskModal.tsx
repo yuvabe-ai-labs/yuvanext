@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useUpdateStudentTask } from "@/hooks/useStudentTasks";
-import type { StudentTask } from "@/types/studentTasks.types";
+import type { StudentTask } from "@/types/candidateTasks.types";
 import { viewTaskSchema, type ViewTaskFormData } from "@/lib/taskSchemas";
 import { toast } from "sonner";
 

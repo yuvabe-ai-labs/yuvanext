@@ -51,7 +51,7 @@ const ProfileSidebar = ({ savedCount = 0 }: ProfileSidebarProps) => {
               <h3 className="font-semibold text-lg text-gray-900">
                 {profile?.name}
               </h3>
-              <p className="text-sm text-gray-500">{profile?.role}</p>
+              <p className="text-sm text-gray-500">{profile?.type}</p>
             </div>
 
             <Button

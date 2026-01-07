@@ -7,7 +7,10 @@ export const handleApiResponse = <T>(
   response: AxiosResponse<BaseApiResponse<T>>,
   defaultValue: T
 ): T => {
-  if (response.data.status_code === 200) {
+  // Check for any 2xx success status code
+  const statusCode = response.data.status_code ?? response.status;
+
+  if (statusCode >= 200 && statusCode < 300) {
     return response.data.data ?? defaultValue;
   } else {
     throw new Error(response.data.message || "API request failed");

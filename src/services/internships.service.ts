@@ -5,6 +5,9 @@ import type {
   AppliedInternships,
   SavedAndAppliedCount,
   AppliedInternshipStatus,
+  CandidateDecision,
+  ApiMessageResponse,
+  ApplyInternshipRequest,
 } from "@/types/internships.types";
 import { handleApiResponse, handleApiError } from "@/lib/api-handler";
 
@@ -32,33 +35,33 @@ export const getInternshipById = async (id: string): Promise<Internship> => {
 
 // Get recommended internships
 
-// export const getRemommendedInternships = async (): Promise<Internship[]> => {
-//   try {
-//     const response = await axiosInstance.get("/internships/recommended");
-//     return handleApiResponse<Internship[]>(response, []);
-//   } catch (error) {
-//     return handleApiError(error, "Failed to fetch recommended internships");
-//   }
-// };
-
 export const getRemommendedInternships = async (): Promise<Internship[]> => {
   try {
     const response = await axiosInstance.get("/internships/recommended");
-
-    // Handle the nested structure: data.data.internships
-    const apiData = response.data;
-
-    // If the response has the expected structure
-    if (apiData?.data?.internships && Array.isArray(apiData.data.internships)) {
-      return apiData.data.internships;
-    }
-
-    // Fallback to handleApiResponse for other structures
     return handleApiResponse<Internship[]>(response, []);
   } catch (error) {
     return handleApiError(error, "Failed to fetch recommended internships");
   }
 };
+
+// export const getRemommendedInternships = async (): Promise<Internship[]> => {
+//   try {
+//     const response = await axiosInstance.get("/internships/recommended");
+
+//     // Handle the nested structure: data.data.internships
+//     const apiData = response.data;
+
+//     // If the response has the expected structure
+//     if (apiData?.data?.internships && Array.isArray(apiData.data.internships)) {
+//       return apiData.data.internships;
+//     }
+
+//     // Fallback to handleApiResponse for other structures
+//     return handleApiResponse<Internship[]>(response, []);
+//   } catch (error) {
+//     return handleApiError(error, "Failed to fetch recommended internships");
+//   }
+// };
 
 // Get Saved internships
 
@@ -102,13 +105,16 @@ export const getSaveAndAppliedCount =
 // Save internship
 export const saveInternship = async (
   internshipId: string
-): Promise<boolean> => {
+): Promise<ApiMessageResponse> => {
   try {
     const response = await axiosInstance.post(
       `/candidate/internship/${internshipId}/save`
     );
 
-    return handleApiResponse<boolean>(response, false);
+    return handleApiResponse<ApiMessageResponse>(
+      response,
+      {} as ApiMessageResponse
+    );
   } catch (error) {
     return handleApiError(error, "Failed to save internship");
   }
@@ -117,13 +123,16 @@ export const saveInternship = async (
 // Remove saved internship
 export const removeSavedInternship = async (
   internshipId: string
-): Promise<boolean> => {
+): Promise<ApiMessageResponse> => {
   try {
     const response = await axiosInstance.delete(
       `/candidate/internship/${internshipId}/save`
     );
 
-    return handleApiResponse<boolean>(response, false);
+    return handleApiResponse<ApiMessageResponse>(
+      response,
+      {} as ApiMessageResponse
+    );
   } catch (error) {
     return handleApiError(error, "Failed to remove saved internship");
   }
@@ -161,16 +170,39 @@ export const getAppliedInternshipStatus =
     }
   };
 
-export const updateOfferDecision = async (
-  applicationId: string
-): Promise<string> => {
+// Update candidate decision (accept / reject / pending)
+export const updateCandidateDecision = async (
+  applicationId: string,
+  decision: CandidateDecision
+): Promise<boolean> => {
   try {
     const response = await axiosInstance.post(
-      `/candidate/internship/application/${applicationId}/accept-offer`
+      `/candidate/internship/application/${applicationId}/accept-offer`,
+      { decision }
     );
 
-    return handleApiResponse<string>(response, "");
+    return handleApiResponse<boolean>(response, false);
   } catch (error) {
-    return handleApiError(error, "Failed to generate share link");
+    return handleApiError(error, "Failed to update candidate decision");
+  }
+};
+
+// Apply to an internship
+export const applyToInternship = async (
+  internshipId: string,
+  data: ApplyInternshipRequest
+): Promise<ApplyInternshipRequest> => {
+  try {
+    const response = await axiosInstance.post(
+      `/candidate/internship/${internshipId}/apply`,
+      data
+    );
+
+    return handleApiResponse<ApplyInternshipRequest>(
+      response,
+      {} as ApplyInternshipRequest
+    );
+  } catch (error) {
+    return handleApiError(error, "Failed to apply to internship");
   }
 };

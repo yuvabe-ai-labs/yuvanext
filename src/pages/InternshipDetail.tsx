@@ -1,13 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   MapPin,
   Clock,
-  DollarSign,
   Bookmark,
   Share2,
   CircleCheckBig,
@@ -15,19 +13,16 @@ import {
   IndianRupee,
 } from "lucide-react";
 import { ShareDialog } from "@/components/ShareDialog";
-import Navbar from "@/components/Navbar";
 import ProfileSummaryDialog from "@/components/ProfileSummaryDialog";
 import ApplicationSuccessDialog from "@/components/ApplicationSuccessDialog";
 import { useSession } from "@/lib/auth-client";
-import { useIsSaved } from "@/hooks/useSavedInternships";
+import { useInternshipStatus } from "@/hooks/useSavedInternships";
 import {
   useInternshipById,
   useSaveInternship,
   useRemoveSavedInternship,
-  useAppliedInternshipStatus,
 } from "@/hooks/useInternships";
 import { useToast } from "@/hooks/use-toast";
-import { PayIcon } from "@/components/ui/custom-icons";
 
 const InternshipDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -38,30 +33,24 @@ const InternshipDetail = () => {
   // Fetch internship data
   const { data: internship, isLoading, error } = useInternshipById(id || "");
 
+  // Get saved and applied status for this internship
+  const {
+    isSaved,
+    isApplied,
+    applicationData,
+    isLoading: isCheckingStatus,
+    refetchSaved,
+    refetchApplied,
+  } = useInternshipStatus(id || "");
+
   // Mutations for save/unsave
   const { mutate: saveInternship, isPending: isSaving } = useSaveInternship();
   const { mutate: removeSavedInternship, isPending: isRemoving } =
     useRemoveSavedInternship();
 
-  // Get applied internship status
-  const {
-    data: appliedStatus,
-    isLoading: isLoadingStatus,
-    refetch: refetchAppliedStatus,
-  } = useAppliedInternshipStatus();
-
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [showApplicationDialog, setShowApplicationDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
-
-  // Check if the current internship has been applied to
-  const hasApplied = appliedStatus?.id === id;
-
-  const {
-    isSaved,
-    isLoading: isCheckingSaved,
-    refetch: refetchSaved,
-  } = useIsSaved(id || "");
 
   const savingInternship = isSaving || isRemoving;
 
@@ -117,14 +106,13 @@ const InternshipDetail = () => {
   };
 
   const handleApplicationSuccess = () => {
-    refetchAppliedStatus();
+    refetchApplied();
     setShowSuccessDialog(true);
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        {/* <Navbar /> */}
         <div className="max-w-5xl mx-auto px-6 py-8">
           <Skeleton className="h-12 w-64 mb-4" />
           <Skeleton className="h-96 w-full rounded-2xl" />
@@ -136,7 +124,6 @@ const InternshipDetail = () => {
   if (error || !internship) {
     return (
       <div className="min-h-screen bg-background">
-        {/* <Navbar /> */}
         <div className="max-w-5xl mx-auto px-6 py-8 text-center">
           <h1 className="text-2xl font-bold mb-4">Internship Not Found</h1>
           <p className="text-muted-foreground mb-6">
@@ -160,8 +147,6 @@ const InternshipDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* <Navbar /> */}
-
       {/* Main Content */}
       <div className="container px-4 py-4 md:px-8 lg:px-[7.5rem] lg:py-10 overflow-hidden">
         {/* Mobile Header */}
@@ -175,7 +160,7 @@ const InternshipDetail = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={handleSaveInternship}
-              disabled={savingInternship || isCheckingSaved}
+              disabled={savingInternship || isCheckingStatus}
               className="p-2"
             >
               <Bookmark
@@ -192,17 +177,17 @@ const InternshipDetail = () => {
             <Button
               variant="gradient"
               className="rounded-full text-white"
-              disabled={hasApplied || isLoadingStatus}
+              disabled={isApplied || isCheckingStatus}
               onClick={() => setShowApplicationDialog(true)}
             >
-              {hasApplied ? "Applied" : "Apply Now"}
+              {isApplied ? "Applied" : "Apply Now"}
             </Button>
           </div>
         </div>
 
-        <div className="space-y-8 rounded-3xl  border-0 md:border md:border-gray-200 p-2 md:p-10 lg:p-14">
+        <div className="space-y-8 rounded-3xl border-0 md:border md:border-gray-200 p-2 md:p-10 lg:p-14">
           {/* Header Card */}
-          <Card className="mb-6  border-0 first-line:shadow-none">
+          <Card className="mb-6 border-0 first-line:shadow-none">
             <CardContent className="border-0 p-0">
               <div className="flex lg:hidden flex-col gap-4 pb-7 border-b border-gray-200">
                 {/* Avatar + title + company */}
@@ -294,7 +279,7 @@ const InternshipDetail = () => {
                       unit?.avatarUrl
                         ? "bg-transparent border border-gray-200"
                         : "bg-gradient-to-br from-teal-400 to-teal-600"
-                    } w-[6.25rem] h-[6.25rem] rounded-full  flex items-center justify-center flex-shrink-0`}
+                    } w-[6.25rem] h-[6.25rem] rounded-full flex items-center justify-center flex-shrink-0`}
                   >
                     <span className="text-3xl text-white font-bold">
                       {unit?.avatarUrl ? (
@@ -376,7 +361,7 @@ const InternshipDetail = () => {
                         : "text-gray-600 bg-white"
                     }`}
                     onClick={handleSaveInternship}
-                    disabled={savingInternship || isCheckingSaved}
+                    disabled={savingInternship || isCheckingStatus}
                   >
                     <Bookmark
                       className={`w-4 h-4 ${isSaved ? "fill-current" : ""}`}
@@ -394,15 +379,39 @@ const InternshipDetail = () => {
                   <Button
                     variant="gradient"
                     className="rounded-full text-white"
-                    disabled={hasApplied || isLoadingStatus}
+                    disabled={isApplied || isCheckingStatus}
                     onClick={() => setShowApplicationDialog(true)}
                   >
-                    {hasApplied ? "Applied" : "Apply Now"}
+                    {isApplied ? "Applied" : "Apply Now"}
                   </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Status Banner - Shows if saved or applied */}
+          {(isSaved || isApplied) && (
+            <div className="flex gap-2 mb-4">
+              {isSaved && (
+                <div className="px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg flex items-center gap-2">
+                  <Bookmark className="w-4 h-4 text-teal-600 fill-teal-600" />
+                  <span className="text-sm font-medium text-teal-700">
+                    Saved
+                  </span>
+                </div>
+              )}
+              {isApplied && applicationData && (
+                <div className="px-4 py-2 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                  <CircleCheckBig className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-700">
+                    Applied on{" "}
+                    {new Date(applicationData.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* About the Internship */}
           <div className="lg:hidden border-b border-gray-200 pb-7">
             {unit?.description && (
@@ -416,7 +425,7 @@ const InternshipDetail = () => {
                 <div className="py-4">
                   <Button
                     variant="gradient"
-                    className="border-none  bg-orange-500 hover:bg-orange-600 text-white rounded-full px-8"
+                    className="border-none bg-orange-500 hover:bg-orange-600 text-white rounded-full px-8"
                     onClick={() => {
                       if (unit.userId) {
                         navigate(`/units/${unit.userId}`);
@@ -435,6 +444,7 @@ const InternshipDetail = () => {
               </section>
             )}
           </div>
+
           <section className="border-b border-gray-200 pb-7">
             <h2 className="text-xl font-medium mb-4">About the Internship</h2>
             <p className="text-muted-foreground leading-relaxed text-justify">
@@ -524,11 +534,11 @@ const InternshipDetail = () => {
                   {/* Button */}
                   <Button
                     variant="gradient"
-                    className="text-white rounded-full "
-                    disabled={hasApplied || isLoadingStatus}
+                    className="text-white rounded-full"
+                    disabled={isApplied || isCheckingStatus}
                     onClick={() => setShowApplicationDialog(true)}
                   >
-                    {hasApplied ? "Applied" : "Apply Now"}
+                    {isApplied ? "Applied" : "Apply Now"}
                   </Button>
                 </div>
               </CardContent>
@@ -546,7 +556,7 @@ const InternshipDetail = () => {
                     unit?.avatarUrl
                       ? "bg-transparent border border-gray-200"
                       : "bg-gradient-to-br from-teal-400 to-teal-600"
-                  } w-[6.25rem] h-[6.25rem] rounded-full  flex items-center justify-center flex-shrink-0`}
+                  } w-[6.25rem] h-[6.25rem] rounded-full flex items-center justify-center flex-shrink-0`}
                 >
                   <span className="text-3xl text-white font-bold">
                     {unit?.avatarUrl ? (

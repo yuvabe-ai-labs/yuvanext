@@ -35,6 +35,14 @@ export enum InternshipApplicationStatus {
   HIRED = "hired",
 }
 
+export interface ApiMessageResponse {
+  message: string;
+}
+
+export interface ApplyInternshipRequest {
+  includedSections: string[];
+}
+
 export interface CreatedBy {
   userId: string;
   name: string;

@@ -158,9 +158,14 @@ const UnitDashboard = () => {
   // A. Applications & Stats (Unified hook we built)
   const { data: applications, isLoading: dashboardLoading } =
     useUnitApplications();
+  console.log("applications");
+  console.log(applications);
+
   const { data: stats, isLoading: statsLoading } = useUnitStats();
   // B. Internships List
   const { internships, loading: internshipsLoading } = useInternships();
+  console.log("internships");
+  console.log(internships);
 
   // Helper hook for updating status (avoiding manual axios calls)
   const updateInternshipMutation = useUpdateInternship();
@@ -241,6 +246,9 @@ const UnitDashboard = () => {
       if (filterStatuses.length === 0) return true;
       return filterStatuses.includes(status);
     }) || [];
+
+  console.log("filteredApplications");
+  console.log(filteredApplications);
 
   const filteredHiredCandidates =
     hiredCandidates?.filter((candidate: any) => {
@@ -655,6 +663,9 @@ const UnitDashboard = () => {
                 {filteredApplications.slice(0, 9).map((appData: any) => {
                   const appStatus = appData.application?.status;
                   const appId = appData.application?.id;
+                  console.log("-------------------");
+                  console.log(appId);
+
                   const candidate = appData.candidate || {};
                   const internship = appData.internship || {};
                   const skills = safeParse(candidate.skills, []);
@@ -722,9 +733,7 @@ const UnitDashboard = () => {
                           variant="outline"
                           size="lg"
                           className="w-full border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full"
-                          onClick={() =>
-                            navigate(`/candidate/${candidate.userId}`)
-                          }
+                          onClick={() => navigate(`/candidate/${appId}`)}
                         >
                           View Profile
                         </Button>
@@ -769,6 +778,9 @@ const UnitDashboard = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 <Card>
                   <CardContent className="p-6">
+                    <Skeleton className="h-6 w-32 mb-4" />
+                    <Skeleton className="h-6 w-32 mb-4" />
+                    <Skeleton className="h-6 w-32 mb-4" />
                     <Skeleton className="h-6 w-32 mb-4" />
                   </CardContent>
                 </Card>
@@ -858,7 +870,7 @@ const UnitDashboard = () => {
                               Applications:
                             </span>
                             <span className="font-medium">
-                              {/* {applicationCount} Applied */}
+                              {internship.applicationCount} Applied
                             </span>
                           </div>
                           <div className="flex justify-between text-xs sm:text-sm">

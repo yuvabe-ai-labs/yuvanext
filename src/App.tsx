@@ -18,7 +18,7 @@ import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
 // import UnitDashboard from "./pages/UnitDashboard";
-// import Chatbot from "./pages/Chatbot";
+import Chatbot from "./pages/Chatbot";
 import Internships from "./pages/Internships";
 import Courses from "./pages/Courses";
 import Units from "./pages/Units";
@@ -45,52 +45,12 @@ import { useProfile } from "@/hooks/useProfile";
 
 const queryClient = new QueryClient();
 
-// Protected Route component with role-based routing (onboarding redirect removed)
+// Protected Route component - redirects to chatbot by default
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   // 2. CHECK SESSION STATUS
   const { data: session, isPending: isAuthPending } = useSession();
-  const { data: profile, isLoading: profileLoading } = useProfile();
 
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  useEffect(() => {
-    const checkProfileAndRedirect = async () => {
-      // If auth is still loading, do nothing yet
-      if (isAuthPending) return;
-
-      // If no session, the render will handle the redirect to "/"
-      if (!session) {
-        return;
-      }
-
-      // If profile is still loading, wait
-      if (profileLoading) return;
-
-      // If profile is loaded, handle role-based redirects
-      if (profile) {
-        const role = profile?.role;
-
-        // Only handle role-based dashboard redirects
-        if (role === "candidate") {
-          navigate("/dashboard", { replace: true });
-        } else if (role === "unit") {
-          navigate("/unit-dashboard", { replace: true });
-        }
-      }
-    };
-
-    checkProfileAndRedirect();
-  }, [
-    session,
-    isAuthPending,
-    profile,
-    profileLoading,
-    location.pathname,
-    navigate,
-  ]);
-
-  if (isAuthPending || (session && profileLoading)) {
+  if (isAuthPending) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-muted flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -100,6 +60,31 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   // If not authenticated, redirect to Landing
   return session ? <>{children}</> : <Navigate to="/" replace />;
+};
+
+// Auth redirect component - redirects authenticated users to chatbot
+const AuthRedirect = ({ children }: { children: React.ReactNode }) => {
+  const { data: session, isPending: isAuthPending } = useSession();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isAuthPending && session) {
+      // Redirect authenticated users to chatbot
+      navigate("/chatbot", { replace: true });
+    }
+  }, [session, isAuthPending, navigate]);
+
+  if (isAuthPending) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-muted flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // If authenticated, will redirect via useEffect
+  // If not authenticated, show the auth page
+  return !session ? <>{children}</> : null;
 };
 
 const App = () => (
@@ -113,7 +98,7 @@ const App = () => (
         <NuqsAdapter>
           <Routes>
             <Route path="/auth/callback" element={<AuthCallback />} />
-            {/* 
+
             <Route
               path="/chatbot"
               element={
@@ -121,10 +106,24 @@ const App = () => (
                   <Chatbot />
                 </ProtectedRoute>
               }
-            /> */}
+            />
             <Route path="/" element={<Landing />} />
-            <Route path="/auth/:role/signin" element={<SignIn />} />
-            <Route path="/auth/:role/signup" element={<SignUp />} />
+            <Route
+              path="/auth/:role/signin"
+              element={
+                <AuthRedirect>
+                  <SignIn />
+                </AuthRedirect>
+              }
+            />
+            <Route
+              path="/auth/:role/signup"
+              element={
+                <AuthRedirect>
+                  <SignUp />
+                </AuthRedirect>
+              }
+            />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 

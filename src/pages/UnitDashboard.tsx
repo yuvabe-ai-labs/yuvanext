@@ -15,6 +15,7 @@ import {
   Trash2,
   Users,
   ChevronDown,
+  XCircle, // Import XCircle for the Close icon
 } from "lucide-react";
 
 // Components
@@ -76,7 +77,6 @@ import { useStudentTasks } from "@/hooks/useStudentTasks";
 // Utilities
 import { calculateOverallTaskProgress } from "@/utils/taskProgress";
 import axiosInstance from "@/config/platform-api";
-import { log } from "console";
 
 // Helper safe parser
 const safeParse = (data: any, fallback: any) => {
@@ -89,11 +89,7 @@ const safeParse = (data: any, fallback: any) => {
 };
 
 // --- Sub-component: Task Progress ---
-const CandidateTaskProgress = ({
-  applicationId,
-}: {
-  applicationId: string;
-}) => {
+const CandidateTaskProgress = ({ applicationId, startDate, endDate }) => {
   const { data: tasksData } = useStudentTasks(applicationId);
   const tasks = tasksData?.data || [];
   const taskProgress = calculateOverallTaskProgress(tasks);
@@ -117,7 +113,7 @@ const CandidateTaskProgress = ({
     return { startDate, endDate };
   };
 
-  const { startDate, endDate } = getInternshipDates();
+  // const { startDate, endDate } = getInternshipDates();
 
   return (
     <div className="space-y-2">
@@ -158,14 +154,10 @@ const UnitDashboard = () => {
   // A. Applications & Stats (Unified hook we built)
   const { data: applications, isLoading: dashboardLoading } =
     useUnitApplications();
-  console.log("applications");
-  console.log(applications);
 
   const { data: stats, isLoading: statsLoading } = useUnitStats();
   // B. Internships List
   const { internships, loading: internshipsLoading } = useInternships();
-  console.log("internships");
-  console.log(internships);
 
   // Helper hook for updating status (avoiding manual axios calls)
   const updateInternshipMutation = useUpdateInternship();
@@ -205,7 +197,8 @@ const UnitDashboard = () => {
         // Map field: closingDate
         if (!internship.closingDate) return false;
         const deadline = new Date(internship.closingDate);
-        return deadline < now;
+        // Compare properly
+        return deadline.getTime() < now.getTime();
       });
 
       if (expiredInternships.length > 0) {
@@ -247,9 +240,6 @@ const UnitDashboard = () => {
       return filterStatuses.includes(status);
     }) || [];
 
-  console.log("filteredApplications");
-  console.log(filteredApplications);
-
   const filteredHiredCandidates =
     hiredCandidates?.filter((candidate: any) => {
       if (!searchQuery) return true;
@@ -260,9 +250,6 @@ const UnitDashboard = () => {
         internshipTitle.includes(searchQuery.toLowerCase())
       );
     }) || [];
-
-  console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-  console.log(filteredHiredCandidates);
 
   // --- 5. HANDLERS ---
 
@@ -305,11 +292,12 @@ const UnitDashboard = () => {
 
   const handleToggleStatus = async (internship: any) => {
     if (internship.status !== "active") {
-      // Activating requires editing (date check etc)
+      // If currently CLOSED, we want to ACTIVATE it
+      // Activating often requires checking/updating the deadline, so we open the edit dialog
       setActivatingInternship(internship);
       setEditingInternship(internship);
     } else {
-      // Closing is direct
+      // If currently ACTIVE, we want to CLOSE it immediately
       try {
         setUpdating(internship.id);
         // Use our mutation hook for better state management
@@ -663,9 +651,6 @@ const UnitDashboard = () => {
                 {filteredApplications.slice(0, 9).map((appData: any) => {
                   const appStatus = appData.application?.status;
                   const appId = appData.application?.id;
-                  console.log("-------------------");
-                  console.log(appId);
-
                   const candidate = appData.candidate || {};
                   const internship = appData.internship || {};
                   const skills = safeParse(candidate.skills, []);
@@ -845,7 +830,9 @@ const UnitDashboard = () => {
                               >
                                 <Pencil className="w-4 h-4 mr-2" /> Edit JD
                               </DropdownMenuItem>
-                              {internship.status !== "active" && (
+
+                              {/* --- UPDATED LOGIC: Toggle Activate/Close --- */}
+                              {internship.status !== "active" ? (
                                 <DropdownMenuItem
                                   onClick={() => handleToggleStatus(internship)}
                                 >
@@ -854,7 +841,17 @@ const UnitDashboard = () => {
                                     Activate JD
                                   </span>
                                 </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem
+                                  onClick={() => handleToggleStatus(internship)}
+                                >
+                                  <span className="flex items-center text-red-500">
+                                    <XCircle className="w-4 h-4 mr-2" /> Close
+                                    JD
+                                  </span>
+                                </DropdownMenuItem>
                               )}
+
                               <DropdownMenuItem
                                 onClick={() => handleDeleteClick(internship)}
                                 className="text-red-600 focus:text-red-600"
@@ -964,57 +961,56 @@ const UnitDashboard = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filteredHiredCandidates.map((hired: any) => (
+                {filteredHiredCandidates.map((hired: any, i) => (
                   <Card
-                    key={hired.id || hired.application_id}
+                    key={i}
                     className="border border-gray-200 rounded-3xl hover:shadow-lg transition-shadow"
                   >
                     <CardContent className="p-6 space-y-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="text-sm text-gray-600 mb-3">
-                            {hired.internship?.title ||
-                              "Position not specified"}
+                            {hired.internshipName || "Position not specified"}
                           </p>
                           <div className="flex items-center gap-4">
                             <Avatar className="w-20 h-20">
                               <AvatarImage
-                                src={hired.candidate?.avatarUrl || undefined}
-                                alt={hired.candidate?.name || "Candidate"}
+                                src={hired.candidateAvatarUrl || undefined}
+                                alt={hired.applicantName || "Candidate"}
                                 className="object-cover"
                               />
                               <AvatarFallback className="text-lg font-semibold bg-gray-200">
-                                {(hired.candidate?.name || "NA")
+                                {(hired.applicantName || "NA")
                                   .charAt(0)
                                   .toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             <div>
                               <h3 className="text-xl font-bold text-gray-900 mb-1">
-                                {hired.candidate?.name || "Name not available"}
+                                {hired.applicantName || "Name not available"}
                               </h3>
                             </div>
                           </div>
                         </div>
                         <div className="text-right text-sm text-gray-600">
                           <span>
-                            {hired.internship?.duration ||
+                            {hired.internshipDuration ||
                               "Duration not specified"}{" "}
-                            | {formatJobType(hired.internship?.type || "")}
+                            | {formatJobType(hired.internshipJobType || "")}
                           </span>
                         </div>
                       </div>
                       <CandidateTaskProgress
-                        applicationId={hired.id || hired.application_id}
+                        applicationId={hired.id || hired.applicationId}
+                        startDate={hired.internshipCreatedAt}
+                        endDate={hired.internshipClosingDate}
                       />
                       <div className="flex justify-end pt-2">
                         <Button
                           variant="outline"
                           className="rounded-full"
                           onClick={() =>
-                            handleViewCandidate(
-                              hired.id || hired.application_id
-                            )
+                            handleViewCandidate(hired.id || hired.applicationId)
                           }
                         >
                           View Details <ArrowRight className="w-4 h-4 ml-2" />
@@ -1029,6 +1025,7 @@ const UnitDashboard = () => {
 
           {/* TAB 4: REPORTS */}
           <TabsContent value="reports" className="px-0 sm:px-4 lg:px-10 py-2">
+            {/* ... (Existing Reports Content) ... */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <h2 className="text-xl sm:text-2xl font-semibold">
                 Reports for this Month

@@ -10,14 +10,12 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-// 1. IMPORT BETTER AUTH CLIENT
 import { useSession } from "@/lib/auth-client";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
-// import UnitDashboard from "./pages/UnitDashboard";
 import Chatbot from "./pages/Chatbot";
 import Internships from "./pages/Internships";
 import Courses from "./pages/Courses";
@@ -45,12 +43,57 @@ import { useProfile } from "@/hooks/useProfile";
 
 const queryClient = new QueryClient();
 
-// Protected Route component - redirects to chatbot by default
+// Protected Route component with onboarding check
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  // 2. CHECK SESSION STATUS
   const { data: session, isPending: isAuthPending } = useSession();
+  const { data: profile, isLoading: profileLoading } = useProfile();
 
-  if (isAuthPending) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Wait for auth and profile to load
+    if (isAuthPending || profileLoading) return;
+
+    // If no session, redirect handled by render
+    if (!session) return;
+
+    // If no profile data, wait
+    if (!profile) return;
+
+    const currentPath = location.pathname;
+    const isOnChatbot = currentPath === "/chatbot";
+
+    // Check onboarding status
+    if (profile.onboardingCompleted === true) {
+      // Onboarding completed - redirect away from chatbot to dashboard
+      if (isOnChatbot) {
+        // Redirect based on role
+        if (profile.role === "candidate") {
+          navigate("/dashboard", { replace: true });
+        } else if (profile.role === "unit") {
+          navigate("/unit-dashboard", { replace: true });
+        } else {
+          navigate("/dashboard", { replace: true });
+        }
+      }
+    } else {
+      // Onboarding NOT completed - redirect to chatbot
+      if (!isOnChatbot) {
+        navigate("/chatbot", { replace: true });
+      }
+    }
+  }, [
+    session,
+    isAuthPending,
+    profile,
+    profileLoading,
+    location.pathname,
+    navigate,
+  ]);
+
+  // Show loading spinner while checking auth and profile
+  if (isAuthPending || (session && profileLoading)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-muted flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -62,31 +105,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return session ? <>{children}</> : <Navigate to="/" replace />;
 };
 
-// Auth redirect component - redirects authenticated users to chatbot
-const AuthRedirect = ({ children }: { children: React.ReactNode }) => {
-  const { data: session, isPending: isAuthPending } = useSession();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!isAuthPending && session) {
-      // Redirect authenticated users to chatbot
-      navigate("/chatbot", { replace: true });
-    }
-  }, [session, isAuthPending, navigate]);
-
-  if (isAuthPending) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-muted flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  // If authenticated, will redirect via useEffect
-  // If not authenticated, show the auth page
-  return !session ? <>{children}</> : null;
-};
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -94,11 +112,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ScrollToTop />
-        {/* 4. REMOVED AuthProvider (Better Auth manages its own state) */}
         <NuqsAdapter>
           <Routes>
             <Route path="/auth/callback" element={<AuthCallback />} />
-
             <Route
               path="/chatbot"
               element={
@@ -108,22 +124,8 @@ const App = () => (
               }
             />
             <Route path="/" element={<Landing />} />
-            <Route
-              path="/auth/:role/signin"
-              element={
-                <AuthRedirect>
-                  <SignIn />
-                </AuthRedirect>
-              }
-            />
-            <Route
-              path="/auth/:role/signup"
-              element={
-                <AuthRedirect>
-                  <SignUp />
-                </AuthRedirect>
-              }
-            />
+            <Route path="/auth/:role/signin" element={<SignIn />} />
+            <Route path="/auth/:role/signup" element={<SignUp />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
@@ -151,14 +153,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* <Route
-              path="/unit-dashboard"
-              element={
-                <ProtectedRoute>
-                  <UnitDashboard />
-                </ProtectedRoute>
-              }
-            /> */}
             <Route
               path="/internships"
               element={

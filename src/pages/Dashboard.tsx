@@ -29,6 +29,7 @@ import {
   formatDistanceToNow,
 } from "date-fns";
 import ProfileSidebar from "@/components/ProfileSidebar";
+import Navbar from "@/components/Navbar";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -100,6 +101,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Navbar />
       <div className="container px-4 sm:px-6 lg:px-[7.5rem] py-4 lg:py-10">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-2.5">
           {/* Left Sidebar - Profile - Fixed */}

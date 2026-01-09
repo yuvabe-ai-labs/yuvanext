@@ -75,7 +75,7 @@ export default function MyTasks() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
-      {/* <Navbar /> */}
+      <Navbar />
 
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
         {/* Main Content Grid */}

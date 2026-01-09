@@ -15,7 +15,7 @@ export default function CandidateTasks() {
 
   return (
     <div className="bg-[#F8F9FA]">
-      {/* <Navbar /> */}
+      <Navbar />
       <div className="flex h-screen mx-24 bg-white">
         {/* Left Sidebar */}
         <aside className="w-[20%] border-r-2 border-gray-300">

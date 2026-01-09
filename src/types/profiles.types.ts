@@ -1,5 +1,6 @@
 export enum UserRole {
   CANDIDATE = "candidate",
+  UNIT = "unit",
 }
 
 export interface Profile {

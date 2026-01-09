@@ -13,21 +13,21 @@ import {
   Share2,
   ChevronLeft,
   IndianRupee,
+  CircleCheckBig,
 } from "lucide-react";
-// import Navbar from "@/components/Navbar";
 import {
   useRemommendedInternships,
-  useSavedInternships,
   useSaveInternship,
   useRemoveSavedInternship,
   useInternshipShareLink,
-  useAppliedInternshipStatus,
 } from "@/hooks/useInternships";
+import { useInternshipStatus } from "@/hooks/useSavedInternships";
 import ProfileSummaryDialog from "@/components/ProfileSummaryDialog";
 import ApplicationSuccessDialog from "@/components/ApplicationSuccessDialog";
 import { ShareDialog } from "@/components/ShareDialog";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { useSession } from "@/lib/auth-client";
 import type { Internship } from "@/types/internships.types";
 
 const RecommendedInternships = () => {
@@ -35,6 +35,7 @@ const RecommendedInternships = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const contentRef = useRef<HTMLDivElement>(null);
+  const { data: session } = useSession();
 
   const [selectedInternship, setSelectedInternship] = useState<string>("");
   const [showApplicationDialog, setShowApplicationDialog] = useState(false);
@@ -47,11 +48,21 @@ const RecommendedInternships = () => {
     isLoading: loading,
     error: fetchError,
   } = useRemommendedInternships();
-  const { data: savedData } = useSavedInternships();
-  const { data: appliedStatusData } = useAppliedInternshipStatus();
+
+  // Get saved and applied status for the selected internship
+  const {
+    isSaved,
+    isApplied,
+    applicationData,
+    isLoading: isCheckingStatus,
+    refetchSaved,
+    refetchApplied,
+  } = useInternshipStatus(selectedInternship || "");
+
   const { mutate: saveInternshipMutation, isPending: isSaving } =
     useSaveInternship();
-  const { mutate: removeSavedInternshipMutation } = useRemoveSavedInternship();
+  const { mutate: removeSavedInternshipMutation, isPending: isRemoving } =
+    useRemoveSavedInternship();
   const { mutate: generateShareLink } = useInternshipShareLink();
 
   // Process data
@@ -60,13 +71,7 @@ const RecommendedInternships = () => {
     : [];
   const error = fetchError ? "Failed to fetch internships" : null;
 
-  // Create a Set of saved internship IDs for quick lookup
-  const savedInternshipsSet = new Set(
-    Array.isArray(savedData) ? savedData.map((item) => item.internshipId) : []
-  );
-
-  // Check if current internship has been applied to
-  const hasApplied = appliedStatusData?.id === selectedInternship;
+  const savingInternship = isSaving || isRemoving;
 
   // Set default selected internship when data loads or from URL params
   useEffect(() => {
@@ -96,22 +101,31 @@ const RecommendedInternships = () => {
     internships.find((int) => int.id === selectedInternship) || internships[0];
 
   const handleSaveInternship = async () => {
-    if (!selectedInternship || isSaving) return;
+    if (!selectedInternship) return;
 
-    const isSaved = savedInternshipsSet.has(selectedInternship);
+    if (!session) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to save internships.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (isSaved) {
       removeSavedInternshipMutation(selectedInternship, {
         onSuccess: () => {
           toast({
-            title: "Success",
+            title: "Removed",
             description: "Internship removed from saved list.",
           });
+          refetchSaved();
         },
-        onError: () => {
+        onError: (error: any) => {
+          console.error("Error removing internship:", error);
           toast({
             title: "Error",
-            description: "Failed to remove internship.",
+            description: error.message || "Failed to remove internship.",
             variant: "destructive",
           });
         },
@@ -120,14 +134,16 @@ const RecommendedInternships = () => {
       saveInternshipMutation(selectedInternship, {
         onSuccess: () => {
           toast({
-            title: "Success",
-            description: "Internship saved successfully.",
+            title: "Saved",
+            description: "Internship saved successfully!",
           });
+          refetchSaved();
         },
-        onError: () => {
+        onError: (error: any) => {
+          console.error("Error saving internship:", error);
           toast({
             title: "Error",
-            description: "Failed to save internship.",
+            description: error.message || "Failed to save internship.",
             variant: "destructive",
           });
         },
@@ -140,8 +156,6 @@ const RecommendedInternships = () => {
 
     generateShareLink(selectedInternship, {
       onSuccess: (shareUrl) => {
-        // If the API returns a share URL, use it
-        // Otherwise, use the current page URL
         setShowShareDialog(true);
       },
       onError: () => {
@@ -155,10 +169,8 @@ const RecommendedInternships = () => {
   };
 
   const handleApplicationSuccess = () => {
-    setShowApplicationDialog(false);
+    refetchApplied();
     setShowSuccessDialog(true);
-    // Refetch applied status to update the UI
-    // React Query will automatically refetch when the query is invalidated
   };
 
   // Parse array fields safely
@@ -175,7 +187,6 @@ const RecommendedInternships = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* <Navbar /> */}
       <div className="container px-4 sm:px-6 lg:px-[5.5rem]">
         <div className="flex flex-col h-[calc(100vh-4rem)] lg:flex-row">
           {/* Left Sidebar - Fixed Header + Scrollable List */}
@@ -403,9 +414,9 @@ const RecommendedInternships = () => {
                         <div className="flex justify-end gap-2">
                           <Button
                             size="sm"
-                            disabled={isSaving}
+                            disabled={savingInternship || isCheckingStatus}
                             className={`flex items-center px-3 py-2 ${
-                              savedInternshipsSet.has(selectedInternship)
+                              isSaved
                                 ? "text-blue-600 bg-blue-50"
                                 : "text-gray-600 bg-white"
                             }`}
@@ -413,16 +424,10 @@ const RecommendedInternships = () => {
                           >
                             <Bookmark
                               className={`w-4 h-4 mr-1 ${
-                                savedInternshipsSet.has(selectedInternship)
-                                  ? "fill-current"
-                                  : ""
+                                isSaved ? "fill-current" : ""
                               }`}
                             />
-                            <span>
-                              {savedInternshipsSet.has(selectedInternship)
-                                ? "Saved"
-                                : "Save"}
-                            </span>
+                            <span>{isSaved ? "Saved" : "Save"}</span>
                           </Button>
                           <Button
                             size="sm"
@@ -434,10 +439,10 @@ const RecommendedInternships = () => {
                           </Button>
                           <Button
                             className="bg-orange-500 hover:bg-orange-600 rounded-full text-white px-6"
-                            disabled={hasApplied}
+                            disabled={isApplied || isCheckingStatus}
                             onClick={() => setShowApplicationDialog(true)}
                           >
-                            {hasApplied ? "Applied" : "Apply Now"}
+                            {isApplied ? "Applied" : "Apply Now"}
                           </Button>
                         </div>
                       </div>
@@ -483,6 +488,31 @@ const RecommendedInternships = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Status Banner - Shows if saved or applied */}
+                {(isSaved || isApplied) && (
+                  <div className="flex gap-2 mb-6">
+                    {isSaved && (
+                      <div className="px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg flex items-center gap-2">
+                        <Bookmark className="w-4 h-4 text-teal-600 fill-teal-600" />
+                        <span className="text-sm font-medium text-teal-700">
+                          Saved
+                        </span>
+                      </div>
+                    )}
+                    {isApplied && applicationData && (
+                      <div className="px-4 py-2 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                        <CircleCheckBig className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-700">
+                          Applied on{" "}
+                          {new Date(
+                            applicationData.createdAt
+                          ).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* About the Internship */}
                 <div className="mb-6 sm:mb-8">

@@ -16,3 +16,13 @@ export interface NotificationsData {
   total: number;
   unreadCount: number;
 }
+
+export interface DeleteAllNotificationsResponse {
+  deletedCount: number;
+}
+
+export type MarkNotificationReadResponse = Notification;
+
+export interface MarkAllNotificationsReadResponse {
+  updatedCount: number;
+}

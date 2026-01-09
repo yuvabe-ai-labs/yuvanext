@@ -19,24 +19,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/hooks/useAuth";
+import { useSession } from "@/lib/auth-client";
+import { useProfile } from "@/hooks/useProfile";
+import { UserRole } from "@/types/profiles.types";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
 import logo from "@/assets/YuvaNext.svg";
 import logoName from "@/assets/YuvaNext_name.svg";
 import { Disc } from "@/components/ui/custom-icons";
 
 const Navbar = () => {
-  const { user, signOut } = useAuth();
+  const { data: session, signOut } = useSession();
+  const { data: profileData, isLoading: profileLoading } = useProfile();
   const navigate = useNavigate();
   const location = useLocation();
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [profileId, setProfileId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+
+  // Extract profile data
+  const profile = profileData;
+  const userRole = profile?.role || null;
+  const avatarUrl = profile?.avatarUrl || profile?.image || null;
+  const userName = profile?.name || session?.user?.email || "User";
+  const userEmail = profile?.email || session?.user?.email || "";
 
   const allNavItems = [
     { name: "Internships", path: "/internships" },
@@ -44,13 +50,13 @@ const Navbar = () => {
     { name: "Units", path: "/units" },
   ];
 
-  const navItems = userRole === "unit" ? [] : allNavItems;
+  const navItems = userRole === UserRole.UNIT ? [] : allNavItems;
   const isActive = (path: string) => location.pathname === path;
 
   const handleSignOut = async () => {
     await signOut();
 
-    if (userRole === "unit") {
+    if (userRole === UserRole.UNIT) {
       navigate("/auth/unit/signin");
     } else {
       navigate("/auth/candidate/signin");
@@ -60,7 +66,7 @@ const Navbar = () => {
   };
 
   const handleProfileClick = () => {
-    if (userRole === "unit") {
+    if (userRole === UserRole.UNIT) {
       navigate("/unit-profile");
     } else {
       navigate("/profile");
@@ -73,15 +79,16 @@ const Navbar = () => {
     setMobileMenuOpen(false);
   };
 
-  // ✅ Dynamic dashboard link based on role
-  const dashboardLink = userRole === "unit" ? "/unit-dashboard" : "/dashboard";
+  // Dynamic dashboard link based on role
+  const dashboardLink =
+    userRole === UserRole.UNIT ? "/unit-dashboard" : "/dashboard";
 
   return (
     <>
       <nav className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/70 shadow-sm">
         <div className="container h-16 px-4 sm:px-6 md:px-8 lg:px-20 flex items-center relative justify-between">
           {/* Logo */}
-          <div className="flex w-full items-center ">
+          <div className="flex w-full items-center">
             <div className="lg:hidden p-3 items-center justify-between">
               <Button
                 variant="ghost"
@@ -99,7 +106,7 @@ const Navbar = () => {
               </Button>
             </div>
 
-            {/* ✅ Updated link based on userRole */}
+            {/* Updated link based on userRole */}
             <a href={dashboardLink}>
               {/* Mobile Logo */}
               <img
@@ -155,10 +162,12 @@ const Navbar = () => {
                     <Avatar className="h-10 w-10 border-1 border-white shadow-md">
                       <AvatarImage
                         src={avatarUrl || undefined}
-                        alt={user?.email || "User"}
+                        alt={userName}
                       />
                       <AvatarFallback className="text-sm bg-[#F8F6F2] text-gray-800">
-                        {user?.email?.charAt(0).toUpperCase() ?? "U"}
+                        {profileLoading
+                          ? "..."
+                          : userName?.charAt(0).toUpperCase() ?? "U"}
                       </AvatarFallback>
                     </Avatar>
                   </button>
@@ -171,7 +180,7 @@ const Navbar = () => {
                     <CircleUserRound className="mr-2 h-4 w-4" />
                     <span>My Profile</span>
                   </DropdownMenuItem>
-                  {userRole === "student" && (
+                  {userRole === UserRole.CANDIDATE && (
                     <DropdownMenuItem
                       onClick={() => navigate("/candidate-tasks")}
                       className="cursor-pointer hover:!text-blue-500 hover:bg-transparent focus:bg-transparent transition-colors [&_svg]:hover:!text-blue-500"
@@ -245,17 +254,16 @@ const Navbar = () => {
               <div className="p-6 border-b">
                 <div className="flex items-center space-x-3">
                   <Avatar className="h-12 w-12 border-2 border-gray-200">
-                    <AvatarImage
-                      src={avatarUrl || undefined}
-                      alt={user?.email || "User"}
-                    />
+                    <AvatarImage src={avatarUrl || undefined} alt={userName} />
                     <AvatarFallback className="text-sm bg-[#F8F6F2] text-gray-800">
-                      {user?.email?.charAt(0).toUpperCase() ?? "U"}
+                      {profileLoading
+                        ? "..."
+                        : userName?.charAt(0).toUpperCase() ?? "U"}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
-                      {user?.email || "User"}
+                      {userName}
                     </p>
                     <p className="text-xs text-gray-500 capitalize">
                       {userRole || "Guest"}
@@ -290,9 +298,51 @@ const Navbar = () => {
                   <CircleUserRound className="mr-3 h-5 w-5 text-gray-400" />
                   My Profile
                 </button>
+                {userRole === UserRole.CANDIDATE && (
+                  <button
+                    onClick={() => {
+                      navigate("/candidate-tasks");
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left px-6 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                  >
+                    <Disc className="mr-3 h-5 w-5 text-gray-400" />
+                    Applications
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    navigate("");
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full text-left px-6 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                >
+                  <MessageSquare className="mr-3 h-5 w-5 text-gray-400" />
+                  Feedbacks
+                </button>
+                <button
+                  onClick={() => {
+                    navigate("");
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full text-left px-6 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                >
+                  <HelpCircle className="mr-3 h-5 w-5 text-gray-400" />
+                  Help
+                </button>
+                <button
+                  onClick={() => {
+                    navigate("/settings");
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full text-left px-6 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                >
+                  <Settings className="mr-3 h-5 w-5 text-gray-400" />
+                  Settings
+                </button>
                 <button
                   onClick={handleSignOut}
-                  className="w-full text-left px-6 py-3 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center justify-center"
+                  className="w-full text-left px-6 py-3 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center justify-center mt-4"
                 >
                   <LogOut className="mr-2 h-5 w-5" />
                   Sign Out

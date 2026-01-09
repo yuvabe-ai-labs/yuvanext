@@ -22,7 +22,7 @@ import {
   Clock,
   Filter,
 } from "lucide-react";
-// import Navbar from "@/components/Navbar";
+import Navbar from "@/components/Navbar";
 import { useInternship } from "@/hooks/useInternships";
 import {
   differenceInDays,
@@ -180,7 +180,7 @@ const Internship = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* <Navbar /> */}
+      <Navbar />
       <div className="container px-4 sm:px-6 lg:px-[7.5rem] py-4 lg:py-10">
         <div className="flex flex-col lg:flex-row gap-5">
           {/* Sidebar Filters */}

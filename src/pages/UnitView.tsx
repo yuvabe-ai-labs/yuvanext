@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Mail, Phone, MapPin, Clock } from "lucide-react";
-// import Navbar from "@/components/Navbar";
+import Navbar from "@/components/Navbar";
 import { useUnitById } from "@/hooks/useUnits";
 import { useSession } from "@/lib/auth-client";
 import ProfileSummaryDialog from "@/components/ProfileSummaryDialog";
@@ -46,7 +46,7 @@ const UnitView = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        {/* <Navbar /> */}
+        <Navbar />
         <div className="max-w-7xl mx-auto px-6 py-8">
           <Skeleton className="h-64 w-full rounded-2xl mb-8" />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -66,7 +66,7 @@ const UnitView = () => {
   if (error || !unit) {
     return (
       <div className="min-h-screen bg-background">
-        {/* <Navbar /> */}
+        <Navbar />
         <div className="max-w-7xl mx-auto px-6 py-8 text-center">
           <h1 className="text-2xl font-bold text-foreground mb-4">
             Unit Not Found
@@ -87,7 +87,7 @@ const UnitView = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* <Navbar /> */}
+      <Navbar />
 
       <div className="relative h-[17.625rem] bg-gradient-to-r from-primary/10 via-secondary/10 to-accent/10">
         {unit.bannerUrl && (

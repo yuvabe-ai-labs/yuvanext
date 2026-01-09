@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,9 +25,8 @@ const InternshipApplicants = () => {
   // 2. USE HOOK
   const { data: applicants = [], isLoading: loading } =
     useInternshipApplicants(internshipId);
-  const [filteredApplications, setFilteredApplications] = useState<
-    typeof applicants
-  >([]);
+
+  // Removed: filteredApplications state
   const [displayCount, setDisplayCount] = useState(6);
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -37,15 +36,20 @@ const InternshipApplicants = () => {
   const internshipTitle =
     applicants.length > 0 ? applicants[0].internshipTitle : "Internship";
 
-  // Filter Logic
-  useEffect(() => {
+  //  - Diagram showing how useMemo prevents re-calculation/re-render
+  // FIX: Use useMemo instead of useEffect for filtering
+  const filteredApplications = useMemo(() => {
     let result = applicants;
     if (statusFilter) {
       result = result.filter((app) => app.status === statusFilter);
     }
-    setFilteredApplications(result);
-    setDisplayCount(6);
+    return result;
   }, [applicants, statusFilter]);
+
+  // Reset display count when filter changes (using effect only for this side effect)
+  useEffect(() => {
+    setDisplayCount(6);
+  }, [statusFilter]);
 
   // Infinite Scroll Observer
   const handleObserver = useCallback(
@@ -213,7 +217,7 @@ const InternshipApplicants = () => {
                 {filteredApplications.slice(0, displayCount).map((app) => {
                   // NOTE: Backend needs to provide appliedDate
                   // If missing, this defaults to 0
-                  const daysAgo = getDaysAgo(app.createdAt);
+                  const daysAgo = getDaysAgo(app.appliedDate);
 
                   // NOTE: Backend needs to provide matchScore if we want the colored rings back
                   const matchScore = 0;

@@ -60,3 +60,129 @@ export interface SocialLink {
   platform: string;
   url: string;
 }
+
+export interface CandidateInternship {
+  id: string;
+  title: string;
+  company?: string;
+  description?: string;
+  start_date?: string;
+  end_date?: string;
+  is_current?: boolean;
+}
+
+export interface CandidateProject {
+  id: string;
+  title?: string;
+  name?: string; // Fallback
+  client_name?: string;
+  description?: string;
+  start_date?: string;
+  end_date?: string;
+  is_current?: boolean;
+  technologies?: string[];
+  project_url?: string;
+}
+
+export interface CandidateCourse {
+  id: string;
+  title: string;
+  provider?: string;
+  completion_date?: string;
+  certificate_url?: string;
+}
+
+export interface CandidateEducation {
+  id: string;
+  degree?: string;
+  name?: string; // Fallback
+  institution?: string;
+  school?: string; // Fallback
+  college?: string; // Fallback
+  field_of_study?: string;
+  description?: string;
+  start_year?: string;
+  start_date?: string;
+  end_year?: string;
+  end_date?: string;
+  score?: string;
+  grade?: string;
+  gpa?: string;
+}
+
+export interface SocialLink {
+  id: string;
+  platform: string;
+  url: string;
+}
+
+export interface CandidateProfileData {
+  application: {
+    id: string;
+    status:
+      | "applied"
+      | "shortlisted"
+      | "not_shortlisted"
+      | "interviewed"
+      | "hired";
+    profileScore: number | null;
+    candidateOfferDecision: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  internship: {
+    // The internship being applied TO
+    id: string;
+    title: string;
+    type: string | null;
+    duration: string | null;
+  };
+  candidate: {
+    userId: string;
+    name: string;
+    email: string;
+    image: string | null;
+    avatarUrl: string | null;
+    type: string | null;
+    location: string | null;
+    phone: string | null;
+    skills: string[];
+    experienceLevel: string | null;
+    profileSummary: string | null;
+    interests: string[];
+
+    // Arrays for history
+    education: CandidateEducation[];
+    course: CandidateCourse[];
+    socialLinks: SocialLink[] | null;
+    internship: CandidateInternship[]; // Candidate's PAST internships
+    projects: CandidateProject[];
+  };
+}
+
+export interface InterviewDetails {
+  scheduledAt: string; // ISO Date string
+  meetingLink: string; // "zoom" (backend handles generation) OR explicit link
+  notes?: string;
+  durationMinutes: number;
+  provider: "zoom" | "google_meet" | "teams" | "other";
+}
+
+export interface UpdateApplicationStatusPayload {
+  applicationId: string;
+  status:
+    | "applied"
+    | "shortlisted"
+    | "not_shortlisted"
+    | "interviewed"
+    | "hired";
+  interviewDetails?: InterviewDetails; // Optional, required only for 'interviewed' status
+}
+
+// Navbar
+export interface UserProfileDTO {
+  id: string;
+  role: "unit" | "candidate" | "admin";
+  avatarUrl: string | null;
+  // You can add other fields returned by the /profile endpoint here if needed later
+}

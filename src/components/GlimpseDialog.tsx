@@ -71,7 +71,7 @@ export const GlimpseDialog = ({
       formData.append("type", "glimpse");
       formData.append("userId", userId);
 
-      const response = await axiosInstance.post("/upload", formData, {
+      const response = await axiosInstance.put("/profile", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 

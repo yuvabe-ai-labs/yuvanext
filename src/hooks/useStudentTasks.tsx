@@ -1,20 +1,29 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axiosInstance from "@/config/platform-api";
+import { getStudentTasksByApplication } from "@/services/studentTasks.service";
 
 // Fetch tasks for a specific application
+// export const useStudentTasks = (applicationId: string | undefined) => {
+//   return useQuery({
+//     queryKey: ["studentTasks", applicationId],
+//     queryFn: async () => {
+//       if (!applicationId) throw new Error("No application ID");
+
+//       // Assumption: GET /api/tasks?application_id=...
+//       // Or: GET /api/tasks/application/{id}
+//       const { data } = await axiosInstance.get(
+//         `/tasks/application/${applicationId}`
+//       );
+//       return data;
+//     },
+//     enabled: !!applicationId,
+//   });
+// };
+
 export const useStudentTasks = (applicationId: string | undefined) => {
   return useQuery({
     queryKey: ["studentTasks", applicationId],
-    queryFn: async () => {
-      if (!applicationId) throw new Error("No application ID");
-
-      // Assumption: GET /api/tasks?application_id=...
-      // Or: GET /api/tasks/application/{id}
-      const { data } = await axiosInstance.get(`/tasks`, {
-        params: { application_id: applicationId },
-      });
-      return data;
-    },
+    queryFn: () => getStudentTasksByApplication(applicationId || ""),
     enabled: !!applicationId,
   });
 };

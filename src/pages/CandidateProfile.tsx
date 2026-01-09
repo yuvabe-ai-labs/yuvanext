@@ -5,8 +5,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  ExternalLink,
-  Star,
   Heart,
   XCircle,
   User,
@@ -29,9 +27,20 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
-import { useCandidateProfile } from "@/hooks/useCandidateProfile";
-// 1. IMPORT AXIOS
-import axiosInstance from "@/config/platform-api";
+
+// 1. IMPORT HOOKS & TYPES
+import {
+  useCandidateProfile,
+  useUpdateApplicationStatus,
+} from "@/hooks/useCandidateProfile";
+import type {
+  CandidateInternship,
+  CandidateProject,
+  CandidateCourse,
+  CandidateEducation,
+  SocialLink,
+} from "@/types/profile.types";
+
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import {
@@ -54,7 +63,7 @@ import {
 import { useRef, useState } from "react";
 import ScheduleInterviewDialog from "@/components/ScheduleInterviewDialog";
 
-const safeParse = (data: any, fallback: any) => {
+const safeParse = <T,>(data: any, fallback: T): T => {
   if (!data) return fallback;
   try {
     return typeof data === "string" ? JSON.parse(data) : data;
@@ -64,46 +73,36 @@ const safeParse = (data: any, fallback: any) => {
 };
 
 const CandidateProfile = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>(); // This is applicationId
   const navigate = useNavigate();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { toast } = useToast();
-  const { data, loading, error, refetch } = useCandidateProfile(id || "");
-  console.log("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&77");
-  console.log(data, id);
 
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  // 2. DATA FETCHING
+  const { data, isLoading, error, refetch } = useCandidateProfile(id || "");
+  const updateStatusMutation = useUpdateApplicationStatus();
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isDownloaded, setIsDownloaded] = useState(false);
 
   type StatusType =
     | "applied"
     | "shortlisted"
-    | "rejected"
+    | "not_shortlisted"
     | "interviewed"
     | "hired";
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const statusOptions: { value: StatusType; label: string; icon: any }[] = [
-    { value: "shortlisted", label: "Shortlisted", icon: Heart },
-    { value: "applied", label: "Not Shortlisted", icon: Ban },
-    { value: "rejected", label: "Not Selected", icon: XCircle },
-    { value: "hired", label: "Select Candidate", icon: CopyCheck },
-    { value: "interviewed", label: "Schedule Interview", icon: User },
-  ];
-
   const [pendingStatus, setPendingStatus] = useState<StatusType | null>(null);
 
+  // --- Helpers ---
   const getStatusLabel = (status: string) => {
     const statusMap: Record<string, string> = {
-      applied: "Not Shortlisted",
+      applied: "Applied",
       shortlisted: "Shortlisted",
-      rejected: "Not Shortlisted",
-      interviewed: "Schedule Interview",
-      hired: "Select Candidate",
+      not_shortlisted: "Not Shortlisted", // Updated key
+      interviewed: "Interview Scheduled",
+      hired: "Hired",
     };
     return statusMap[status] || status;
   };
@@ -116,7 +115,7 @@ const CandidateProfile = () => {
         return "bg-yellow-500 text-white";
       case "applied":
         return "bg-white text-gray-700 border border-gray-300";
-      case "rejected":
+      case "not_shortlisted":
         return "bg-red-500 text-white";
       case "hired":
         return "bg-blue-500 text-white";
@@ -126,10 +125,7 @@ const CandidateProfile = () => {
   };
 
   const getDialogContent = (status: string) => {
-    // Determine name safely
-    const candidateName =
-      data?.candidate?.name || data?.profile?.full_name || "Candidate";
-
+    const candidateName = data?.candidate?.name || "Candidate";
     switch (status) {
       case "shortlisted":
         return {
@@ -137,10 +133,10 @@ const CandidateProfile = () => {
           description: `Are you sure you want to shortlist ${candidateName}? This will move them to the next stage of the hiring process.`,
           icon: <Heart className="w-6 h-6 text-green-500" />,
         };
-      case "applied":
+      case "not_shortlisted":
         return {
           title: "Not Shortlist Candidate?",
-          description: `Are you sure you want to mark ${candidateName} as not shortlisted? You can change this status later if needed.`,
+          description: `Are you sure you want to mark ${candidateName} as not shortlisted?`,
           icon: <Ban className="w-6 h-6 text-red-500" />,
         };
       case "hired":
@@ -158,65 +154,27 @@ const CandidateProfile = () => {
     }
   };
 
-  const handleStatusChange = async (newStatus: StatusType) => {
-    // Ensure we have an application ID
-    const appId = data?.application?.id || data?.id; // Fallback if data root is application
-    if (!appId) return;
-
-    // If status is "interviewed", open the schedule dialog instead
+  const handleStatusChange = (newStatus: StatusType) => {
     if (newStatus === "interviewed") {
       setShowScheduleDialog(true);
       return;
     }
-
-    // Store pending status and show confirmation dialog
     setPendingStatus(newStatus);
     setShowConfirmDialog(true);
   };
 
-  const handleConfirmStatusChange = async () => {
-    const appId = data?.application?.id || data?.id;
-    if (!appId || !pendingStatus) return;
+  const handleConfirmStatusChange = () => {
+    if (!id || !pendingStatus) return;
 
-    setIsUpdatingStatus(true);
-    setShowConfirmDialog(false);
-
-    try {
-      console.log("Updating application status to:", pendingStatus);
-
-      // 2. CALL HONO BACKEND (Replaces Supabase Update + Edge Function)
-      // Endpoint: PUT /api/applications/{id}/status
-      // Or PUT /api/unit/applications/{id}
-      await axiosInstance.put(`/unit/applications/${appId}`, {
-        status: pendingStatus,
-        // Backend should handle email notifications internally based on this change
-      });
-
-      console.log("✅ Status updated successfully");
-
-      await refetch();
-
-      toast({
-        title: "Status Updated",
-        description: `Application status changed to ${getStatusLabel(
-          pendingStatus
-        )}`,
-        duration: 3000,
-      });
-    } catch (err: any) {
-      console.error("❌ Error updating status:", err);
-      toast({
-        title: "Update Failed",
-        description:
-          err.message ||
-          "Failed to update application status. Please try again.",
-        variant: "destructive",
-        duration: 3000,
-      });
-    } finally {
-      setIsUpdatingStatus(false);
-      setPendingStatus(null);
-    }
+    updateStatusMutation.mutate(
+      { applicationId: id, status: pendingStatus },
+      {
+        onSuccess: () => {
+          setShowConfirmDialog(false);
+          setPendingStatus(null);
+        },
+      }
+    );
   };
 
   const handleCancelStatusChange = () => {
@@ -224,7 +182,8 @@ const CandidateProfile = () => {
     setPendingStatus(null);
   };
 
-  if (loading) {
+  // --- Loading State ---
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -240,17 +199,15 @@ const CandidateProfile = () => {
     );
   }
 
+  // --- Error State ---
   if (error || !data) {
-    {
-      console.log(error, data);
-    }
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
         <div className="max-w-7xl mx-auto px-6 py-8 text-center">
           <h1 className="text-2xl font-bold mb-4">Candidate Not Found</h1>
           <p className="text-muted-foreground mb-6">
-            {error || "The candidate profile could not be found."}
+            The candidate profile could not be found.
           </p>
           <Button onClick={() => navigate("/unit-dashboard")}>
             Back to Dashboard
@@ -260,31 +217,34 @@ const CandidateProfile = () => {
     );
   }
 
-  // DATA MAPPING
-  // Adjust based on your Hono API Response
-  const candidate = data.candidate || data.studentProfile || {};
-  const internship = data.internship || {};
-  const application = data.application || data; // Fallback if data root is application
+  // --- DATA MAPPING ---
+  const { candidate, internship, application } = data;
 
-  const skills = safeParse(candidate.skills, []);
-  const interests = safeParse(candidate.interests, []);
-  const achievements = safeParse(candidate.achievements, []);
-  const projects = safeParse(candidate.projects, []);
-  const internshipsList = safeParse(candidate.internships, []);
-  const courses = safeParse(
-    candidate.completed_courses || candidate.course,
+  const skills = safeParse<string[]>(candidate.skills, []);
+  const interests = safeParse<string[]>(candidate.interests, []);
+
+  // Explicit mapping for nested objects (History)
+  const candidateProjects = safeParse<CandidateProject[]>(
+    candidate.projects,
     []
-  ); // Hono might return 'course'
-  const education = safeParse(candidate.education, []);
-  const links = safeParse(candidate.socialLinks, []);
+  );
+  const candidateCourses = safeParse<CandidateCourse[]>(candidate.course, []);
+  const candidateInternships = safeParse<CandidateInternship[]>(
+    candidate.internship,
+    []
+  );
+  const candidateEducation = safeParse<CandidateEducation[]>(
+    candidate.education,
+    []
+  );
+  const links = safeParse<SocialLink[]>(candidate.socialLinks, []);
 
-  const matchScore =
-    application.profile_match_score || application.profileScore || 0;
+  const matchScore = application.profileScore || 0;
   const dialogContent = pendingStatus ? getDialogContent(pendingStatus) : null;
 
   const handleGeneratePDF = async () => {
     if (!profileRef.current) return;
-    setIsLoading(true);
+    setIsPdfLoading(true);
 
     try {
       const element = profileRef.current;
@@ -293,7 +253,6 @@ const CandidateProfile = () => {
         useCORS: true,
         allowTaint: true,
       });
-
       const imgData = canvas.toDataURL("image/jpeg", 2.8);
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -334,14 +293,9 @@ const CandidateProfile = () => {
       pdf.save(`${candidate.name || "Candidate"}-Profile.pdf`);
       setIsDownloaded(true);
     } catch (e) {
-      console.error("PDF Generation failed", e);
-      toast({
-        title: "Error",
-        description: "Failed to generate PDF",
-        variant: "destructive",
-      });
+      console.error("PDF Failed", e);
     } finally {
-      setIsLoading(false);
+      setIsPdfLoading(false);
     }
   };
 
@@ -352,22 +306,18 @@ const CandidateProfile = () => {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          {/* Back Button */}
           <Button
             variant="ghost"
             onClick={() => navigate("/unit-dashboard")}
             className="gap-2 flex items-center"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back
+            <ArrowLeft className="w-4 h-4" /> Back
           </Button>
 
-          {/* Center Title */}
           <h1 className="text-2xl font-bold text-center flex-1">
             Applied for "{internship.title || "Internship"}"
           </h1>
 
-          {/* Profile Match Section */}
           <div className="flex items-center gap-2">
             <span className="text-l font-medium">Profile Match</span>
             <div className="relative w-10 h-10">
@@ -411,10 +361,7 @@ const CandidateProfile = () => {
                     alt={candidate.name}
                   />
                   <AvatarFallback className="text-2xl">
-                    {(candidate.name || "U")
-                      .split(" ")
-                      .map((n: string) => n[0])
-                      .join("")}
+                    {(candidate.name || "U").charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
 
@@ -423,29 +370,26 @@ const CandidateProfile = () => {
                     {candidate.name || "Unknown"}
                   </h2>
                   <p className="text-muted-foreground mb-4">
-                    {typeof candidate.profileSummary === "string"
-                      ? candidate.profileSummary
-                      : Array.isArray(candidate.profileSummary)
-                      ? candidate.profileSummary.join(" ")
-                      : "Passionate professional with experience creating meaningful impact."}
+                    {candidate.profileSummary ||
+                      "Passionate professional with experience creating meaningful impact."}
                   </p>
 
                   <div className="flex flex-row gap-4 text-sm text-muted-foreground mb-6">
                     {candidate.email && (
                       <div className="flex items-center gap-2 leading-none">
-                        <Mail className="w-4 h-4" />
+                        <Mail className="w-4 h-4" />{" "}
                         <span>{candidate.email}</span>
                       </div>
                     )}
                     {candidate.phone && (
                       <div className="flex items-center gap-2 leading-none">
-                        <Phone className="w-4 h-4" />
+                        <Phone className="w-4 h-4" />{" "}
                         <span>{candidate.phone}</span>
                       </div>
                     )}
                     {candidate.location && (
                       <div className="flex items-center gap-2 leading-none">
-                        <MapPin className="w-4 h-4" />
+                        <MapPin className="w-4 h-4" />{" "}
                         <span>{candidate.location}</span>
                       </div>
                     )}
@@ -454,10 +398,10 @@ const CandidateProfile = () => {
                   <div className={`flex items-center gap-3 `}>
                     <Button
                       onClick={handleGeneratePDF}
-                      disabled={isLoading}
+                      disabled={isPdfLoading}
                       className="no-pdf w-52 rounded-full px-3 py-1.5 text-sm text-white transition-all flex items-center justify-center gap-1.5 bg-gradient-to-r from-[#07636C] to-[#0694A2] hover:opacity-90"
                     >
-                      {isLoading ? (
+                      {isPdfLoading ? (
                         <>
                           <svg
                             className="animate-spin h-4 w-4"
@@ -481,8 +425,7 @@ const CandidateProfile = () => {
                         </>
                       ) : isDownloaded ? (
                         <>
-                          <Check className="w-4 h-4" />
-                          Downloaded
+                          <Check className="w-4 h-4" /> Downloaded
                         </>
                       ) : (
                         <>
@@ -497,10 +440,11 @@ const CandidateProfile = () => {
                           ? ""
                           : application.status
                       }
-                      onValueChange={handleStatusChange}
-                      disabled={isUpdatingStatus}
+                      onValueChange={(val: string) =>
+                        handleStatusChange(val as StatusType)
+                      }
+                      disabled={updateStatusMutation.isPending}
                     >
-                      {/* Trigger with dynamic background */}
                       <SelectTrigger
                         className={`w-52 rounded-full px-3 py-1.5 text-sm ${getStatusBg(
                           application.status
@@ -508,34 +452,25 @@ const CandidateProfile = () => {
                       >
                         <SelectValue placeholder="Select Status" />
                       </SelectTrigger>
-
-                      {/* Dropdown content */}
                       <SelectContent className="rounded-2xl">
                         <SelectItem value="shortlisted">
-                          <div className="flex items-center gap-1.5 px-3 py-1">
-                            <Heart className="w-4 h-4" />
-                            Shortlisted
+                          <div className="flex items-center gap-2">
+                            <Heart className="w-4 h-4" /> Shortlisted
                           </div>
                         </SelectItem>
-
-                        <SelectItem value="rejected">
-                          <div className="flex items-center gap-1.5 px-3 py-1">
-                            <Ban className="w-4 h-4" />
-                            Not Shortlisted
+                        <SelectItem value="not_shortlisted">
+                          <div className="flex items-center gap-2">
+                            <Ban className="w-4 h-4" /> Not Shortlisted
                           </div>
                         </SelectItem>
-
                         <SelectItem value="hired">
-                          <div className="flex items-center gap-1.5 px-3 py-1">
-                            <CopyCheck className="w-4 h-4" />
-                            Select Candidate
+                          <div className="flex items-center gap-2">
+                            <CopyCheck className="w-4 h-4" /> Select Candidate
                           </div>
                         </SelectItem>
-
                         <SelectItem value="interviewed">
-                          <div className="flex items-center gap-1.5 px-3 py-1">
-                            <User className="w-4 h-4" />
-                            Schedule Interview
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4" /> Schedule Interview
                           </div>
                         </SelectItem>
                       </SelectContent>
@@ -558,22 +493,16 @@ const CandidateProfile = () => {
                   </h3>
                   <div className="space-y-4">
                     {skills.length > 0 ? (
-                      skills.map((skill: any, idx: number) => {
-                        const skillName =
-                          typeof skill === "string" ? skill : skill.name;
-                        const skillLevel =
-                          typeof skill === "object"
-                            ? skill.level
-                            : "Intermediate";
-                        return (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between"
-                          >
-                            <span className="font-medium">{skillName}</span>
-                          </div>
-                        );
-                      })
+                      skills.map((skill: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between"
+                        >
+                          <span className="font-medium">
+                            {typeof skill === "string" ? skill : skill.name}
+                          </span>
+                        </div>
+                      ))
                     ) : (
                       <p className="text-sm text-muted-foreground">
                         No skills listed
@@ -583,16 +512,13 @@ const CandidateProfile = () => {
                 </CardContent>
               </Card>
 
-              {/* Internships - Check if data exists in Hono response */}
-              {/* ... (Existing internship mapping logic, if candidate.internships exists) ... */}
-
-              {/* Internships */}
+              {/* CANDIDATE'S INTERNSHIPS (HISTORY) */}
               <Card className="rounded-3xl">
                 <CardContent className="p-6">
                   <h3 className="text-2xl font-bold mb-4">Internships</h3>
-                  {internships.length > 0 ? (
+                  {candidateInternships.length > 0 ? (
                     <ul className="space-y-4">
-                      {internships.map((internship: any) => (
+                      {candidateInternships.map((internship) => (
                         <li key={internship.id} className="text-base">
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-lg">
@@ -601,9 +527,13 @@ const CandidateProfile = () => {
                             <span className="text-sm text-muted-foreground">
                               {internship.is_current
                                 ? "Ongoing"
-                                : `${new Date(
+                                : `${
                                     internship.start_date
-                                  ).toLocaleDateString()} - ${
+                                      ? new Date(
+                                          internship.start_date
+                                        ).toLocaleDateString()
+                                      : "N/A"
+                                  } - ${
                                     internship.end_date
                                       ? new Date(
                                           internship.end_date
@@ -612,14 +542,12 @@ const CandidateProfile = () => {
                                   }`}
                             </span>
                           </div>
-
                           <p className="text-muted-foreground text-base mt-1">
                             Company:{" "}
                             <span className="font-medium text-foreground">
                               {internship.company || "—"}
                             </span>
                           </p>
-
                           {internship.description ? (
                             <p className="text-muted-foreground text-[15px] leading-relaxed mt-1">
                               {internship.description}
@@ -666,14 +594,15 @@ const CandidateProfile = () => {
                   </div>
                 </CardContent>
               </Card>
+
               {/* Completed Courses */}
               <Card className="rounded-3xl">
                 <CardContent className="p-6">
                   <h3 className="text-2xl font-bold mb-4">Completed Courses</h3>
-                  {courses.length > 0 ? (
+                  {candidateCourses.length > 0 ? (
                     <ul className="space-y-4">
-                      {courses.map((course: any) => (
-                        <li key={course.id} className="text-base">
+                      {candidateCourses.map((course, i) => (
+                        <li key={i} className="text-base">
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-lg">
                               {course.title}
@@ -721,46 +650,51 @@ const CandidateProfile = () => {
               <Card className="rounded-3xl">
                 <CardContent className="p-6">
                   <h3 className="text-2xl font-bold mb-4">Projects</h3>
-                  {projects.length > 0 ? (
+                  {candidateProjects.length > 0 ? (
                     <ul className="space-y-4">
-                      {projects.map((project: any) => (
-                        <li key={project.id} className="text-base">
+                      {candidateProjects.map((project, idx) => (
+                        <li key={project.id || idx} className="text-base">
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-lg">
-                              {project.title}
+                              {project.title || project.name}
                             </span>
                             <span className="text-sm text-muted-foreground">
                               {project.is_current
                                 ? "Ongoing"
-                                : `${new Date(
+                                : `${
                                     project.start_date
-                                  ).toLocaleDateString()} - ${new Date(
+                                      ? new Date(
+                                          project.start_date
+                                        ).toLocaleDateString()
+                                      : ""
+                                  } ${
                                     project.end_date
-                                  ).toLocaleDateString()}`}
+                                      ? "- " +
+                                        new Date(
+                                          project.end_date
+                                        ).toLocaleDateString()
+                                      : ""
+                                  }`}
                             </span>
                           </div>
-
                           {project.description && (
                             <p className="text-muted-foreground text-[15px] leading-relaxed mt-1">
                               {project.description}
                             </p>
                           )}
-
-                          {project.technologies?.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {project.technologies.map(
-                                (tech: string, idx: number) => (
+                          {project.technologies &&
+                            project.technologies.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {project.technologies.map((tech, i) => (
                                   <span
-                                    key={idx}
+                                    key={i}
                                     className="text-xs bg-muted px-2 py-1 rounded-full"
                                   >
                                     {tech}
                                   </span>
-                                )
-                              )}
-                            </div>
-                          )}
-
+                                ))}
+                              </div>
+                            )}
                           {project.project_url ? (
                             <a
                               href={project.project_url}
@@ -785,13 +719,14 @@ const CandidateProfile = () => {
                   )}
                 </CardContent>
               </Card>
+
               {/* Education */}
               <Card className="rounded-3xl">
                 <CardContent className="p-6">
                   <h3 className="text-2xl font-bold mb-6">Education</h3>
-                  {education.length > 0 ? (
+                  {candidateEducation.length > 0 ? (
                     <div className="space-y-5">
-                      {education.map((edu: any, idx: number) => (
+                      {candidateEducation.map((edu, idx) => (
                         <div
                           key={idx}
                           className="flex items-start justify-between pb-4 border-b last:border-0"
@@ -801,10 +736,7 @@ const CandidateProfile = () => {
                               {edu.degree || edu.name || "Education"}
                             </h4>
                             <p className="text-base text-muted-foreground">
-                              {edu.institution ||
-                                edu.school ||
-                                edu.college ||
-                                "Educational Institution"}
+                              {edu.institution || edu.school || "Institution"}
                             </p>
                             {edu.field_of_study && (
                               <p className="text-base text-muted-foreground mt-1">
@@ -855,11 +787,9 @@ const CandidateProfile = () => {
                   <h3 className="text-2xl font-bold mb-4">Links</h3>
                   <div className="flex flex-wrap gap-3 items-center">
                     {(() => {
-                      // 1. Define Helper Function
                       const getSocialIcon = (link: any) => {
                         const url = (link.url || "").toLowerCase();
                         const platform = (link.platform || "").toLowerCase();
-
                         if (
                           platform.includes("linkedin") ||
                           url.includes("linkedin.com")
@@ -878,8 +808,7 @@ const CandidateProfile = () => {
                         if (
                           platform.includes("twitter") ||
                           platform.includes("x") ||
-                          url.includes("twitter.com") ||
-                          url.includes("x.com")
+                          url.includes("twitter.com")
                         )
                           return Twitter;
                         if (
@@ -887,32 +816,21 @@ const CandidateProfile = () => {
                           url.includes("youtube.com")
                         )
                           return Youtube;
-                        if (
-                          platform.includes("behance") ||
-                          url.includes("behance.net")
-                        )
-                          return Palette;
-                        if (
-                          platform.includes("dribbble") ||
-                          url.includes("dribbble.com")
-                        )
-                          return Dribbble;
+                        if (platform.includes("dribbble")) return Dribbble;
+                        if (platform.includes("behance")) return Palette;
                         return Globe;
                       };
 
-                      // 2. Handle Empty State
-                      if (!links || links.length === 0) {
+                      if (!links || links.length === 0)
                         return (
                           <p className="text-sm text-muted-foreground">
                             No links provided
                           </p>
                         );
-                      }
 
-                      // 3. Render List
                       return (
                         <div className="flex flex-wrap gap-3">
-                          {links.map((link: any, idx: number) => {
+                          {links.map((link, idx) => {
                             const Icon = getSocialIcon(link);
                             return (
                               <Button
@@ -938,9 +856,8 @@ const CandidateProfile = () => {
                   </div>
                 </CardContent>
               </Card>
-
               {/* Projects */}
-              <Card className="rounded-3xl">
+              {/* <Card className="rounded-3xl">
                 <CardContent className="p-6">
                   <h3 className="text-2xl font-bold mb-4">Projects</h3>
                   {projects.length > 0 ? (
@@ -966,7 +883,7 @@ const CandidateProfile = () => {
                     </p>
                   )}
                 </CardContent>
-              </Card>
+              </Card> */}
             </div>
           </div>
         </div>
@@ -995,17 +912,10 @@ const CandidateProfile = () => {
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmStatusChange}
-              className={`rounded-full ${
-                pendingStatus === "shortlisted"
-                  ? "bg-green-500 hover:bg-green-600"
-                  : pendingStatus === "applied"
-                  ? "bg-red-500 hover:bg-red-600"
-                  : pendingStatus === "hired"
-                  ? "bg-blue-500 hover:bg-blue-600"
-                  : ""
-              }`}
+              disabled={updateStatusMutation.isPending}
+              className="rounded-full bg-blue-600 hover:bg-blue-700"
             >
-              {isUpdatingStatus ? "Updating..." : "Confirm"}
+              {updateStatusMutation.isPending ? "Updating..." : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1019,9 +929,10 @@ const CandidateProfile = () => {
         candidateEmail={candidate.email}
         applicationId={application.id}
         onSuccess={refetch}
-        candidateProfileId={candidate.id} // Ensure candidate ID is passed
+        candidateProfileId={candidate.userId}
       />
     </div>
   );
 };
+
 export default CandidateProfile;

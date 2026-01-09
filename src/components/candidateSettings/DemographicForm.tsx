@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { ChevronLeft } from "lucide-react";
-import { useProfileData } from "@/hooks/useProfileData";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { demographicSchema } from "@/lib/demographicFormSchema";
@@ -13,44 +12,48 @@ import {
 } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 
-export default function DemographicForm({ onBack }) {
-  const {
-    profile,
-    studentProfile,
-    loading,
-    updateProfile,
-    updateStudentProfile,
-  } = useProfileData();
+// NEW IMPORTS: Use our standardized hooks
+import { useUnitProfile, useUpdateUnitProfile } from "@/hooks/useUnitProfile";
+
+export default function DemographicForm({ onBack }: { onBack: () => void }) {
+  // 1. Fetch Profile Data
+  const { data: profile, isLoading: loading } = useUnitProfile();
+  console.log("profile");
+  console.log(profile);
+
+  // 2. Mutation Hook for updates
+  const updateProfileMutation = useUpdateUnitProfile();
 
   const form = useForm({
     resolver: zodResolver(demographicSchema),
     defaultValues: {
-      gender: profile?.gender || "",
-      disability: studentProfile?.is_differently_abled ? "Yes" : "No",
+      gender: "",
+      disability: "No",
     },
   });
 
+  // 3. Populate Form
   useEffect(() => {
     if (profile) {
+      // Assuming 'gender' and 'isDifferentlyAbled' (or similar) are in the unified profile object now.
+      // Adjust property names based on your exact API response if different.
       form.setValue("gender", profile.gender || "");
+      // If disability status is stored in profile (e.g. isDifferentlyAbled boolean)
+      // We map boolean to "Yes"/"No" string for the select input
+      form.setValue("disability", profile.isDifferentlyAbled ? "Yes" : "No");
     }
-    if (studentProfile) {
-      form.setValue(
-        "disability",
-        studentProfile.is_differently_abled ? "Yes" : "No"
-      );
-    }
-  }, [profile, studentProfile, form]);
+  }, [profile, form]);
 
-  const onSubmit = async (data) => {
+  const onSubmit = async (data: any) => {
     try {
-      // Update Gender in Profile
-      await updateProfile({ gender: data.gender });
-
-      // Update Disability in Student Profile
-      await updateStudentProfile({
-        is_differently_abled: data.disability === "Yes",
+      // 4. Update Profile via Mutation
+      // We map the form "Yes"/"No" back to boolean for the API
+      await updateProfileMutation.mutateAsync({
+        gender: data.gender,
+        isDifferentlyAbled: data.disability === "Yes", // Map string to boolean
       });
+
+      // Optional: Add success toast here if not handled by hook, or just rely on hook
     } catch (error) {
       console.error("Failed to save demographic data:", error);
     }
@@ -174,9 +177,11 @@ export default function DemographicForm({ onBack }) {
               <button
                 type="submit"
                 className="bg-blue-500 hover:bg-blue-600 text-white px-10 py-2 rounded-full font-medium transition disabled:opacity-50"
-                disabled={form.formState.isSubmitting}
+                disabled={updateProfileMutation.isPending}
               >
-                {form.formState.isSubmitting ? "Saving..." : "Agree and save"}
+                {updateProfileMutation.isPending
+                  ? "Saving..."
+                  : "Agree and save"}
               </button>
             </div>
           </form>

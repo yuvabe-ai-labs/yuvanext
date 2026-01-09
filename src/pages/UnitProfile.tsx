@@ -60,11 +60,11 @@ const UnitProfile = () => {
   };
 
   const handleAddProject = (projectData: any) => {
+    console.log("profileData");
+    console.log(profileData);
+
     const currentProjects = profileData?.projects;
-    const updatedProjects = [
-      ...currentProjects,
-      { ...projectData, id: Date.now().toString() }, // Temp ID if backend doesn't generate
-    ];
+    const updatedProjects = [...currentProjects, { ...projectData }];
     updateMutation.mutate({ projects: updatedProjects });
   };
 
@@ -77,7 +77,7 @@ const UnitProfile = () => {
   };
 
   const handleUpdateSocialLinks = (links: any[]) => {
-    updateMutation.mutate({ socialLinks: links });
+    updateMutation.mutate({ socialLinks: { ...links } });
   };
 
   const handleRemoveSocialLink = (linkId: string) => {
@@ -417,22 +417,22 @@ const UnitProfile = () => {
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <h4 className="font-semibold text-sm sm:text-base text-foreground">
-                              {project.project_name || "Untitled Project"}
+                              {project.projectName || "Untitled Project"}
                             </h4>
 
-                            {project.client_name && (
+                            {project.clientName && (
                               <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                                {project.client_name}
+                                {project.clientName}
                               </p>
                             )}
 
                             <p className="text-xs text-muted-foreground mt-2">
                               {project.status === "Completed" &&
-                              project.completion_date ? (
+                              project.completionDate ? (
                                 <>
                                   Completed on{" "}
                                   {new Date(
-                                    project.completion_date
+                                    project.completionDate
                                   ).toLocaleDateString()}
                                 </>
                               ) : (

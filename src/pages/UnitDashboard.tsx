@@ -15,7 +15,7 @@ import {
   Trash2,
   Users,
   ChevronDown,
-  XCircle, // Import XCircle for the Close icon
+  XCircle,
 } from "lucide-react";
 
 // Components
@@ -67,8 +67,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Hooks (Using our new/refactored hooks)
-import { useInternships, useUpdateInternship } from "@/hooks/useInternships"; // Added update hook here for status toggling
+// Hooks
+import { useInternships, useUpdateInternship } from "@/hooks/useInternships";
 import { useUnitStats, useUnitApplications } from "@/hooks/useUnitApplications";
 import { useUnitReports } from "@/hooks/useUnitReports";
 import { useHiredApplicants } from "@/hooks/useHiredApplicants";
@@ -89,9 +89,14 @@ const safeParse = (data: any, fallback: any) => {
 };
 
 // --- Sub-component: Task Progress ---
-const CandidateTaskProgress = ({ applicationId, startDate, endDate }) => {
+const CandidateTaskProgress = ({
+  applicationId,
+}: {
+  applicationId: string;
+}) => {
   const { data: tasksData } = useStudentTasks(applicationId);
-  const tasks = tasksData?.data || [];
+  // @ts-ignore - Assuming hook returns new structure or old, handling safely
+  const tasks = tasksData?.tasks || tasksData?.data || [];
   const taskProgress = calculateOverallTaskProgress(tasks);
 
   // Get internship start and end dates
@@ -113,7 +118,7 @@ const CandidateTaskProgress = ({ applicationId, startDate, endDate }) => {
     return { startDate, endDate };
   };
 
-  // const { startDate, endDate } = getInternshipDates();
+  const { startDate, endDate } = getInternshipDates();
 
   return (
     <div className="space-y-2">
@@ -151,22 +156,17 @@ const UnitDashboard = () => {
   const [activeTab, setActiveTab] = useState("applications");
 
   // --- 1. DATA FETCHING (REACT QUERY) ---
-  // A. Applications & Stats (Unified hook we built)
   const { data: applications, isLoading: dashboardLoading } =
     useUnitApplications();
 
   const { data: stats, isLoading: statsLoading } = useUnitStats();
-  // B. Internships List
   const { internships, loading: internshipsLoading } = useInternships();
 
-  // Helper hook for updating status (avoiding manual axios calls)
   const updateInternshipMutation = useUpdateInternship();
 
-  // C. Hired Applicants
   const { data: hiredCandidates = [], isLoading: hiredLoading } =
     useHiredApplicants();
 
-  // D. Reports (Charts)
   const {
     weeklyData,
     stats: reportStats,
@@ -194,25 +194,19 @@ const UnitDashboard = () => {
       const now = new Date();
       const expiredInternships = internships.filter((internship) => {
         if (internship.status !== "active") return false;
-        // Map field: closingDate
         if (!internship.closingDate) return false;
         const deadline = new Date(internship.closingDate);
-        // Compare properly
         return deadline.getTime() < now.getTime();
       });
 
       if (expiredInternships.length > 0) {
         try {
           const updatePromises = expiredInternships.map((internship) =>
-            // Using mutation hook would be cleaner, but batching promises is okay for this background task
             axiosInstance.put(`/internships/${internship.id}`, {
               status: "closed",
             })
           );
-
           await Promise.all(updatePromises);
-          // Reload not needed; query invalidation handled by mutation hooks usually
-          // For this specific background check, a silent fail or manual invalidate is fine.
         } catch (err) {
           console.error("Error auto-closing expired internships:", err);
         }
@@ -234,7 +228,6 @@ const UnitDashboard = () => {
   // --- 4. FILTERING LOGIC ---
   const filteredApplications =
     applications?.filter((appObj: any) => {
-      // Handle nested structure from hook: appObj.application.status
       const status = appObj.application?.status || appObj.status;
       if (filterStatuses.length === 0) return true;
       return filterStatuses.includes(status);
@@ -254,7 +247,7 @@ const UnitDashboard = () => {
   // --- 5. HANDLERS ---
 
   const handleInternshipCreated = () => {
-    // No reload needed; React Query invalidates cache automatically
+    // React Query handles cache invalidation
   };
 
   const handleAddComments = (internshipId: string) => {
@@ -275,11 +268,7 @@ const UnitDashboard = () => {
     try {
       setUpdating(deletingInternship.id);
       await axiosInstance.delete(`/internships/${deletingInternship.id}`);
-
-      // Ideally use delete mutation hook, but for now:
-      // Manually force refresh if not using hook
       window.location.reload();
-
       setShowDeleteDialog(false);
       setDeletingInternship(null);
     } catch (err: any) {
@@ -292,17 +281,13 @@ const UnitDashboard = () => {
 
   const handleToggleStatus = async (internship: any) => {
     if (internship.status !== "active") {
-      // If currently CLOSED, we want to ACTIVATE it
-      // Activating often requires checking/updating the deadline, so we open the edit dialog
       setActivatingInternship(internship);
       setEditingInternship(internship);
     } else {
-      // If currently ACTIVE, we want to CLOSE it immediately
       try {
         setUpdating(internship.id);
-        // Use our mutation hook for better state management
         updateInternshipMutation.mutate(
-          { id: internship.id, status: "closed" } as any, // Partial update
+          { id: internship.id, status: "closed" } as any,
           {
             onSuccess: () => {
               setUpdating(null);
@@ -318,10 +303,8 @@ const UnitDashboard = () => {
   };
 
   const handleEditSuccess = async () => {
-    // Logic for activating
     if (activatingInternship) {
       try {
-        // Activate via mutation
         updateInternshipMutation.mutate(
           { id: activatingInternship.id, status: "active" } as any,
           {
@@ -338,9 +321,7 @@ const UnitDashboard = () => {
         setEditingInternship(null);
       }
     } else {
-      // Standard edit success
       setEditingInternship(null);
-      // Data refreshes automatically via React Query
     }
   };
 
@@ -349,7 +330,6 @@ const UnitDashboard = () => {
     setEditingInternship(null);
   };
 
-  // Helper formatting functions
   const getStatusColor = (status: string) => {
     switch (status) {
       case "shortlisted":
@@ -415,7 +395,6 @@ const UnitDashboard = () => {
     navigate(`/unit/candidate-tasks/${applicationId}`);
   };
 
-  // --- RENDER ---
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -423,7 +402,6 @@ const UnitDashboard = () => {
       <div className="container px-4 sm:px-6 lg:px-[7.5rem] py-4 lg:py-10">
         {/* STATS CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {/* Total Applications */}
           <Card className="rounded-2xl">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
@@ -449,7 +427,6 @@ const UnitDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Total Job Descriptions */}
           <Card className="rounded-2xl">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
@@ -477,7 +454,6 @@ const UnitDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Interview Scheduled */}
           <Card className="rounded-2xl">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
@@ -505,7 +481,6 @@ const UnitDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Hired This Month */}
           <Card className="rounded-2xl">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
@@ -543,7 +518,7 @@ const UnitDashboard = () => {
           className="space-y-4 sm:space-y-6"
         >
           <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-            <TabsList className="grid w-full min-w-max sm:min-w-0 grid-cols-4 bg-gray-100/70 backdrop-blur-sm rounded-3xl shadow-inner border border-gray-200 h-12 sm:h-16 shadow-[inset_0_4px_10px_rgba(0,0,0,0.2)]">
+            <TabsList className="grid w-full min-w-max sm:min-w-0 grid-cols-4 bg-gray-100/70 backdrop-blur-sm rounded-3xl shadow-inner border border-gray-200 h-12 sm:h-16">
               {[
                 "applications",
                 "job-descriptions",
@@ -830,8 +805,6 @@ const UnitDashboard = () => {
                               >
                                 <Pencil className="w-4 h-4 mr-2" /> Edit JD
                               </DropdownMenuItem>
-
-                              {/* --- UPDATED LOGIC: Toggle Activate/Close --- */}
                               {internship.status !== "active" ? (
                                 <DropdownMenuItem
                                   onClick={() => handleToggleStatus(internship)}
@@ -851,7 +824,6 @@ const UnitDashboard = () => {
                                   </span>
                                 </DropdownMenuItem>
                               )}
-
                               <DropdownMenuItem
                                 onClick={() => handleDeleteClick(internship)}
                                 className="text-red-600 focus:text-red-600"
@@ -1001,9 +973,9 @@ const UnitDashboard = () => {
                         </div>
                       </div>
                       <CandidateTaskProgress
-                        applicationId={hired.id || hired.applicationId}
-                        startDate={hired.internshipCreatedAt}
-                        endDate={hired.internshipClosingDate}
+                        applicationId={hired.id || hired.application_id}
+                        // startDate={hired.internshipCreatedAt}
+                        // endDate={hired.internshipClosingDate}
                       />
                       <div className="flex justify-end pt-2">
                         <Button
@@ -1025,7 +997,6 @@ const UnitDashboard = () => {
 
           {/* TAB 4: REPORTS */}
           <TabsContent value="reports" className="px-0 sm:px-4 lg:px-10 py-2">
-            {/* ... (Existing Reports Content) ... */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <h2 className="text-xl sm:text-2xl font-semibold">
                 Reports for this Month
@@ -1052,9 +1023,7 @@ const UnitDashboard = () => {
                 {reportsLoading ? (
                   <div className="h-[300px] sm:h-[400px] w-full flex items-center justify-center">
                     <Skeleton className="w-full h-full" />
-                    {/* Grid lines skeleton */}
                     <div className="h-full w-full relative">
-                      {/* Horizontal grid lines */}
                       {[...Array(5)].map((_, i) => (
                         <div
                           key={i}
@@ -1062,21 +1031,16 @@ const UnitDashboard = () => {
                           style={{ top: `${(i + 1) * 20}%` }}
                         />
                       ))}
-
-                      {/* Bar chart skeleton */}
                       <div className="absolute bottom-0 left-0 right-0 h-[85%] flex items-end justify-around px-8">
-                        {/* 7 days of the week */}
                         {[20, 10, 5, 45, 8, 15, 12].map((height, i) => (
                           <div
                             key={i}
                             className="flex flex-col items-center gap-2 flex-1"
                           >
-                            {/* Bar */}
                             <Skeleton
                               className="w-8 sm:w-10 rounded-t-2xl"
                               style={{ height: `${height}%` }}
                             />
-                            {/* Day label */}
                             <Skeleton className="h-3 w-8" />
                           </div>
                         ))}
@@ -1097,7 +1061,7 @@ const UnitDashboard = () => {
                     }}
                     className="h-[300px] sm:h-[400px] w-full"
                   >
-                    <ResponsiveContainer width="100%" height={400}>
+                    <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={weeklyData}
                         margin={{ top: 20, right: 30, left: 20, bottom: 5 }}

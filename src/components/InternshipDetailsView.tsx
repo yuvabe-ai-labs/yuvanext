@@ -32,7 +32,7 @@ const InternshipDetailsView = ({
 
   const responsibilities = safeParse(internship.responsibilities, []);
   const requirements = safeParse(internship.requirements, []);
-  const skills = safeParse(internship.skills_required, []);
+  const skills = safeParse(internship.skillsRequired, []);
   const benefits = safeParse(internship.benefits, []);
 
   const internshipData = {
@@ -293,15 +293,13 @@ const InternshipDetailsView = ({
           {/* Additional Info */}
           <div className="border-t border-gray-200 mb-8"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {internshipData.application_deadline && (
+            {internshipData.closingDate && (
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   Application Deadline
                 </h3>
                 <p className="text-gray-700">
-                  {new Date(
-                    internshipData.application_deadline
-                  ).toLocaleDateString()}
+                  {new Date(internshipData.closingDate).toLocaleDateString()}
                 </p>
               </div>
             )}

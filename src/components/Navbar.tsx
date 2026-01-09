@@ -17,59 +17,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-// 1. IMPORT BETTER AUTH & AXIOS
 import { authClient } from "@/lib/auth-client";
-import axiosInstance from "@/config/platform-api";
+import { useUserProfile } from "@/hooks/useUnitProfile";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
 import logo from "@/assets/YuvaNext.svg";
 import logoName from "@/assets/YuvaNext_name.svg";
 
 const Navbar = () => {
-  // 2. USE SESSION HOOK
+  // 1. Better Auth Session
   const { data: session } = authClient.useSession();
   const user = session?.user;
 
+  // 2. React Query Hook for Profile Data
+  const { data: userProfile } = useUserProfile();
+
   const navigate = useNavigate();
   const location = useLocation();
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [profileId, setProfileId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
-  // 3. FETCH PROFILE DATA FROM BACKEND
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (!user) {
-        setUserRole(null);
-        setAvatarUrl(null);
-        setProfileId(null);
-        return;
-      }
-
-      try {
-        // Fetch from Hono Backend
-        const response = await axiosInstance.get("/profile");
-
-        // Based on your JSON: { "data": { "role": "unit", "avatarUrl": "..." } }
-        const profileData = response.data?.data;
-
-        if (profileData) {
-          setUserRole(profileData.role); // "unit" or "candidate"
-          setProfileId(profileData.id);
-          // Note: Backend returns 'avatarUrl' (camelCase), not 'avatar_url'
-          setAvatarUrl(profileData.avatarUrl);
-        }
-      } catch (error) {
-        console.error("Failed to fetch user data:", error);
-      }
-    };
-
-    fetchUserData();
-  }, [user]);
+  // 3. Extract Role & Avatar from the cached profile data
+  const userRole = userProfile?.role || null;
+  const avatarUrl = userProfile?.avatarUrl || null;
 
   const allNavItems = [
     { name: "Internships", path: "/internships" },
@@ -80,12 +51,11 @@ const Navbar = () => {
   const navItems = userRole === "unit" ? [] : allNavItems;
   const isActive = (path: string) => location.pathname === path;
 
-  // 4. UPDATED SIGN OUT
+  // 4. Sign Out
   const handleSignOut = async () => {
     await authClient.signOut({
       fetchOptions: {
         onSuccess: () => {
-          // Redirect based on the role we had stored
           if (userRole === "unit") {
             navigate("/auth/unit/signin");
           } else {
@@ -111,7 +81,6 @@ const Navbar = () => {
     setMobileMenuOpen(false);
   };
 
-  // Dynamic dashboard link
   const dashboardLink = userRole === "unit" ? "/unit-dashboard" : "/dashboard";
 
   return (
@@ -137,16 +106,12 @@ const Navbar = () => {
               </Button>
             </div>
 
-            {/* Link based on userRole */}
             <a href={dashboardLink}>
-              {/* Mobile Logo */}
               <img
                 src={logoName}
                 className="h-10 w-auto cursor-pointer block md:hidden"
                 alt="Mobile Logo"
               />
-
-              {/* Desktop Logo */}
               <img
                 src={logo}
                 className="h-12 w-auto cursor-pointer hidden md:block"
@@ -155,7 +120,7 @@ const Navbar = () => {
             </a>
           </div>
 
-          {/* Navigation Links - Desktop Only */}
+          {/* Desktop Nav Items */}
           {navItems.length > 0 && (
             <div className="hidden lg:flex absolute left-1/2 transform -translate-x-1/2 items-center space-x-6 xl:space-x-10">
               {navItems.map((item) => (
@@ -179,7 +144,7 @@ const Navbar = () => {
           <div className="flex items-center space-x-2 sm:space-x-4 ml-auto lg:ml-0">
             <NotificationDropdown />
 
-            {/* User Avatar with Dropdown - Desktop */}
+            {/* Desktop User Menu */}
             <div className="hidden lg:block">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -194,7 +159,7 @@ const Navbar = () => {
                       <AvatarImage
                         src={avatarUrl || undefined}
                         alt={user?.email || "User"}
-                        className="object-cover" // Added object-cover for better image fitting
+                        className="object-cover"
                       />
                       <AvatarFallback className="text-sm bg-[#F8F6F2] text-gray-800">
                         {user?.email?.charAt(0).toUpperCase() ?? "U"}
@@ -211,7 +176,6 @@ const Navbar = () => {
                     <span>My Profile</span>
                   </DropdownMenuItem>
 
-                  {/* Updated check to "candidate" instead of "student" */}
                   {userRole === "candidate" && (
                     <DropdownMenuItem
                       onClick={() => navigate("/candidate-tasks")}

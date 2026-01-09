@@ -218,21 +218,42 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
         ? internship.benefits.join("\n")
         : internship.benefits || "";
 
-      // Correct Mapping: skillsRequired
-      const skillsText = Array.isArray(internship.skillsRequired)
-        ? internship.skillsRequired.join("\n")
-        : internship.skillsRequired || "";
+      // Correct Mapping: skillsRequired (handle both camelCase and snake_case just in case)
+      const rawSkills = internship.skillsRequired || internship.skills_required;
+      const skillsText = Array.isArray(rawSkills)
+        ? rawSkills.join("\n")
+        : rawSkills || "";
 
       // Correct Mapping: language
-      const languageReqs = Array.isArray(internship.language)
-        ? internship.language
-        : [{ language: "", read: false, write: false, speak: false }];
+      let languageReqs = [
+        { language: "", read: false, write: false, speak: false },
+      ];
+
+      if (
+        Array.isArray(internship.language) &&
+        internship.language.length > 0
+      ) {
+        // If backend returns array of strings ["English", "Tamil"]
+        if (typeof internship.language[0] === "string") {
+          languageReqs = internship.language.map((lang: string) => ({
+            language: lang,
+            read: true, // Default to true for display since string doesn't have detail
+            write: true,
+            speak: true,
+          }));
+        } else {
+          // If backend returns array of objects (legacy support)
+          languageReqs = internship.language;
+        }
+      }
 
       setLanguages(languageReqs);
 
-      // Correct Mapping: closingDate
-      if (internship.closingDate) {
-        const deadline = new Date(internship.closingDate);
+      // Correct Mapping: closingDate or application_deadline
+      const closingDateVal =
+        internship.closingDate || internship.application_deadline;
+      if (closingDateVal) {
+        const deadline = new Date(closingDateVal);
         setSelectedDate(deadline.getDate().toString());
         setSelectedMonth((deadline.getMonth() + 1).toString());
         setSelectedYear(deadline.getFullYear().toString());
@@ -241,18 +262,26 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
       reset({
         title: internship.title || "",
         duration: internship.duration || "",
-        isPaid: internship.isPaid || false,
+        // Check both CamelCase and snake_case for boolean
+        isPaid:
+          internship.isPaid !== undefined
+            ? internship.isPaid
+            : internship.is_paid || false,
         payment: internship.payment || "",
         description: internship.description || "",
         responsibilities: responsibilitiesText,
         benefits: benefitsText,
         skills_required: skillsText,
         language_requirements: languageReqs,
-        application_deadline: internship.closingDate
-          ? new Date(internship.closingDate)
+        application_deadline: closingDateVal
+          ? new Date(closingDateVal)
           : undefined,
-        min_age_required: Number(internship.minAgeRequired) || undefined, // Backend sends string, form needs number
-        jobType: internship.jobType || "full_time",
+        // Check both CamelCase and snake_case for Min Age
+        min_age_required:
+          Number(internship.minAgeRequired || internship.min_age_required) ||
+          undefined,
+        // Check both CamelCase and snake_case for Job Type
+        job_type: internship.jobType || internship.job_type || "full_time",
       } as any);
     }
   }, [internship, isOpen, reset]);
@@ -321,7 +350,7 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
     // Fix Payment: Ensure string, not null
     const paymentValue = data.isPaid && data.payment ? data.payment : "Unpaid";
 
-    // Fix Language: Ensure object structure matches strict type
+    // Fix Language: Ensure object structure matches strict type (Backend expects array of strings for PUT)
     const languageArray = data.language_requirements.map((l) => l.language);
 
     // 5. CALL MUTATION
@@ -365,7 +394,6 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
 
   // ... (AI Assist Logic remains same - using axiosInstance) ...
   const handleAIAssist = async (fieldName: keyof FormData) => {
-    console.log("AI Assist triggered for:", fieldName);
     setAiLoading(fieldName as string);
 
     try {

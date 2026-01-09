@@ -72,3 +72,42 @@ export interface ReportStats {
   totalInternships: number;
   activeInternships: number;
 }
+
+// Response structure from the new /api/tasks endpoint
+export interface HiredCandidateDTO {
+  internshipId: string;
+  internshipName: string;
+  internshipCreatedAt: string;
+  internshipClosingDate: string;
+  internshipDuration: string;
+  internshipJobType: string;
+  applicationId: string;
+  applicantId: string;
+  applicantName: string;
+  unitName: string;
+  candidateAvatarUrl: string | null;
+  tasks: Array<{
+    taskId: string;
+    taskStatus: string;
+  }>;
+}
+
+// Normalized structure for your Dashboard UI
+export interface HiredCandidate {
+  id: string; // application id
+  application: {
+    id: string;
+  };
+  internship: {
+    id: string;
+    title: string;
+    duration: string;
+    type: string;
+  };
+  candidate: {
+    userId: string;
+    name: string;
+    avatarUrl: string | null;
+  };
+  tasks: any[]; // Array of task objects
+}

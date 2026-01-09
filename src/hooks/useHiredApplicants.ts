@@ -91,10 +91,10 @@ export const useUnitProfile = () => {
   });
 };
 
-// Hook 2: Get Hired Applicants List
 export const useHiredApplicants = () => {
   return useQuery({
-    queryKey: ["hiredApplicants"],
+    queryKey: ["hiredApplicants"], // Unique key for this specific data
     queryFn: getHiredApplicants,
+    // No select/filter needed anymore because the endpoint returns exactly what we need
   });
 };

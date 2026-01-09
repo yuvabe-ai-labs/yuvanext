@@ -115,7 +115,7 @@ export const GalleryDialog = ({
         formData.append("userId", userId);
 
         // POST /api/upload (Backend handles storage logic)
-        const response = await axiosInstance.post("/upload", formData, {
+        const response = await axiosInstance.put("/profile", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
 

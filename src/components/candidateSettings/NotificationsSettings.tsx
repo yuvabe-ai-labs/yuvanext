@@ -5,14 +5,20 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
 import NotificationToggle from "./NotificationToggle";
-import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { notificationSchema } from "@/lib/schemas";
+
+// 1. NEW IMPORTS
+import { useUnitProfile } from "@/hooks/useUnitProfile";
+import { useUpdateNotifications } from "@/hooks/useSettings";
 
 type NotificationFormData = z.infer<typeof notificationSchema>;
 
 export default function NotificationsSettings() {
-  const { preferences, loading, updatePreferences } =
-    useNotificationPreferences();
+  // 2. USE REACT QUERY HOOKS
+  // Fetch current settings via profile
+  const { data: profile, isLoading: loading } = useUnitProfile();
+  // Mutation to update settings
+  const updateMutation = useUpdateNotifications();
 
   const [activeSubView, setActiveSubView] = useState<string | null>(null);
 
@@ -27,14 +33,31 @@ export default function NotificationsSettings() {
 
   /* ---------- INIT ---------- */
   useEffect(() => {
-    if (!preferences) return;
+    if (!profile) return;
+
+    // 3. MAP BACKEND (CamelCase) TO FORM (snake_case)
+    // Backend: emailNotificationsEnabled, inAppNotificationsEnabled
+    const emailEnabled = profile.emailNotificationsEnabled || false;
+    const inAppEnabled = profile.inAppNotificationsEnabled || false;
+
+    // Derived 'allow_all' state
+    const allowAll = emailEnabled || inAppEnabled;
 
     reset({
-      allow_all: preferences.allow_all,
-      application_status_in_app: preferences.application_status_in_app,
-      application_status_email: preferences.application_status_email,
+      allow_all: allowAll,
+      application_status_in_app: inAppEnabled,
+      application_status_email: emailEnabled,
     });
-  }, [preferences, reset]);
+  }, [profile, reset]);
+
+  /* ---------- HELPER: SYNC TO BACKEND ---------- */
+  const syncToBackend = (data: NotificationFormData) => {
+    updateMutation.mutate({
+      // Map Form (snake_case) -> Backend (CamelCase)
+      emailNotificationsEnabled: data.application_status_email,
+      inAppNotificationsEnabled: data.application_status_in_app,
+    });
+  };
 
   /* ---------- GLOBAL TOGGLE ---------- */
   const handleAllowAllToggle = async () => {
@@ -46,8 +69,8 @@ export default function NotificationsSettings() {
       application_status_email: next,
     };
 
-    reset(payload);
-    await updatePreferences(payload);
+    reset(payload); // Optimistic UI update
+    syncToBackend(payload);
   };
 
   /* ---------- SUB TOGGLE ---------- */
@@ -71,9 +94,11 @@ export default function NotificationsSettings() {
 
     setValue("allow_all", allowAll);
 
-    await updatePreferences({
-      [key]: nextValue,
+    // Sync with backend
+    syncToBackend({
       allow_all: allowAll,
+      application_status_in_app: inApp,
+      application_status_email: email,
     });
   };
 
@@ -86,13 +111,8 @@ export default function NotificationsSettings() {
     );
   }
 
-  if (!preferences) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">Unable to load notification preferences</p>
-      </div>
-    );
-  }
+  // Fallback if profile fails to load (optional)
+  // if (!profile) return ...
 
   /* ---------- SUB VIEW ---------- */
   if (activeSubView) {
@@ -133,6 +153,7 @@ export default function NotificationsSettings() {
             className="sr-only peer"
             checked={getValues("allow_all")}
             onChange={handleAllowAllToggle}
+            disabled={updateMutation.isPending}
           />
           <div className="w-11 h-6 bg-gray-300 rounded-full peer peer-checked:bg-green-500 transition-colors"></div>
           <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full peer-checked:translate-x-5 transition-transform"></div>

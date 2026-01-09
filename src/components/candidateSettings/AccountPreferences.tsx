@@ -113,10 +113,15 @@ export default function AccountPreferences() {
           title="Name, Skills and Interests"
           onClick={openProfile}
         />
-        <PreferenceItem
-          title="Personal Demographic Information"
-          onClick={() => openSubViewWithLoad("demographic")}
-        />
+
+        {/* CONDITIONAL RENDER: Only show Demographic for Candidates */}
+        {profile?.role === "candidate" && (
+          <PreferenceItem
+            title="Personal Demographic Information"
+            onClick={() => openSubViewWithLoad("demographic")}
+          />
+        )}
+
         {/* <PreferenceItem
           title="Verifications"
           onClick={() => openSubViewWithLoad("verification")}

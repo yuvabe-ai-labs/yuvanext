@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Calendar, Clock, Video, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,8 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useInterviews } from "@/hooks/useInterviews";
+import { useUpdateApplicationStatus } from "@/hooks/useCandidateProfile";
 
 interface ScheduleInterviewDialogProps {
   open: boolean;
@@ -20,7 +19,7 @@ interface ScheduleInterviewDialogProps {
   candidateName: string;
   candidateEmail: string;
   applicationId: string;
-  candidateProfileId: string; // student_id
+  candidateProfileId: string; // Not strictly needed for API call but kept for interface compat
   onSuccess?: () => void;
 }
 
@@ -30,14 +29,14 @@ export default function ScheduleInterviewDialog({
   candidateName,
   candidateEmail,
   applicationId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   candidateProfileId,
   onSuccess,
 }: ScheduleInterviewDialogProps) {
   const { toast } = useToast();
-  const { createInterview } = useInterviews();
-  const [isLoading, setIsLoading] = useState(false);
-  const [senderEmail, setSenderEmail] = useState<string>("");
-  const [unitProfileId, setUnitProfileId] = useState<string>("");
+
+  // 1. USE MUTATION HOOK
+  const updateStatusMutation = useUpdateApplicationStatus();
 
   const [formData, setFormData] = useState({
     title: "",
@@ -47,54 +46,12 @@ export default function ScheduleInterviewDialog({
     meetingType: "zoom",
   });
 
-  const [guestEmails, setGuestEmails] = useState<string[]>(
-    candidateEmail ? [candidateEmail] : []
-  );
+  // Guest emails state (Backend might not support guests directly in this endpoint version,
+  // but if notes support it, we can append there, or check if backend adds a guests field later)
+  // For now, I'll assume we just notify the main candidate based on your API doc.
+  const [guestEmails, setGuestEmails] = useState<string[]>([]);
 
-  // Fetch current user's email and profile ID
-  useEffect(() => {
-    const fetchUserData = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user?.email) {
-        setSenderEmail(user.email);
-
-        // Fetch profile ID
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("user_id", user.id)
-          .single();
-
-        if (profileError) {
-          console.error("Error fetching profile:", profileError);
-          toast({
-            title: "Error",
-            description: "Failed to fetch user profile",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        if (profileData) {
-          setUnitProfileId(profileData.id);
-          console.log("✅ Unit Profile ID fetched:", profileData.id);
-        }
-      }
-    };
-    fetchUserData();
-  }, []);
-
-  // Reset guest emails when candidate email changes
-  useEffect(() => {
-    if (candidateEmail) {
-      setGuestEmails([candidateEmail]);
-    }
-  }, [candidateEmail]);
-
-  // Add guest email
+  // Add/Remove Guest logic (Visual only for now unless API supports 'guests' field)
   const addEmail = (email: string) => {
     const trimmed = email.trim();
     if (
@@ -106,23 +63,7 @@ export default function ScheduleInterviewDialog({
     }
   };
 
-  const handleAddGuest = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (["Enter", " ", ","].includes(e.key)) {
-      e.preventDefault();
-      addEmail(e.currentTarget.value);
-      e.currentTarget.value = "";
-    }
-  };
-
-  const handlePasteGuests = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData("text");
-    const emails = pasted.split(/[\s,;]+/).filter(Boolean);
-    emails.forEach(addEmail);
-  };
-
   const handleRemoveGuest = (email: string) => {
-    if (email === candidateEmail) return;
     setGuestEmails(guestEmails.filter((g) => g !== email));
   };
 
@@ -131,132 +72,73 @@ export default function ScheduleInterviewDialog({
     if (!formData.date || !formData.time) {
       toast({
         title: "Missing Information",
-        description: "Please provide date and time for the interview",
+        description: "Please provide date and time",
         variant: "destructive",
       });
       return;
     }
-
     if (!formData.title) {
       toast({
         title: "Missing Information",
-        description: "Please provide a title for the interview",
+        description: "Please provide a title",
         variant: "destructive",
       });
       return;
     }
-
-    if (!unitProfileId || !candidateProfileId) {
-      toast({
-        title: "Error",
-        description: "Missing profile information. Please try again.",
-        variant: "destructive",
-      });
-      console.error("Missing IDs:", { unitProfileId, candidateProfileId });
-      return;
-    }
-
-    setIsLoading(true);
 
     try {
       const scheduledDate = new Date(
-        `${formData.date}T${formData.time}:00Z`
+        `${formData.date}T${formData.time}:00`
       ).toISOString();
 
-      console.log("📩 Interview Submission Details:", {
-        applicationId,
-        candidateName,
-        candidateEmail,
-        guestEmails,
-        scheduledDate,
-        title: formData.title,
-        description: formData.description,
-        durationMinutes: 60,
-        senderEmail,
-        unitProfileId,
-        candidateProfileId,
-      });
-
-      // Step 1: Call edge function to create Zoom meeting and send emails
-      console.log("🔄 Calling edge function to create Zoom meeting...");
-      const { data: zoomData, error: zoomError } =
-        await supabase.functions.invoke("schedule-interview", {
-          body: {
-            applicationId,
-            candidateName,
-            candidateEmail: guestEmails, // Array of all guest emails
-            scheduledDate,
-            title: formData.title,
-            description: formData.description,
+      // 2. CALL MUTATION
+      // Backend expects: applicationId, status, interviewDetails
+      updateStatusMutation.mutate(
+        {
+          applicationId,
+          status: "interviewed",
+          interviewDetails: {
+            scheduledAt: scheduledDate,
+            meetingLink: "zoom", // Backend generates link if provider is zoom
+            notes: `${formData.description}\n\nGuests: ${guestEmails.join(
+              ", "
+            )}`, // Append guests to notes
             durationMinutes: 60,
-            senderEmail,
+            provider: "zoom",
           },
-        });
-
-      if (zoomError) {
-        console.error("Zoom function error:", zoomError);
-        throw zoomError;
-      }
-
-      console.log("✅ Zoom meeting created:", zoomData);
-
-      // Extract meeting link from response
-      const meetingLink =
-        zoomData?.meetingLink || zoomData?.join_url || zoomData?.zoomLink || "";
-
-      if (!meetingLink) {
-        throw new Error("Failed to generate meeting link from Zoom");
-      }
-
-      console.log("🔗 Meeting link:", meetingLink);
-
-      // Step 2: Store interview in database with profile IDs
-      console.log("💾 Storing interview in database...");
-      const { error: dbError } = await createInterview({
-        applicationId,
-        scheduledDate,
-        meetingLink,
-        title: formData.title,
-        description: formData.description || "",
-        durationMinutes: 60,
-        unitId: unitProfileId,
-        studentId: candidateProfileId,
-      });
-
-      if (dbError) {
-        console.error("Database error:", dbError);
-        throw new Error(dbError);
-      }
-
-      console.log("✅ Interview stored in database");
-
-      toast({
-        title: "Interview Scheduled",
-        description: `Zoom meeting link has been sent to ${candidateName} and all guests`,
-      });
-
-      onOpenChange(false);
-      onSuccess?.();
-
-      // Reset fields
-      setFormData({
-        title: "",
-        description: "",
-        date: "",
-        time: "",
-        meetingType: "zoom",
-      });
-      setGuestEmails(candidateEmail ? [candidateEmail] : []);
+        },
+        {
+          onSuccess: () => {
+            onOpenChange(false);
+            onSuccess?.();
+            // Reset form
+            setFormData({
+              title: "",
+              description: "",
+              date: "",
+              time: "",
+              meetingType: "zoom",
+            });
+            setGuestEmails([]);
+          },
+          onError: (error: any) => {
+            // Error toast handled by global handler or custom logic here
+            const msg =
+              error.response?.data?.message || "Failed to schedule interview.";
+            toast({ title: "Error", description: msg, variant: "destructive" });
+          },
+        }
+      );
     } catch (error: any) {
-      console.error("❌ Error scheduling interview:", error);
-      toast({
-        title: "Error",
-        description:
-          error.message || "Failed to schedule interview. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+      console.error("Error preparing submission:", error);
+    }
+  };
+
+  const handleAddGuestKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (["Enter", " ", ","].includes(e.key)) {
+      e.preventDefault();
+      addEmail(e.currentTarget.value);
+      e.currentTarget.value = "";
     }
   };
 
@@ -266,32 +148,20 @@ export default function ScheduleInterviewDialog({
         <DialogHeader className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl font-semibold">
-              Schedule Interview
+              Schedule Interview with {candidateName}
             </DialogTitle>
           </div>
         </DialogHeader>
 
         <div className="px-6 pb-6 space-y-5">
-          {/* Sender Email (view only) */}
-          {senderEmail && (
-            <div className="space-y-1">
-              <Label className="text-sm text-gray-700">Host Email</Label>
-              <Input
-                value={senderEmail}
-                disabled
-                className="h-11 bg-gray-100 text-gray-700 cursor-not-allowed"
-              />
-            </div>
-          )}
-
           {/* Title */}
           <div className="space-y-2">
             <Label htmlFor="title" className="text-sm text-gray-700">
-              Add title <span className="text-red-500">*</span>
+              Interview Title <span className="text-red-500">*</span>
             </Label>
             <Input
               id="title"
-              placeholder="e.g., Technical Interview - Software Engineer"
+              placeholder="e.g., Technical Interview"
               value={formData.title}
               onChange={(e) =>
                 setFormData({ ...formData, title: e.target.value })
@@ -303,11 +173,11 @@ export default function ScheduleInterviewDialog({
           {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="description" className="text-sm text-gray-700">
-              Add description
+              Description / Notes
             </Label>
             <Textarea
               id="description"
-              placeholder="Description of the meeting"
+              placeholder="Agenda or notes..."
               value={formData.description}
               onChange={(e) =>
                 setFormData({ ...formData, description: e.target.value })
@@ -316,39 +186,31 @@ export default function ScheduleInterviewDialog({
             />
           </div>
 
-          {/* Guests */}
+          {/* Guests (Visual placeholder effectively, sent as notes) */}
           <div className="space-y-2">
             <Label htmlFor="guests" className="text-sm text-gray-700">
-              Add guests
+              Additional Guests (Emails)
             </Label>
             <div className="flex flex-wrap items-center gap-2 border rounded-lg p-2 min-h-[44px] focus-within:ring-2 focus-within:ring-purple-500">
               {guestEmails.map((email) => (
                 <span
                   key={email}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm ${
-                    email === candidateEmail
-                      ? "bg-gray-200 text-gray-700"
-                      : "bg-purple-100 text-purple-700"
-                  }`}
+                  className="flex items-center gap-1 px-2 py-1 rounded-full text-sm bg-purple-100 text-purple-700"
                 >
                   {email}
-                  {email !== candidateEmail && (
-                    <button
-                      onClick={() => handleRemoveGuest(email)}
-                      className="hover:text-red-500"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleRemoveGuest(email)}
+                    className="hover:text-red-500"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 </span>
               ))}
-
               <input
                 id="guests"
                 type="email"
-                placeholder="Add guest email..."
-                onKeyDown={handleAddGuest}
-                onPaste={handlePasteGuests}
+                placeholder="Type & Enter..."
+                onKeyDown={handleAddGuestKey}
                 className="flex-1 border-none outline-none bg-transparent text-sm p-1 min-w-[150px]"
               />
             </div>
@@ -394,24 +256,16 @@ export default function ScheduleInterviewDialog({
             </div>
           </div>
 
-          {/* Meeting Type */}
+          {/* Meeting Type Info */}
           <div className="space-y-3">
-            <Label className="text-sm text-gray-700">Meeting Link</Label>
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setFormData({ ...formData, meetingType: "zoom" })
-                }
-                className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-200"
-              >
-                <div className="w-6 h-6 bg-[#2196F3] rounded flex items-center justify-center">
-                  <Video className="w-4 h-4 text-white fill-current" />
-                </div>
-                <span className="text-sm text-gray-500 font-medium">
-                  Add Zoom Meet video conferencing
-                </span>
-              </button>
+            <Label className="text-sm text-gray-700">Meeting Platform</Label>
+            <div className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50">
+              <div className="w-6 h-6 bg-[#2196F3] rounded flex items-center justify-center">
+                <Video className="w-4 h-4 text-white fill-current" />
+              </div>
+              <span className="text-sm text-gray-600 font-medium">
+                Zoom Meeting (Link auto-generated)
+              </span>
             </div>
           </div>
 
@@ -419,10 +273,12 @@ export default function ScheduleInterviewDialog({
           <div className="flex justify-end pt-2">
             <Button
               onClick={handleSubmit}
-              disabled={isLoading || !unitProfileId || !candidateProfileId}
-              className="bg-[#2196F3] rounded-full text-white px-8 h-11 hover:bg-[#1976D2] disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={updateStatusMutation.isPending}
+              className="bg-[#2196F3] rounded-full text-white px-8 h-11 hover:bg-[#1976D2]"
             >
-              {isLoading ? "Scheduling..." : "Save"}
+              {updateStatusMutation.isPending
+                ? "Scheduling..."
+                : "Schedule Interview"}
             </Button>
           </div>
         </div>

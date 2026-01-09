@@ -60,9 +60,6 @@ const UnitProfile = () => {
   };
 
   const handleAddProject = (projectData: any) => {
-    console.log("profileData");
-    console.log(profileData);
-
     const currentProjects = profileData?.projects;
     const updatedProjects = [...currentProjects, { ...projectData }];
     updateMutation.mutate({ projects: updatedProjects });

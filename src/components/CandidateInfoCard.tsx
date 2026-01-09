@@ -83,12 +83,6 @@ export default function CandidateInfoCard({
             {internship.title || "N/A"}
           </p>
 
-          {/* MISSING DATA: Location & Bio */}
-          {/* <p className="text-sm text-gray-500 mb-2">
-             {candidate.location || "Location not available"}
-          </p>
-          */}
-
           {/* Contact Details */}
           <div className="flex flex-wrap gap-4 text-sm text-gray-600">
             <div className="flex items-center gap-2">

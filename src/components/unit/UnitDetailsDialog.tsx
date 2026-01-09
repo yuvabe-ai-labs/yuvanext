@@ -38,13 +38,13 @@ export const UnitDetailsDialog = ({
   // Use camelCase from your new API response
   const [formData, setFormData] = useState({
     name: unitProfile?.name || profile?.name || "",
-    type: unitProfile?.type || "", // was unit_type
+    type: unitProfile?.type || "",
     industry: unitProfile?.industry || "",
-    websiteUrl: unitProfile?.websiteUrl || "", // was website_url
-    email: unitProfile?.email || profile?.email || "", // Contact email
-    phone: unitProfile?.phone || profile?.phone || "", // Contact phone
+    websiteUrl: unitProfile?.websiteUrl || "",
+    email: unitProfile?.email || profile?.email || "",
+    phone: unitProfile?.phone || profile?.phone || "",
     address: unitProfile?.address || "",
-    isAurovillian: unitProfile?.isAurovillian || false, // was is_aurovillian
+    isAurovillian: unitProfile?.isAurovillian || false,
   });
 
   // Update local state when props change (e.g. after a fetch)

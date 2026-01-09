@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getUnitProfile, updateUnitProfile } from "@/services/profile.service";
 import { useToast } from "@/hooks/use-toast";
 import type { Profile } from "@/types/profile.types";
+import { uploadImage } from "@/services/profile.service";
+import type { UploadImagePayload } from "@/types/profile.types";
 
 // --- Main Query Hook ---
 export const useUnitProfile = () => {
@@ -10,23 +12,6 @@ export const useUnitProfile = () => {
     queryFn: getUnitProfile,
     staleTime: 1000 * 60 * 5, // Cache data for 5 minutes
     retry: 1,
-  });
-};
-
-import { getUserProfile } from "@/services/profile.service"; // Updated import path
-import { authClient } from "@/lib/auth-client";
-
-export const useUserProfile = () => {
-  // We use the session to control the 'enabled' state of the query
-  const { data: session } = authClient.useSession();
-  const user = session?.user;
-
-  return useQuery({
-    queryKey: ["userProfile", user?.id], // Cache key unique to the logged-in user
-    queryFn: getUserProfile,
-    enabled: !!user, // Only run the fetch if a user is logged in
-    staleTime: 1000 * 60 * 5, // Cache the profile data for 5 minutes
-    retry: 1, // Only retry once if it fails
   });
 };
 
@@ -74,5 +59,11 @@ export const useUpdateUnitProfile = () => {
         variant: "destructive",
       });
     },
+  });
+};
+
+export const useUploadImage = () => {
+  return useMutation({
+    mutationFn: (payload: UploadImagePayload) => uploadImage(payload),
   });
 };

@@ -43,7 +43,7 @@ export default function AccountPreferences() {
     },
   });
 
-  const onSubmit = (values: any) => {
+  const onSubmit = (values) => {
     console.log("Saved Preferences:", values);
     // updateProfile({ settings: values });
   };

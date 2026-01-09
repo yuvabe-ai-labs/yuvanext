@@ -1,28 +1,46 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { authClient } from "@/lib/auth-client"; // For signing out after deactivation
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  getNotificationSettings,
   updateNotificationSettings,
   deactivateAccount,
 } from "@/services/settings.service";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
-import { authClient } from "@/lib/auth-client"; // For signing out after deactivation
+import type { NotificationSettings } from "@/types/settings.types";
 
+// Hook to FETCH settings
+export const useNotificationSettings = () => {
+  return useQuery({
+    queryKey: ["notificationSettings"],
+    queryFn: getNotificationSettings,
+    staleTime: 1000 * 60 * 5, // Cache for 5 mins
+  });
+};
+
+// Hook to UPDATE settings
 export const useUpdateNotifications = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: updateNotificationSettings,
+    mutationFn: (payload: NotificationSettings) =>
+      updateNotificationSettings(payload),
     onSuccess: () => {
       toast({
         title: "Success",
         description: "Notification preferences updated.",
       });
-      // Invalidate profile in case settings are returned there
-      queryClient.invalidateQueries({ queryKey: ["unitProfile"] });
+      // Invalidate the specific settings query, NOT the profile query
+      queryClient.invalidateQueries({ queryKey: ["notificationSettings"] });
     },
     onError: (error: any) => {
       console.error("Update failed", error);
+      toast({
+        title: "Error",
+        description: "Failed to update settings.",
+        variant: "destructive",
+      });
     },
   });
 };

@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth-client";
-import { useUserProfile } from "@/hooks/useUnitProfile";
+import { useUnitProfile } from "@/hooks/useUnitProfile";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
@@ -31,7 +31,7 @@ const Navbar = () => {
   const user = session?.user;
 
   // 2. React Query Hook for Profile Data
-  const { data: userProfile } = useUserProfile();
+  const { data: userProfile } = useUnitProfile();
 
   const navigate = useNavigate();
   const location = useLocation();

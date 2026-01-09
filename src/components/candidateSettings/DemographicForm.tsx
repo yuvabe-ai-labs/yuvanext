@@ -18,8 +18,6 @@ import { useUnitProfile, useUpdateUnitProfile } from "@/hooks/useUnitProfile";
 export default function DemographicForm({ onBack }: { onBack: () => void }) {
   // 1. Fetch Profile Data
   const { data: profile, isLoading: loading } = useUnitProfile();
-  console.log("profile");
-  console.log(profile);
 
   // 2. Mutation Hook for updates
   const updateProfileMutation = useUpdateUnitProfile();

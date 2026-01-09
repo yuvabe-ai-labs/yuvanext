@@ -179,10 +179,15 @@ export interface UpdateApplicationStatusPayload {
   interviewDetails?: InterviewDetails; // Optional, required only for 'interviewed' status
 }
 
-// Navbar
-export interface UserProfileDTO {
-  id: string;
-  role: "unit" | "candidate" | "admin";
-  avatarUrl: string | null;
-  // You can add other fields returned by the /profile endpoint here if needed later
+export type ImageType = "avatar" | "banner";
+
+export interface UploadImageResponse {
+  url: string;
+  // Add other fields if backend returns them (e.g., key, size)
+}
+
+export interface UploadImagePayload {
+  file: File;
+  type: ImageType;
+  userId: string;
 }

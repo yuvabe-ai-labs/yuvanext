@@ -10,10 +10,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-// 1. IMPORT USE SESSION
 import { useSession } from "@/lib/auth-client";
-// 2. IMPORT YOUR AXIOS INSTANCE
-import axiosInstance from "@/config/platform-api";
 import { useState, useEffect } from "react";
 import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
@@ -35,7 +32,6 @@ import InternshipDetail from "./pages/InternshipDetail";
 import AuthCallback from "@/hooks/AuthCallback";
 import RecommendedInternships from "./pages/RecommendedInternships";
 import ForgotPassword from "./pages/ForgotPassword";
-// import CheckEmail from "./components/CheckEmail"; // This is likely inside ForgotPassword now?
 import ResetPassword from "./pages/ResetPassword";
 import CandidateTasks from "./pages/CandidateTasks";
 import MyTasks from "./pages/MyTasks";
@@ -43,55 +39,41 @@ import UnitCandidateTasks from "./pages/UnitCandidateTasks";
 import Settings from "./pages/Settings";
 import ScrollToTop from "@/components/ScrollToTop";
 import { NuqsAdapter } from "nuqs/adapters/react-router";
+import { useUnitProfile } from "@/hooks/useUnitProfile";
 
 const queryClient = new QueryClient();
-
-// Protected Route component with role-based routing (onboarding redirect removed)
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { data: session, isPending: isAuthPending } = useSession();
 
-  const [profileLoading, setProfileLoading] = useState(true);
+  const { data: userProfile, isLoading: isProfileLoading } = useUnitProfile();
+
   const navigate = useNavigate();
   const location = useLocation();
 
+  // EFFECT FOR ROLE-BASED REDIRECTS
   useEffect(() => {
-    const checkProfileAndRedirect = async () => {
-      // If auth is still loading, do nothing yet
-      if (isAuthPending) return;
+    // Wait until auth and profile are fully loaded
+    if (isAuthPending || isProfileLoading || !session || !userProfile) return;
 
-      // If no session, the render will handle the redirect to "/"
-      if (!session) {
-        setProfileLoading(false);
-        return;
-      }
+    const role = userProfile.role;
 
-      try {
-        // 3. REFACTORED: Use Axios Instance
-        // Base URL is handled by the instance (e.g. /api is appended if config has it)
-        // Adjust path if your axios baseURL already includes /api
-        const { data: profile } = await axiosInstance.get("/profile");
+    // Role-based dashboard redirects
+    if (role === "candidate" && location.pathname === "/unit-dashboard") {
+      navigate("/dashboard", { replace: true });
+    } else if (role === "unit" && location.pathname === "/dashboard") {
+      navigate("/unit-dashboard", { replace: true });
+    }
+  }, [
+    isAuthPending,
+    isProfileLoading,
+    session,
+    userProfile,
+    location.pathname,
+    navigate,
+  ]);
 
-        // Note: Check your API structure.
-        // If your Hono backend returns { data: { role: ... } } use profile.data.role
-        // If it returns { role: ... } directly, use profile.role
-        const role = profile?.data?.role;
-        // Role-based dashboard redirects
-        if (role === "candidate" && location.pathname === "/unit-dashboard") {
-          navigate("/dashboard", { replace: true });
-        } else if (role === "unit" && location.pathname === "/dashboard") {
-          navigate("/unit-dashboard", { replace: true });
-        }
-      } catch (error) {
-        console.error("Error checking profile:", error);
-      } finally {
-        setProfileLoading(false);
-      }
-    };
-
-    checkProfileAndRedirect();
-  }, [session, isAuthPending, location.pathname, navigate]);
-
-  if (isAuthPending || (session && profileLoading)) {
+  // Show spinner while checking Session OR Profile (if session exists)
+  if (isAuthPending || (session && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-muted flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -99,9 +81,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
+  // If no session, redirect to home. Otherwise render children.
   return session ? <>{children}</> : <Navigate to="/" replace />;
 };
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -126,8 +108,6 @@ const App = () => (
             <Route path="/auth/:role/signup" element={<SignUp />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-
-            {/* ... All your other Protected Routes ... */}
 
             <Route
               path="/internships/:id"

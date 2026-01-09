@@ -7,17 +7,17 @@ import * as z from "zod";
 import NotificationToggle from "./NotificationToggle";
 import { notificationSchema } from "@/lib/schemas";
 
-// 1. NEW IMPORTS
-import { useUnitProfile } from "@/hooks/useUnitProfile";
-import { useUpdateNotifications } from "@/hooks/useSettings";
+// 1. UPDATED IMPORTS: Use the dedicated settings hooks
+import {
+  useNotificationSettings,
+  useUpdateNotifications,
+} from "@/hooks/useSettings";
 
 type NotificationFormData = z.infer<typeof notificationSchema>;
 
 export default function NotificationsSettings() {
-  // 2. USE REACT QUERY HOOKS
-  // Fetch current settings via profile
-  const { data: profile, isLoading: loading } = useUnitProfile();
-  // Mutation to update settings
+  // 2. USE SETTINGS HOOKS instead of Profile hook
+  const { data: settings, isLoading: loading } = useNotificationSettings();
   const updateMutation = useUpdateNotifications();
 
   const [activeSubView, setActiveSubView] = useState<string | null>(null);
@@ -33,14 +33,13 @@ export default function NotificationsSettings() {
 
   /* ---------- INIT ---------- */
   useEffect(() => {
-    if (!profile) return;
+    if (!settings) return;
 
     // 3. MAP BACKEND (CamelCase) TO FORM (snake_case)
-    // Backend: emailNotificationsEnabled, inAppNotificationsEnabled
-    const emailEnabled = profile.emailNotificationsEnabled || false;
-    const inAppEnabled = profile.inAppNotificationsEnabled || false;
+    const emailEnabled = settings.emailNotificationsEnabled || false;
+    const inAppEnabled = settings.inAppNotificationsEnabled || false;
 
-    // Derived 'allow_all' state
+    // Derived 'allow_all' logic
     const allowAll = emailEnabled || inAppEnabled;
 
     reset({
@@ -48,12 +47,11 @@ export default function NotificationsSettings() {
       application_status_in_app: inAppEnabled,
       application_status_email: emailEnabled,
     });
-  }, [profile, reset]);
+  }, [settings, reset]);
 
   /* ---------- HELPER: SYNC TO BACKEND ---------- */
   const syncToBackend = (data: NotificationFormData) => {
     updateMutation.mutate({
-      // Map Form (snake_case) -> Backend (CamelCase)
       emailNotificationsEnabled: data.application_status_email,
       inAppNotificationsEnabled: data.application_status_in_app,
     });
@@ -69,7 +67,8 @@ export default function NotificationsSettings() {
       application_status_email: next,
     };
 
-    reset(payload); // Optimistic UI update
+    // Optimistic UI update
+    reset(payload);
     syncToBackend(payload);
   };
 
@@ -110,9 +109,6 @@ export default function NotificationsSettings() {
       </div>
     );
   }
-
-  // Fallback if profile fails to load (optional)
-  // if (!profile) return ...
 
   /* ---------- SUB VIEW ---------- */
   if (activeSubView) {

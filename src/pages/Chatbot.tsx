@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useSession } from "@/lib/auth-client";
 import { useToast } from "@/components/ui/use-toast";
 import { Send, Sparkles } from "lucide-react";
-import { useChatbotStreaming } from "@/hooks/useChatbot";
+import { useChatbotStream } from "@/hooks/useChatbotStream";
 import chatbotAvatar from "@/assets/chatbot.png";
 import logo from "@/assets/logo-3.png";
 import bag from "@/assets/bag.svg";
@@ -33,24 +32,44 @@ const Chatbot = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const {
-    sendMessage: sendStreamingMessage,
-    isLoading,
-    abort,
-  } = useChatbotStreaming();
+    messages: chatMessages,
+    streamingText,
+    loading: isLoading,
+    onboardingCompleted,
+    sendMessage: sendBackendMessage,
+  } = useChatbotStream();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [showChat, setShowChat] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [userRole, setUserRole] = useState<string>("");
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [isMultiSelect, setIsMultiSelect] = useState(false);
+  const [hasStartedStreaming, setHasStartedStreaming] = useState(false);
+  const [initialGreetingSent, setInitialGreetingSent] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const streamingMessageIdRef = useRef<string | null>(null);
+
+  // Helper function to render message content with bold text
+  const renderMessageContent = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+
+    return parts.map((part, index) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        // Remove ** and render as bold
+        const boldText = part.slice(2, -2);
+        return (
+          <strong key={index} className="font-semibold">
+            {boldText}
+          </strong>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
 
   // Auth guard - redirect if not authenticated
   useEffect(() => {
@@ -66,10 +85,10 @@ const Chatbot = () => {
 
   // Auto-focus input whenever messages or quick options update
   useEffect(() => {
-    if (!isTyping && !isLoading) {
+    if (!isLoading) {
       inputRef.current?.focus();
     }
-  }, [messages, isTyping, isLoading]);
+  }, [messages, isLoading]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -80,10 +99,7 @@ const Chatbot = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (user) {
-        // TODO: Fetch user profile to get role and onboarding status
-        // For now, using placeholder
-        setUserRole("student"); // or "unit"
-        // setIsCompleted(profile.onboarding_completed);
+        setUserRole;
       }
     };
 
@@ -96,24 +112,91 @@ const Chatbot = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isTyping]);
+  }, [messages]);
+
+  // Update isCompleted from backend
+  useEffect(() => {
+    if (onboardingCompleted) {
+      setIsCompleted(true);
+    }
+  }, [onboardingCompleted]);
+
+  // Track streaming state
+  useEffect(() => {
+    if (streamingText && streamingText.length > 0) {
+      setHasStartedStreaming(true);
+    } else if (!isLoading) {
+      setHasStartedStreaming(false);
+    }
+  }, [streamingText, isLoading]);
+
+  // Sync backend messages with local messages state
+  useEffect(() => {
+    // Keep initial greeting if it exists and backend hasn't sent messages yet
+    if (
+      chatMessages.length === 0 &&
+      !streamingText &&
+      messages.length === 1 &&
+      messages[0].id === "initial"
+    ) {
+      return; // Keep the initial greeting
+    }
+
+    const updatedMessages: Message[] = chatMessages.map((msg, index) => ({
+      id: index.toString(),
+      content: msg.content,
+      role: msg.role === "user" ? "user" : "assistant",
+      timestamp: new Date(),
+    }));
+
+    // Add streaming message if streaming
+    if (streamingText) {
+      updatedMessages.push({
+        id: "streaming",
+        content: streamingText,
+        role: "assistant",
+        timestamp: new Date(),
+        isStreaming: true,
+      });
+    }
+
+    // Only update if we have messages to show
+    if (updatedMessages.length > 0) {
+      // Extract options from messages
+      const messagesWithOptions = updatedMessages.map((msg) => {
+        if (msg.role === "assistant" && !msg.isStreaming) {
+          const { cleanText, options } = extractOptions(msg.content);
+          return {
+            ...msg,
+            content: cleanText,
+            options: options.length > 0 ? options : undefined,
+          };
+        }
+        return msg;
+      });
+
+      setMessages(messagesWithOptions);
+    }
+  }, [chatMessages, streamingText]);
 
   const startChat = async () => {
     setShowChat(true);
-    setIsTyping(true);
+    setInitialGreetingSent(false);
 
+    // Show initial greeting immediately
     setTimeout(() => {
       const name = user?.name || user?.email?.split("@")[0] || "there";
 
       const initialMessage: Message = {
-        id: "1",
+        id: "initial",
         content: `Hey, ${name}! 👋`,
         role: "assistant",
         timestamp: new Date(),
       };
+
       setMessages([initialMessage]);
-      setIsTyping(false);
-    }, 1000);
+      setInitialGreetingSent(true);
+    }, 500);
   };
 
   const extractOptions = (
@@ -226,112 +309,13 @@ const Chatbot = () => {
 
     if (!content || isLoading) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content,
-      role: "user",
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
-    setIsTyping(true);
     setSelectedOptions([]);
 
-    // Create placeholder for streaming assistant message
-    const assistantMessageId = (Date.now() + 1).toString();
-    streamingMessageIdRef.current = assistantMessageId;
-
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      content: "",
-      role: "assistant",
-      timestamp: new Date(),
-      isStreaming: true,
-    };
-
-    setMessages((prev) => [...prev, assistantMessage]);
-
     try {
-      const conversationHistory = messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-
-      let accumulatedText = "";
-
-      await sendStreamingMessage(
-        {
-          message: content,
-          conversationHistory,
-        },
-        // onChunk callback
-        (chunk: string) => {
-          accumulatedText += chunk;
-
-          // Update the streaming message with accumulated text (don't extract options yet)
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMessageId
-                ? { ...msg, content: accumulatedText, isStreaming: true }
-                : msg
-            )
-          );
-
-          // Scroll to bottom during streaming
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-          }, 0);
-        },
-        // onComplete callback
-        (data) => {
-          const finalText = data.fullResponse || accumulatedText;
-
-          // Extract options from final response
-          const { cleanText, options } = extractOptions(finalText);
-
-          console.log("Final text:", finalText);
-          console.log("Extracted options:", options);
-          console.log("Clean text:", cleanText);
-
-          // Check if conversation is complete
-          const isComplete =
-            finalText.includes("Perfect! You're all set!") ||
-            finalText.includes("find the best matches") ||
-            finalText.includes("find the best candidates") ||
-            data.onboardingCompleted;
-
-          // Update message with final content and options
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMessageId
-                ? {
-                    ...msg,
-                    content: cleanText,
-                    options: options.length > 0 ? options : undefined,
-                    isStreaming: false,
-                  }
-                : msg
-            )
-          );
-
-          setIsTyping(false);
-          streamingMessageIdRef.current = null;
-
-          if (isComplete) {
-            setIsCompleted(true);
-          }
-        }
-      );
+      await sendBackendMessage(content);
     } catch (error: any) {
       console.error("Chat error:", error);
-      setIsTyping(false);
-      streamingMessageIdRef.current = null;
-
-      // Remove the streaming placeholder on error
-      setMessages((prev) =>
-        prev.filter((msg) => msg.id !== assistantMessageId)
-      );
 
       toast({
         title: "Error",
@@ -396,36 +380,36 @@ const Chatbot = () => {
 
   const renderQuickOptions = (options: string[]) => {
     return (
-      <div className="mt-3 space-y-2">
-        {options.map((option, index) => {
-          const isSelected = selectedOptions.includes(option);
-          const letter = String.fromCharCode(65 + index);
-
-          return (
-            <Button
-              key={`${option}-${index}`}
-              onClick={() => handleOptionClick(option)}
-              disabled={isLoading}
-              className={`w-full px-4 py-3 rounded-lg text-sm text-left justify-start transition-colors font-normal ${
-                isSelected
-                  ? "bg-primary text-white border-primary"
-                  : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-              }`}
-              variant="outline"
-              size="sm"
-            >
-              <span className="font-semibold mr-2">{letter})</span>
-              {option}
-            </Button>
-          );
-        })}
+      <div className="space-y-2 mt-2">
+        <div className="flex flex-wrap gap-2">
+          {options.map((option) => {
+            const isSelected = selectedOptions.includes(option);
+            return (
+              <Button
+                key={option}
+                onClick={() => handleOptionClick(option)}
+                disabled={isLoading}
+                className={`px-4 py-2 border rounded-full text-sm transition-colors ${
+                  isSelected
+                    ? "border-blue-500 bg-blue-500 text-white"
+                    : "border-blue-500 text-blue-600 bg-transparent hover:bg-blue-50"
+                }`}
+                variant="ghost"
+                size="sm"
+              >
+                {option}
+                {isSelected && isMultiSelect && " ✓"}
+              </Button>
+            );
+          })}
+        </div>
 
         {isMultiSelect && selectedOptions.length > 0 && (
-          <div className="flex gap-2 items-center mt-3">
+          <div className="flex gap-2 items-center">
             <Button
               onClick={handleSubmitMultiSelect}
               disabled={isLoading}
-              className="px-6 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90"
+              className="px-6 py-2 bg-blue-600 text-white rounded-full text-sm font-medium hover:bg-blue-700"
               size="sm"
             >
               Submit ({selectedOptions.length} selected)
@@ -433,7 +417,7 @@ const Chatbot = () => {
             <Button
               onClick={() => setSelectedOptions([])}
               disabled={isLoading}
-              className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 text-gray-600 rounded-full text-sm"
               variant="ghost"
               size="sm"
             >
@@ -665,60 +649,31 @@ const Chatbot = () => {
                     </div>
                   )}
 
-                  <div className="flex flex-col">
+                  <div className="flex flex-col w-full">
                     <Card
                       className={`p-3 rounded-3xl border ${
                         message.role === "user"
                           ? "bg-primary text-primary-foreground"
-                          : "bg-white border-gray-200 text-gray-800"
+                          : "bg-transparent border-blue-500 text-blue-600"
                       }`}
                     >
-                      <div className="text-sm leading-relaxed prose prose-sm max-w-none">
-                        <ReactMarkdown
-                          components={{
-                            p: ({ children }) => (
-                              <p className="mb-2 last:mb-0">{children}</p>
-                            ),
-                            ul: ({ children }) => (
-                              <ul className="list-none pl-0 space-y-1">
-                                {children}
-                              </ul>
-                            ),
-                            ol: ({ children }) => (
-                              <ol className="list-none pl-0 space-y-1">
-                                {children}
-                              </ol>
-                            ),
-                            li: ({ children }) => (
-                              <li className="ml-0">{children}</li>
-                            ),
-                            strong: ({ children }) => (
-                              <strong className="font-semibold">
-                                {children}
-                              </strong>
-                            ),
-                            em: ({ children }) => (
-                              <em className="italic">{children}</em>
-                            ),
-                          }}
-                        >
-                          {message.content}
-                        </ReactMarkdown>
-
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {renderMessageContent(message.content)}
                         {/* Show streaming cursor */}
                         {message.isStreaming && (
-                          <span className="inline-block w-2 h-4 bg-gray-800 ml-1 animate-pulse"></span>
+                          <span className="inline-block w-1 h-4 bg-blue-600 ml-1 animate-pulse"></span>
                         )}
-                      </div>
+                      </p>
                     </Card>
 
+                    {/* Quick options below the message */}
                     {message.role === "assistant" &&
                       message.options &&
                       message.options.length > 0 &&
                       !message.isStreaming &&
                       !isLoading &&
                       message.id === messages[messages.length - 1]?.id && (
-                        <div className="mt-2">
+                        <div className="ml-0">
                           {renderQuickOptions(message.options)}
                         </div>
                       )}
@@ -727,26 +682,31 @@ const Chatbot = () => {
               </div>
             ))}
 
-            {isTyping && !messages[messages.length - 1]?.isStreaming && (
-              <div className="flex justify-start items-center space-x-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-                  <img
-                    src={chatbotAvatar}
-                    alt="AI Assistant"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="px-4 py-2 border border-blue-500 text-blue-600 rounded-full inline-block">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                    <div
-                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.1s" }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    ></div>
+            {/* Typing indicator - show when loading but haven't started streaming yet */}
+            {isLoading && !hasStartedStreaming && (
+              <div className="flex justify-start">
+                <div className="flex items-start space-x-3 max-w-[80%]">
+                  <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                    <img
+                      src={chatbotAvatar}
+                      alt="AI Assistant"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex flex-col w-full">
+                    <Card className="p-3 rounded-3xl border bg-transparent border-blue-500 text-blue-600">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                        <div
+                          className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                          style={{ animationDelay: "0.1s" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                          style={{ animationDelay: "0.2s" }}
+                        ></div>
+                      </div>
+                    </Card>
                   </div>
                 </div>
               </div>
@@ -776,8 +736,7 @@ const Chatbot = () => {
               size="sm"
               className="px-4 rounded-full flex items-center space-x-2"
             >
-              <Send className="w-4 h-4" />
-              <span>Send</span>
+              Send
             </Button>
           </div>
         </div>

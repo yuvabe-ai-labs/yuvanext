@@ -3,17 +3,16 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import {
-  useUpdateStudentTask,
-  useDeleteStudentTask,
-} from "@/hooks/useStudentTasks";
-import type { StudentTask } from "@/types/studentTasks.types";
+import { useUpdateTask, useDeleteTask } from "@/hooks/useCandidateTasks";
+import type { Task } from "@/types/candidateTasks.types";
 import { updateTaskSchema } from "@/lib/schemas";
+import type { UpdateTaskPayload } from "@/types/candidateTasks.types";
+import { toast } from "sonner";
 
 interface UpdateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  task: StudentTask;
+  task: Task;
 }
 
 const COLORS = [
@@ -35,8 +34,8 @@ export default function UpdateTaskModal({
 }: UpdateTaskModalProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const updateTask = useUpdateStudentTask();
-  const deleteTask = useDeleteStudentTask();
+  const updateTaskMutation = useUpdateTask(task.applicationId);
+  const deleteTaskMutation = useDeleteTask(task.applicationId);
 
   const {
     register,
@@ -48,11 +47,11 @@ export default function UpdateTaskModal({
   } = useForm<UpdateTaskFormData>({
     resolver: zodResolver(updateTaskSchema),
     defaultValues: {
-      startDate: task.start_date || "",
-      endDate: task.end_date || "",
+      startDate: task.startDate || "",
+      endDate: task.endDate || "",
       color: task.color || COLORS[0],
       note: task.description || "",
-      submissionLink: task.submission_link || "",
+      submissionLink: task.submissionLink || "",
     },
   });
 
@@ -63,42 +62,44 @@ export default function UpdateTaskModal({
   useEffect(() => {
     if (task) {
       reset({
-        startDate: task.start_date || "",
-        endDate: task.end_date || "",
+        startDate: task.startDate || "",
+        endDate: task.endDate || "",
         color: task.color || COLORS[0],
         note: task.description || "",
-        submissionLink: task.submission_link || "",
+        submissionLink: task.submissionLink || "",
       });
     }
   }, [task, reset]);
 
   const onSubmit = async (data: UpdateTaskFormData) => {
     try {
-      await updateTask.mutateAsync({
+      const payload: UpdateTaskPayload = {
+        startDate: data.startDate || null,
+        endDate: data.endDate || null,
+        color: data.color || null,
+        description: data.note?.trim() || null,
+        submissionLink: data.submissionLink?.trim() || null,
+      };
+
+      await updateTaskMutation.mutateAsync({
         taskId: task.id,
-        updates: {
-          start_date: data.startDate,
-          end_date: data.endDate,
-          color: data.color,
-          description: data.note?.trim() || undefined,
-          submission_link: data.submissionLink?.trim() || undefined,
-        },
+        payload,
       });
 
       onClose();
     } catch (error) {
       console.error("Error updating task:", error);
-      alert("Failed to update task. Please try again.");
+      toast("Failed to update task. Please try again.");
     }
   };
 
   const handleDelete = async () => {
     try {
-      await deleteTask.mutateAsync(task.id);
+      await deleteTaskMutation.mutateAsync(task.id);
       onClose();
     } catch (error) {
       console.error("Error deleting task:", error);
-      alert("Failed to delete task. Please try again.");
+      toast("Failed to delete task. Please try again.");
     }
   };
 
@@ -140,10 +141,10 @@ export default function UpdateTaskModal({
               <div className="flex gap-2">
                 <button
                   onClick={handleDelete}
-                  disabled={deleteTask.isPending}
+                  disabled={deleteTaskMutation.isPending}
                   className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                 >
-                  {deleteTask.isPending ? "Deleting..." : "Yes, Delete"}
+                  {deleteTaskMutation.isPending ? "Deleting..." : "Yes, Delete"}
                 </button>
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
@@ -255,10 +256,10 @@ export default function UpdateTaskModal({
           <button
             type="button"
             onClick={handleSubmit(onSubmit)}
-            disabled={updateTask.isPending}
+            disabled={updateTaskMutation.isPending}
             className="w-full py-3 bg-indigo-600 text-white font-medium rounded-full hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {updateTask.isPending ? "Saving..." : "Save"}
+            {updateTaskMutation.isPending ? "Saving..." : "Save"}
           </button>
         </div>
       </div>

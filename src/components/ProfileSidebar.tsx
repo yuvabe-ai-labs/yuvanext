@@ -1,80 +1,26 @@
-import { useAuth } from "@/hooks/useAuth";
-import { useEffect, useState } from "react";
+import { useSession } from "@/lib/auth-client";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ChevronRight, HelpCircle, Info } from "lucide-react";
 import { CircularProgress } from "@/components/CircularProgress";
-import { useProfileCompletion } from "@/hooks/useProfileCompletion";
-
-interface Profile {
-  id: string;
-  full_name: string;
-  role: string;
-  created_at: string;
-}
+import { useProfile } from "@/hooks/useProfile";
+import { useSaveAndAppliedCount } from "@/hooks/useInternships";
 
 interface ProfileSidebarProps {
   savedCount?: number;
 }
 
 const ProfileSidebar = ({ savedCount = 0 }: ProfileSidebarProps) => {
-  const { user } = useAuth();
+  const { data: session } = useSession();
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [studentProfile, setStudentProfile] = useState<any>(null);
-  const [appliedCount, setAppliedCount] = useState<number>(0);
+  const { data: profile } = useProfile();
+  const { data: countsData } = useSaveAndAppliedCount();
 
-  const profileCompletion = useProfileCompletion({ profile, studentProfile });
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (!user) return;
-
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (!error && data) {
-          setProfile(data);
-
-          // Fetch student profile for completion calculation
-          const { data: studentData } = await supabase
-            .from("student_profiles")
-            .select("*")
-            .eq("profile_id", data.id)
-            .maybeSingle();
-
-          if (studentData) {
-            setStudentProfile(studentData);
-          }
-
-          // Fetch applications table for applied counts
-          const { data: applicationsData, error } = await supabase
-            .from("applications")
-            .select("*")
-            .eq("student_id", data.id);
-
-          if (error) {
-            console.error("Error fetching applications:", error);
-          } else if (applicationsData) {
-            console.log(applicationsData);
-            const appliedCount = applicationsData.length;
-            setAppliedCount(appliedCount);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-      }
-    };
-
-    fetchProfile();
-  }, [user]);
+  const profileCompletion = profile?.profileScore || 0;
+  const appliedCount = countsData?.appliedCount || 0;
+  const savedCountFromApi = countsData?.savedCount || savedCount;
 
   return (
     <div className="w-full max-w-sm">
@@ -91,11 +37,11 @@ const ProfileSidebar = ({ savedCount = 0 }: ProfileSidebarProps) => {
               >
                 <Avatar className="h-20 w-20">
                   <AvatarImage
-                    src={(studentProfile as any)?.avatar_url || ""}
+                    src={profile?.avatarUrl || profile?.image || ""}
                   />
                   <AvatarFallback className="text-lg bg-primary text-primary-foreground">
-                    {profile?.full_name?.charAt(0) ||
-                      user?.email?.charAt(0).toUpperCase()}
+                    {profile?.name?.charAt(0) ||
+                      session?.user?.email?.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               </CircularProgress>
@@ -103,9 +49,9 @@ const ProfileSidebar = ({ savedCount = 0 }: ProfileSidebarProps) => {
 
             <div>
               <h3 className="font-semibold text-lg text-gray-900">
-                {profile?.full_name}
+                {profile?.name}
               </h3>
-              <p className="text-sm text-gray-500">{profile?.role}</p>
+              <p className="text-sm text-gray-500">{profile?.type}</p>
             </div>
 
             <Button
@@ -148,7 +94,7 @@ const ProfileSidebar = ({ savedCount = 0 }: ProfileSidebarProps) => {
               </p>
               <div className="flex items-center justify-center space-x-2">
                 <span className="text-2xl font-semibold text-gray-600">
-                  {savedCount}
+                  {savedCountFromApi}
                 </span>
 
                 {/* need to implement in future */}

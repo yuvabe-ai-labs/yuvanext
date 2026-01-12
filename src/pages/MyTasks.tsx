@@ -1,31 +1,32 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import Navbar from "@/components/Navbar";
-import { useAuth } from "@/hooks/useAuth";
-import { useStudentTasks } from "@/hooks/useStudentTasks";
+import { useSession } from "@/lib/auth-client";
+import { useCandidateTasks } from "@/hooks/useCandidateTasks";
 import TaskCalendar from "@/components/TaskCalendar";
 import AddTaskModal from "@/components/AddTaskModal";
 import UpdateTaskModal from "@/components/UpdateTaskModal";
-import type { StudentTask } from "@/types/studentTasks.types";
+import type { Task } from "@/types/candidateTasks.types";
 import { Badge } from "@/components/ui/badge";
 
 export default function MyTasks() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { data: session } = useSession();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<StudentTask | null>(null);
-  const [replyText, setReplyText] = useState("");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const { data: tasksResponse, isLoading } = useStudentTasks(applicationId);
-  const tasks = tasksResponse?.data || [];
 
-  const handleTaskClick = (task: StudentTask) => {
+  const { data: tasks = [], isLoading } = useCandidateTasks(
+    applicationId || ""
+  );
+
+  const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
     setIsUpdateModalOpen(true);
   };
@@ -74,14 +75,13 @@ export default function MyTasks() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
-      <Navbar />
+      {/* <Navbar /> */}
 
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] min-h-[calc(100vh-80px)] gap-20">
           {/* Calendar Section */}
           <div>
-            {/* --- MOVED BUTTON HERE --- */}
             <button
               className="mb-4 mt-6 flex items-center gap-2 text-gray-600 hover:text-gray-800 
               border border-gray-300 rounded-lg px-3 py-1.5 bg-white w-fit"
@@ -90,7 +90,6 @@ export default function MyTasks() {
               <ArrowLeft className="w-4 h-4" />
               <span className="text-sm">Back</span>
             </button>
-            {/* ------------------------- */}
 
             {isLoading ? (
               <div className="flex items-center justify-center h-96">
@@ -131,7 +130,7 @@ export default function MyTasks() {
                     <div className="flex items-start gap-3 mb-2">
                       <div
                         className="w-4 h-1 rounded-full mt-1.5 flex-shrink-0"
-                        style={{ backgroundColor: task.color }}
+                        style={{ backgroundColor: task.color || "#3B82F6" }}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
@@ -149,10 +148,10 @@ export default function MyTasks() {
                           </Badge>
                         </div>
 
-                        {task.end_date && (
+                        {task.endDate && (
                           <p className="text-xs text-gray-500 flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full border-2 border-orange-400"></span>
-                            Due on {format(new Date(task.end_date), "do MMMM")}
+                            Due on {format(new Date(task.endDate), "do MMMM")}
                           </p>
                         )}
                       </div>
@@ -164,13 +163,13 @@ export default function MyTasks() {
                       </p>
                     )}
 
-                    {task.review_remarks && (
+                    {task.reviewRemarks && (
                       <div className="pl-7 mb-3">
                         <p className="text-[11px] font-medium text-gray-700 mb-1">
                           Remarks
                         </p>
                         <p className="text-xs text-gray-600 leading-relaxed">
-                          {task.review_remarks}
+                          {task.reviewRemarks}
                         </p>
                       </div>
                     )}
@@ -183,12 +182,12 @@ export default function MyTasks() {
       </div>
 
       {/* Add Task Modal */}
-      {user?.id && (
+      {session?.user?.id && (
         <AddTaskModal
           isOpen={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
           applicationId={applicationId}
-          studentId={user.id}
+          studentId={session.user.id}
         />
       )}
 

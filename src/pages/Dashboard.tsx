@@ -1,4 +1,3 @@
-import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,37 +9,58 @@ import {
   BookmarkCheck,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
-import Navbar from "@/components/Navbar";
-import ProfileSidebar from "@/components/ProfileSidebar";
-import { useIntern } from "@/hooks/useInternships";
-import { useUnits } from "@/hooks/useUnits";
-import { useCourses } from "@/hooks/useCourses";
+import { useState } from "react";
 import {
-  useInternshipRecommendations,
-  useCourseRecommendations,
-} from "@/hooks/useRecommendations";
-import { useSavedInternships } from "@/hooks/useSavedInternships";
-import { useAppliedInternships } from "@/hooks/useAppliedInternships";
-import { supabase } from "@/integrations/supabase/client";
+  useRemommendedInternships,
+  useSavedInternships,
+  useAppliedInternships,
+} from "@/hooks/useInternships";
+import { useCourses } from "@/hooks/useCourses";
+import type {
+  Internship,
+  SavedInternships,
+  AppliedInternships,
+} from "@/types/internships.types";
+import type { Course } from "@/types/courses.types";
 import {
   differenceInDays,
   differenceInHours,
   differenceInMinutes,
   formatDistanceToNow,
 } from "date-fns";
+import ProfileSidebar from "@/components/ProfileSidebar";
 
 const Dashboard = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
+
   const [currentInternshipIndex, setCurrentInternshipIndex] = useState(0);
   const [currentCourseIndex, setCurrentCourseIndex] = useState(0);
-
   const [activityView, setActivityView] = useState<"saved" | "applied">(
     "saved"
   );
-
   const [currentActivityIndex, setCurrentActivityIndex] = useState(0);
+
+  // Fetch data using React Query hooks
+  const { data: internshipsData, isLoading: internshipsLoading } =
+    useRemommendedInternships();
+  const { data: coursesData, isLoading: coursesLoading } = useCourses();
+  const { data: savedData, isLoading: savedLoading } = useSavedInternships();
+  const { data: appliedData, isLoading: appliedLoading } =
+    useAppliedInternships();
+
+  // Ensure data is always an array
+  const recommendedInternships: Internship[] = Array.isArray(internshipsData)
+    ? internshipsData
+    : [];
+  const recommendedCourses: Course[] = Array.isArray(coursesData)
+    ? coursesData
+    : [];
+  const savedInternships: SavedInternships[] = Array.isArray(savedData)
+    ? savedData
+    : [];
+  const appliedInternships: AppliedInternships[] = Array.isArray(appliedData)
+    ? appliedData
+    : [];
 
   const nextActivity = (activities: any[]) => {
     setCurrentActivityIndex((prev) =>
@@ -53,78 +73,6 @@ const Dashboard = () => {
       prev === 0 ? Math.max(activities.length - 3, 0) : prev - 3
     );
   };
-
-  const { internships, loading: internshipsLoading } = useIntern();
-  const { units } = useUnits();
-  const { courses, loading: coursesLoading } = useCourses();
-  const { savedInternships, loading: savedLoading } = useSavedInternships();
-  const { appliedInternships, loading: appliedLoading } =
-    useAppliedInternships();
-
-  // --- Add new loading state ---
-  const [userSkills, setUserSkills] = useState<string[]>([]);
-  const [skillsLoading, setSkillsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchUserSkills = async () => {
-      if (!user) return;
-
-      try {
-        setSkillsLoading(true);
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (profile) {
-          const { data: studentProfile } = await supabase
-            .from("student_profiles")
-            .select("skills")
-            .eq("profile_id", profile.id)
-            .maybeSingle();
-
-          if (studentProfile?.skills) {
-            let skills: any[] = [];
-
-            if (typeof studentProfile.skills === "string") {
-              try {
-                // Try to parse JSON
-                const parsed = JSON.parse(studentProfile.skills);
-                skills = Array.isArray(parsed)
-                  ? parsed
-                  : studentProfile.skills.split(",").map((s) => s.trim());
-              } catch {
-                // If invalid JSON, fallback to comma-separated
-                skills = studentProfile.skills.split(",").map((s) => s.trim());
-              }
-            } else if (Array.isArray(studentProfile.skills)) {
-              skills = studentProfile.skills;
-            }
-
-            setUserSkills(skills);
-          } else {
-            setUserSkills([]); // Explicitly empty if no skills
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching user skills:", error);
-        setUserSkills([]);
-      } finally {
-        setSkillsLoading(false);
-      }
-    };
-
-    fetchUserSkills();
-  }, [user]);
-
-  // Use recommendation hooks
-  const recommendedInternships = useInternshipRecommendations(
-    internships,
-    userSkills
-  );
-
-  const recommendedCourses = useCourseRecommendations(courses, userSkills);
 
   const nextInternship = () => {
     setCurrentInternshipIndex((prev) =>
@@ -149,10 +97,9 @@ const Dashboard = () => {
       prev === 0 ? recommendedCourses.length - 1 : prev - 1
     );
   };
+
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-
       <div className="container px-4 sm:px-6 lg:px-[7.5rem] py-4 lg:py-10">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-2.5">
           {/* Left Sidebar - Profile - Fixed */}
@@ -161,15 +108,14 @@ const Dashboard = () => {
               <ProfileSidebar savedCount={savedInternships.length} />
             </div>
           </div>
-
-          {/* Main Content - Scrollable */}
+          {/* Main Content */}
           <div
             className="lg:col-span-3 space-y-2.5 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-2"
             style={{ scrollbarWidth: "thin" }}
           >
             {/* Recommended Internships */}
             <section>
-              <Card className="p-6 bg-white shadow-sm md:border md:border-gray-200 rounded-3xl ">
+              <Card className="p-6 bg-white shadow-sm md:border md:border-gray-200 rounded-3xl">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold">Recommended for you</h2>
                   <Button
@@ -181,14 +127,13 @@ const Dashboard = () => {
                   </Button>
                 </div>
 
-                {skillsLoading || internshipsLoading ? (
+                {internshipsLoading ? (
                   <div className="flex justify-center py-8">
                     <Loader2 className="w-8 h-8 animate-spin text-primary" />
                   </div>
                 ) : recommendedInternships.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">
-                    Please update your skills to see matching internship
-                    opportunities.
+                    No recommended internships available at the moment.
                   </p>
                 ) : (
                   <div className="relative">
@@ -219,10 +164,10 @@ const Dashboard = () => {
                             ];
                             const colorClass = colors[idx % colors.length];
                             const initial =
-                              internship.company_name?.charAt(0) || "C";
+                              internship.createdBy?.name?.charAt(0) || "C";
                             const daysAgo = Math.floor(
                               (Date.now() -
-                                new Date(internship.created_at).getTime()) /
+                                new Date(internship.createdAt).getTime()) /
                                 (1000 * 60 * 60 * 24)
                             );
                             const timeText =
@@ -232,28 +177,21 @@ const Dashboard = () => {
                                 ? "1d ago"
                                 : `${daysAgo}d ago`;
 
-                            const matchingUnit = units.find(
-                              (unit) =>
-                                unit.profile_id === internship.created_by
-                            );
-
                             return (
                               <Card
                                 key={internship.id}
-                                className={`${colorClass} shadow-sm hover:shadow-md transition-shadow cursor-pointer rounded-xl  min-w-[60vw] snap-center md:w-auto md:min-w-0 lg:flex-1 [&::-webkit-scrollbar]:w-0`}
+                                className={`${colorClass} shadow-sm hover:shadow-md transition-shadow cursor-pointer rounded-xl min-w-[60vw] snap-center md:w-auto md:min-w-0 lg:flex-1`}
                                 onClick={() =>
-                                  navigate(
-                                    `/recommended-internships?id=${internship.id}`
-                                  )
+                                  navigate(`/internships/${internship.id}`)
                                 }
                               >
-                                <CardHeader className="pb-2.5 color">
+                                <CardHeader className="pb-2.5">
                                   <div className="flex justify-between items-start mb-2">
                                     <div className="w-8 h-8 bg-foreground rounded-full flex items-center justify-center text-background font-bold text-sm">
-                                      {matchingUnit?.avatar_url ? (
+                                      {internship.createdBy?.avatarUrl ? (
                                         <img
-                                          src={matchingUnit.avatar_url}
-                                          alt={matchingUnit.unit_name}
+                                          src={internship.createdBy.avatarUrl}
+                                          alt={internship.createdBy.name}
                                           className="w-full h-full rounded-full object-cover"
                                         />
                                       ) : (
@@ -264,7 +202,7 @@ const Dashboard = () => {
                                       {timeText}
                                     </Badge>
                                   </div>
-                                  <CardTitle className=" m-0 text-gray-800 text-base font-normal flex justify-between items-center">
+                                  <CardTitle className="m-0 text-gray-800 text-base font-normal flex justify-between items-center">
                                     {internship.title &&
                                     internship.title.length > 17
                                       ? `${internship.title.slice(0, 18)}...`
@@ -315,13 +253,13 @@ const Dashboard = () => {
                   </Button>
                 </div>
 
-                {skillsLoading || coursesLoading ? (
+                {coursesLoading ? (
                   <div className="flex justify-center py-8">
                     <Loader2 className="w-8 h-8 animate-spin text-primary" />
                   </div>
                 ) : recommendedCourses.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">
-                    Please update your skills to see matching courses.
+                    No courses available at the moment.
                   </p>
                 ) : (
                   <div className="relative">
@@ -351,15 +289,15 @@ const Dashboard = () => {
                             return (
                               <Card
                                 key={course.id}
-                                className="overflow-hidden rounded-3xl hover:shadow-lg transition-all min-w-[60vw] snap-center md:w-auto md:min-w-0 lg:flex-1 "
+                                className="overflow-hidden rounded-3xl hover:shadow-lg transition-all min-w-[60vw] snap-center md:w-auto md:min-w-0 lg:flex-1"
                                 onClick={() => navigate("/courses")}
                               >
                                 <div
                                   className={`h-32 relative ${gradientClass} max-h-28 flex items-center justify-center`}
                                 >
-                                  {course.image_url ? (
+                                  {course.bannerUrl ? (
                                     <img
-                                      src={course.image_url}
+                                      src={course.bannerUrl}
                                       alt={course.title}
                                       className="w-full h-full object-cover"
                                     />
@@ -370,33 +308,31 @@ const Dashboard = () => {
                                       </h3>
                                     </div>
                                   )}
-                                  {/* Time ago badge */}
-                                  {course.created_at ? (
+                                  {course.createdAt ? (
                                     <Badge className="absolute top-3 right-3 bg-white/90 text-foreground hover:bg-white">
                                       {formatDistanceToNow(
-                                        new Date(course.created_at),
-                                        { addSuffix: true }
+                                        new Date(course.createdAt),
+                                        {
+                                          addSuffix: true,
+                                        }
                                       )}
                                     </Badge>
                                   ) : (
-                                    "Time"
+                                    <Badge className="absolute top-3 right-3 bg-white/90 text-foreground hover:bg-white">
+                                      New
+                                    </Badge>
                                   )}
                                 </div>
 
                                 <CardContent className="px-5 py-2.5 space-y-2">
-                                  {/* Title */}
-
-                                  {course.title ? (
-                                    <h3 className="font-medium text-base line-clamp-2">
-                                      {course.title.length > 20
+                                  <h3 className="font-medium text-base line-clamp-2">
+                                    {course.title
+                                      ? course.title.length > 20
                                         ? `${course.title.slice(0, 18)}...`
-                                        : course.title}
-                                    </h3>
-                                  ) : (
-                                    "Title"
-                                  )}
+                                        : course.title
+                                      : "Course Title"}
+                                  </h3>
 
-                                  {/* Duration and Level */}
                                   <div className="flex items-center justify-between">
                                     <div className="flex m-0 items-center gap-1 text-sm text-muted-foreground">
                                       <Clock className="w-4 h-4" />
@@ -406,7 +342,6 @@ const Dashboard = () => {
                                     </div>
                                   </div>
 
-                                  {/* Know More Button */}
                                   <button className="border-none flex gap-1 items-center p-0 m-0 text-sm text-primary hover:bg-transparent hover:text-primary">
                                     Know more
                                     <ChevronRight className="w-4 h-4" />
@@ -477,7 +412,6 @@ const Dashboard = () => {
                 ) : (
                   <div className="relative">
                     <div className="flex items-center space-x-2 sm:space-x-4">
-                      {/* Left Button */}
                       <Button
                         variant="outline"
                         size="icon"
@@ -493,18 +427,14 @@ const Dashboard = () => {
                         <ChevronLeft className="w-4 h-4" />
                       </Button>
 
-                      {/* Activity Cards */}
-                      <div className="flex overflow-x-auto  snap-x snap-mandatory sm:grid sm:grid-cols-2 gap-2.5 md:grid-cols-3 px-1 [&::-webkit-scrollbar]:w-0">
+                      <div className="flex overflow-x-auto snap-x snap-mandatory sm:grid sm:grid-cols-2 gap-2.5 md:grid-cols-3 px-1 [&::-webkit-scrollbar]:w-0">
                         {(activityView === "saved"
                           ? savedInternships
                           : appliedInternships
                         )
                           .slice(currentActivityIndex, currentActivityIndex + 3)
                           .map((internship) => {
-                            const dateToUse =
-                              activityView === "saved"
-                                ? (internship as any).saved_at
-                                : (internship as any).applied_at;
+                            const dateToUse = internship.createdAt;
 
                             const getShortTimeAgo = (date: string | Date) => {
                               const now = new Date();
@@ -524,30 +454,27 @@ const Dashboard = () => {
 
                             const timeAgo = getShortTimeAgo(dateToUse);
 
-                            const matchingUnit = units.find(
-                              (unit) =>
-                                unit.profile_id === internship.created_by
-                            );
-
                             return (
                               <Card
                                 key={internship.id}
                                 className="px-5 py-4 hover:shadow-lg transition-all cursor-pointer rounded-xl border border-gray-300 min-w-[60vw] sm:min-w-0 sm:w-full"
                                 onClick={() =>
-                                  navigate(`/internships/${internship.id}`)
+                                  navigate(
+                                    `/internships/${internship.internshipId}`
+                                  )
                                 }
                               >
                                 <div className="space-y-2">
                                   <div className="flex items-start justify-between">
-                                    <div className="w-8 h-8 bg-foreground rounded-full flex items-center justify-center text-background font-bold">
-                                      {matchingUnit?.avatar_url ? (
+                                    <div className="w-8 h-8 bg-foreground rounded-full flex items-center justify-center text-background font-bold text-sm">
+                                      {internship.createdBy?.avatarUrl ? (
                                         <img
-                                          src={matchingUnit.avatar_url}
-                                          alt={matchingUnit.unit_name}
+                                          src={internship.createdBy.avatarUrl}
+                                          alt={internship.createdBy.name}
                                           className="w-full h-full rounded-full object-cover"
                                         />
                                       ) : (
-                                        internship.company_name?.charAt(0) ||
+                                        internship.createdBy?.name?.charAt(0) ||
                                         "C"
                                       )}
                                     </div>
@@ -559,33 +486,20 @@ const Dashboard = () => {
                                     </Badge>
                                   </div>
 
-                                  {internship.title ? (
-                                    <h3 className="text-4 font-semibold text-gray-900 line-clamp-1">
-                                      {internship.title}
-                                    </h3>
-                                  ) : (
-                                    "Title"
-                                  )}
+                                  <h3 className="text-4 font-semibold text-gray-900 line-clamp-1">
+                                    {internship.internshipTitle || "Untitled"}
+                                  </h3>
 
                                   <p className="text-sm text-gray-500 line-clamp-3">
-                                    {internship.description ||
+                                    {internship.internshipDescription ||
                                       "No description available"}
                                   </p>
-                                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                                    <div className="flex items-center gap-1">
-                                      <Clock className="w-4 h-4" />
-                                      <span>
-                                        {internship.duration || "Not specified"}
-                                      </span>
-                                    </div>
-                                  </div>
                                 </div>
                               </Card>
                             );
                           })}
                       </div>
 
-                      {/* Right Button */}
                       <Button
                         variant="outline"
                         size="icon"

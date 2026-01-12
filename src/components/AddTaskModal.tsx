@@ -2,8 +2,9 @@ import { X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useCreateStudentTask } from "@/hooks/useStudentTasks";
+import { useCreateTask } from "@/hooks/useCandidateTasks";
 import { taskSchema } from "@/lib/schemas";
+import type { CreateTaskPayload } from "@/types/candidateTasks.types";
 
 interface AddTaskModalProps {
   isOpen: boolean;
@@ -30,7 +31,7 @@ export default function AddTaskModal({
   applicationId,
   studentId,
 }: AddTaskModalProps) {
-  const createTask = useCreateStudentTask();
+  const createTask = useCreateTask();
 
   const {
     register,
@@ -58,20 +59,18 @@ export default function AddTaskModal({
 
   const onSubmit = async (data: TaskFormData) => {
     try {
-      await createTask.mutateAsync({
-        studentId,
-        taskData: {
-          application_id: applicationId,
-          title: data.title,
-          description: data.note?.trim() || undefined,
-          start_date: data.startDate,
-          start_time: data.startTime || undefined,
-          end_date: data.endDate,
-          end_time: data.endTime || undefined,
-          color: data.color,
-          submission_link: data.submissionLink?.trim() || undefined,
-        },
-      });
+      const payload: CreateTaskPayload = {
+        applicationId,
+        title: data.title,
+        description: data.note?.trim() || null,
+        startDate: data.startDate || null,
+        startTime: data.startTime || null,
+        endDate: data.endDate || null,
+        endTime: data.endTime || null,
+        color: data.color || null,
+      };
+
+      await createTask.mutateAsync(payload);
 
       reset();
       onClose();
@@ -223,7 +222,7 @@ export default function AddTaskModal({
             />
           </div>
 
-          {/* Submission Link */}
+          {/* Submission Link - Commented out as per original */}
           {/* <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Submission link

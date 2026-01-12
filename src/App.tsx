@@ -16,8 +16,8 @@ import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
-import UnitDashboard from "./pages/UnitDashboard";
-import Chatbot from "./pages/Chatbot";
+// import UnitDashboard from "./pages/UnitDashboard";
+// import Chatbot from "./pages/Chatbot";
 import Internships from "./pages/Internships";
 import Courses from "./pages/Courses";
 import Units from "./pages/Units";
@@ -41,9 +41,12 @@ import ScrollToTop from "@/components/ScrollToTop";
 import { NuqsAdapter } from "nuqs/adapters/react-router";
 import { useUnitProfile } from "@/hooks/useUnitProfile";
 
+import { useProfile } from "@/hooks/useProfile";
+
 const queryClient = new QueryClient();
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { data: session, isPending: isAuthPending } = useSession();
+  const { data: profile, isLoading: profileLoading } = useProfile();
 
   const { data: userProfile, isLoading: isProfileLoading } = useUnitProfile();
 
@@ -52,6 +55,30 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   // EFFECT FOR ROLE-BASED REDIRECTS
   useEffect(() => {
+    const checkProfileAndRedirect = async () => {
+      // If auth is still loading, do nothing yet
+      if (isAuthPending) return;
+
+      // If no session, the render will handle the redirect to "/"
+      if (!session) {
+        return;
+      }
+
+      // If profile is still loading, wait
+      if (profileLoading) return;
+
+      // If profile is loaded, handle role-based redirects
+      if (profile) {
+        const role = profile?.role;
+
+        // Only handle role-based dashboard redirects
+        if (role === "candidate") {
+          navigate("/dashboard", { replace: true });
+        } else if (role === "unit") {
+          navigate("/unit-dashboard", { replace: true });
+        }
+      }
+    };
     // Wait until auth and profile are fully loaded
     if (isAuthPending || isProfileLoading || !session || !userProfile) return;
 
@@ -72,6 +99,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     navigate,
   ]);
 
+    checkProfileAndRedirect();
+  }, [
+    session,
+    isAuthPending,
+    profile,
+    profileLoading,
+    location.pathname,
+    navigate,
+  ]);
+
+  if (isAuthPending || (session && profileLoading)) {
   // Show spinner while checking Session OR Profile (if session exists)
   if (isAuthPending || (session && isProfileLoading)) {
     return (
@@ -94,7 +132,7 @@ const App = () => (
         <NuqsAdapter>
           <Routes>
             <Route path="/auth/callback" element={<AuthCallback />} />
-
+            {/* 
             <Route
               path="/chatbot"
               element={
@@ -102,7 +140,7 @@ const App = () => (
                   <Chatbot />
                 </ProtectedRoute>
               }
-            />
+            /> */}
             <Route path="/" element={<Landing />} />
             <Route path="/auth/:role/signin" element={<SignIn />} />
             <Route path="/auth/:role/signup" element={<SignUp />} />
@@ -133,14 +171,14 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
+            {/* <Route
               path="/unit-dashboard"
               element={
                 <ProtectedRoute>
                   <UnitDashboard />
                 </ProtectedRoute>
               }
-            />
+            /> */}
             <Route
               path="/internships"
               element={

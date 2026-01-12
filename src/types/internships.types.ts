@@ -3,10 +3,56 @@ export enum InternshipStatus {
   ACTIVE = "active",
 }
 
+export enum CandidateDecision {
+  ACCEPT = "accept",
+  REJECT = "reject",
+  PENDING = "pending",
+}
+
+export enum UnitDecision {
+  SELECT = "select",
+  REJECT = "reject",
+  PENDING = "pending",
+}
+
+export enum UnitDecision {
+  A = "full_time",
+  PART_TIME = "part_time",
+  BOTH = "both",
+}
+
 export enum JobType {
   FULL_TIME = "full_time",
   PART_TIME = "part_time",
   BOTH = "both",
+}
+
+export enum InternshipApplicationStatus {
+  APPLIED = "applied",
+  SHORTLISTED = "shortlisted",
+  NOT_SHORTLISTED = "not_shortlisted",
+  INTERVIEWED = "interviewed",
+  HIRED = "hired",
+}
+
+export interface ApiMessageResponse {
+  message: string;
+}
+
+export interface ApplyInternshipRequest {
+  includedSections: string[];
+}
+
+export interface CreatedBy {
+  userId: string;
+  name: string;
+  address: string;
+  phone: string;
+  websiteUrl: string;
+  description: string;
+  avatarUrl: string;
+  bannerUrl: string;
+  location: string;
 }
 
 export interface Internship {
@@ -19,7 +65,7 @@ export interface Internship {
     websiteUrl: string;
     avatarUrl: string;
     bannerUrl: string;
-    description: string;
+    description: CreatedBy;
   };
   title: string;
   description: string | null;
@@ -36,46 +82,41 @@ export interface Internship {
   language: string[];
   createdAt: string;
   updatedAt: string;
-  applicationCount?: number;
 }
 
-export interface CreateInternshipPayload {
-  title: string;
-  duration: string;
-  isPaid: boolean; // backend expects isPaid (camelCase)
-  payment: string;
-  description: string;
-  responsibilities: string[];
-  benefits: string[];
-  skillsRequired: string[]; // backend expects skillsRequired
-  language: string[]; // backend expects 'language' string of array
-  closingDate: string; // backend expects closingDate
-  minAgeRequired: string; // backend expects minAgeRequired
-  jobType: "full_time" | "part_time" | "both"; // backend expects jobType
-  status: "active";
+export interface SavedInternships {
+  id: string;
+  internshipId: string;
+  createdAt: string;
+  internshipTitle: string;
+  internshipDescription: string;
+  createdBy: CreatedBy;
 }
 
-// Optional: Response type if needed
-export interface InternshipResponse {
-  status_code: number;
-  message: string;
-  data: object;
+export interface AppliedInternships {
+  id: string;
+  internshipId: string;
+  status: InternshipApplicationStatus;
+  includedSections: string[];
+  createdAt: string;
+  internshipTitle: string;
+  internshipDescription: string;
+  createdBy: CreatedBy;
 }
 
-// This payload is sent to PUT /api/internships/{id}
-export interface UpdateInternshipPayload {
-  id: string; // The ID of the internship to update
-  title: string;
-  duration: string;
-  isPaid: boolean;
-  payment: string;
-  description: string;
-  responsibilities: string[];
-  benefits: string[];
-  skillsRequired: string[];
-  language: string[];
-  closingDate: string;
-  minAgeRequired: string;
-  jobType: "full_time" | "part_time" | "both";
-  // status: "active" | "closed"; // Optional if you update status here too
+export interface SavedAndAppliedCount {
+  savedCount: number;
+  appliedCount: number;
+}
+
+export interface AppliedInternshipStatus {
+  id: string;
+  applicationTitle: string;
+  status: InternshipApplicationStatus;
+  candidateOfferDecision: CandidateDecision | null;
+  unitOfferDecision: UnitDecision | null;
+  unitName: string;
+  avatarUrl: string;
+  createdAt: string;
+  updatedAt: string;
 }

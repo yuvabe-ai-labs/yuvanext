@@ -1,4 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  getStudentTasks,
+  createStudentTask,
+  deleteStudentTask,
+  updateStudentTask,
+} from "@/services/studentTasks.service";
+import type {
+  CreateTaskInput,
+  UpdateTaskInput,
+} from "@/types/candidateTasks.types";
 import axiosInstance from "@/config/platform-api";
 import { getStudentTasksByApplication } from "@/services/studentTasks.service";
 

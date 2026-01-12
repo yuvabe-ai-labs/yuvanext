@@ -123,7 +123,7 @@ export const ImageUploadDialog = ({
 
       onSuccess(publicUrl);
       onClose();
-    } catch (error: any) {
+    } catch (error) {
       console.error(`Error uploading ${imageType}:`, error);
       // Errors are handled by the hooks/service usually, but we keep this fallback
       toast({
@@ -153,7 +153,7 @@ export const ImageUploadDialog = ({
 
       onSuccess("");
       onClose();
-    } catch (error: any) {
+    } catch (error) {
       console.error(`Error deleting ${imageType}:`, error);
       toast({
         title: "Delete failed",

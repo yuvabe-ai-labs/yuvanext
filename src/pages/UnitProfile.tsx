@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,7 +22,15 @@ import {
 
 // 1. IMPORT CUSTOM HOOKS
 import { useUnitProfile, useUpdateUnitProfile } from "@/hooks/useUnitProfile";
-import { useSession } from "@/lib/auth-client"; // For checking auth state if needed
+import { useSession } from "@/lib/auth-client";
+
+// 2. IMPORT YOUR TYPES
+import type {
+  Profile,
+  Project,
+  SocialLink,
+  // Add other types if needed for specific props
+} from "@/types/profile.types"; // Adjust path if needed
 
 // Components
 import { UnitDetailsDialog } from "@/components/unit/UnitDetailsDialog";
@@ -34,14 +43,17 @@ import { CircularProgress } from "@/components/CircularProgress";
 import { ImageUploadDialog } from "@/components/ImageUploadDialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
-import { useState, useRef } from "react";
-
 const UnitProfile = () => {
   const { data: session } = useSession();
   const user = session?.user;
 
-  // 2. USE REACT QUERY HOOKS
+  // 3. USE REACT QUERY HOOKS WITH TYPE
+  // The hook should ideally return 'Profile | undefined'
   const { data: profileData, isLoading, refetch } = useUnitProfile();
+
+  // Cast strictly if the hook returns a generic type, otherwise rely on hook inference
+  const profile = profileData as Profile;
+
   const updateMutation = useUpdateUnitProfile();
 
   // Dialog States
@@ -53,47 +65,46 @@ const UnitProfile = () => {
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // 3. ACTION HANDLERS (Simplified)
+  // 4. ACTION HANDLERS (Typed with your interfaces)
 
-  const handleUpdateProfile = (updates: any) => {
+  const handleUpdateProfile = (updates: Partial<Profile>) => {
     updateMutation.mutate(updates);
   };
 
-  const handleAddProject = (projectData: any) => {
-    const currentProjects = profileData?.projects;
+  const handleAddProject = (projectData: Omit<Project, "id">) => {
+    const currentProjects = profile?.projects || [];
+    // Backend likely assigns ID, but optimistic UI might need a temp ID or wait for refetch
     const updatedProjects = [...currentProjects, { ...projectData }];
     updateMutation.mutate({ projects: updatedProjects });
   };
 
   const handleRemoveProject = (projectId: string) => {
-    const currentProjects = profileData?.projects || [];
-    const updatedProjects = currentProjects.filter(
-      (p: any) => p.id !== projectId
-    );
+    if (!projectId) return;
+    const currentProjects = profile?.projects || [];
+    const updatedProjects = currentProjects.filter((p) => p.id !== projectId);
     updateMutation.mutate({ projects: updatedProjects });
   };
 
-  const handleUpdateSocialLinks = (links: any[]) => {
-    updateMutation.mutate({ socialLinks: { ...links } });
+  const handleUpdateSocialLinks = (links: SocialLink[]) => {
+    updateMutation.mutate({ socialLinks: [...links] });
   };
 
   const handleRemoveSocialLink = (linkId: string) => {
-    const currentLinks = profileData?.socialLinks || [];
-    const updatedLinks = currentLinks.filter((l: any) => l.id !== linkId);
+    const currentLinks = profile?.socialLinks || [];
+    const updatedLinks = currentLinks.filter((l) => l.id !== linkId);
     updateMutation.mutate({ socialLinks: updatedLinks });
   };
 
-  // Callback for image upload dialogs (Use refetch from React Query)
   const handleImageSuccess = () => {
     refetch();
   };
 
-  // 4. DATA MAPPING
-  const projects = profileData?.projects || [];
-  const galleryImages = profileData?.galleryImages || [];
-  const socialLinks = profileData?.socialLinks || [];
-  const glimpseUrl = profileData?.galleryVideos || null;
-  const profileScore = profileData?.profileScore || 0;
+  // 5. DATA MAPPING (Using your Profile interface fields)
+  const projects = profile?.projects || [];
+  const galleryImages = profile?.galleryImages || [];
+  const socialLinks = profile?.socialLinks || [];
+  const glimpseUrl = profile?.galleryVideos || null;
+  const profileScore = profile?.profileScore || 0;
 
   if (isLoading) {
     return (
@@ -126,9 +137,9 @@ const UnitProfile = () => {
 
       {/* Hero Background - Banner */}
       <div className="relative h-48 sm:h-56 md:h-64 lg:h-72 bg-gradient-to-r from-primary to-primary-foreground group">
-        {profileData?.bannerUrl ? (
+        {profile?.bannerUrl ? (
           <img
-            src={profileData.bannerUrl}
+            src={profile.bannerUrl}
             alt="Banner"
             className="w-full h-full object-cover"
           />
@@ -155,9 +166,9 @@ const UnitProfile = () => {
                   strokeWidth={3}
                 >
                   <Avatar className="h-20 w-20">
-                    <AvatarImage src={profileData?.avatarUrl} />
+                    <AvatarImage src={profile?.avatarUrl || undefined} />
                     <AvatarFallback className="text-lg bg-primary text-primary-foreground">
-                      {profileData?.name?.charAt(0) || "U"}
+                      {profile?.name?.charAt(0) || "U"}
                     </AvatarFallback>
                   </Avatar>
                 </CircularProgress>
@@ -172,29 +183,29 @@ const UnitProfile = () => {
               <div className="flex-1 w-full">
                 <div className="flex items-center space-x-2 mb-2">
                   <h1 className="text-xl sm:text-2xl font-bold">
-                    {profileData?.name || "Unit Name"}
+                    {profile?.name || "Unit Name"}
                   </h1>
                   <UnitDetailsDialog
-                    profile={profileData}
-                    unitProfile={profileData}
-                    onUpdate={handleUpdateProfile}
+                    // profile={profile} // Pass full profile object
+                    unitProfile={profile} // Keep for compatibility if dialog expects it
+                    // onUpdate={handleUpdateProfile}
                     onUpdateUnit={handleUpdateProfile}
                   >
                     <Pencil className="w-4 h-4 text-muted-foreground cursor-pointer hover:text-primary" />
                   </UnitDetailsDialog>
                 </div>
                 <p className="text-sm sm:text-base text-muted-foreground mb-2">
-                  {profileData?.type || "Organization"} •{" "}
-                  {profileData?.industry || "Industry"}
+                  {profile?.type || "Organization"} •{" "}
+                  {profile?.industry || "Industry"}
                 </p>
 
                 <div className="mb-4 flex items-start gap-2">
                   <p className="text-xs sm:text-sm text-muted-foreground flex-1">
-                    {profileData?.description ||
+                    {profile?.description ||
                       "Tell the world about your organization - what you do, who you serve, and what makes you unique."}
                   </p>
                   <UnitDescriptionDialog
-                    description={profileData?.description || ""}
+                    description={profile?.description || ""}
                     onSave={(description) =>
                       handleUpdateProfile({ description })
                     }
@@ -208,28 +219,28 @@ const UnitProfile = () => {
                   <div className="flex items-center space-x-1">
                     <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
                     <span className="truncate max-w-[200px] sm:max-w-none">
-                      {profileData?.email || user?.email || "No email provided"}
+                      {profile?.email || user?.email || "No email provided"}
                     </span>
                   </div>
-                  {profileData?.phone && (
+                  {profile?.phone && (
                     <div className="flex items-center space-x-1">
                       <Phone className="w-3 h-3 sm:w-4 sm:h-4" />
-                      <span>{profileData.phone}</span>
+                      <span>{profile.phone}</span>
                     </div>
                   )}
-                  {profileData?.address && (
+                  {profile?.address && (
                     <div className="flex items-center space-x-1">
                       <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
                       <span className="truncate max-w-[150px] sm:max-w-none">
-                        {profileData.address}
+                        {profile.address}
                       </span>
                     </div>
                   )}
-                  {profileData?.websiteUrl && (
+                  {profile?.websiteUrl && (
                     <div className="flex items-center space-x-1">
                       <Globe className="w-3 h-3 sm:w-4 sm:h-4" />
                       <a
-                        href={profileData.websiteUrl}
+                        href={profile.websiteUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hover:text-primary"
@@ -257,9 +268,9 @@ const UnitProfile = () => {
                   <div className="flex items-center justify-between">
                     <span>Unit Details</span>
                     <UnitDetailsDialog
-                      profile={profileData}
-                      unitProfile={profileData}
-                      onUpdate={handleUpdateProfile}
+                      // profile={profile}
+                      unitProfile={profile}
+                      // onUpdate={handleUpdateProfile}
                       onUpdateUnit={handleUpdateProfile}
                     >
                       <Button
@@ -276,7 +287,7 @@ const UnitProfile = () => {
                   <div className="flex items-center justify-between">
                     <span>About Us</span>
                     <UnitDescriptionDialog
-                      description={profileData?.description || ""}
+                      description={profile?.description || ""}
                       onSave={(description) =>
                         handleUpdateProfile({ description })
                       }
@@ -309,7 +320,7 @@ const UnitProfile = () => {
                   <div className="flex items-center justify-between">
                     <span>Mission</span>
                     <UnitDescriptionDialog
-                      description={profileData?.mission || ""}
+                      description={profile?.mission || ""}
                       onSave={(mission) => handleUpdateProfile({ mission })}
                       title="Edit Mission"
                     >
@@ -327,7 +338,7 @@ const UnitProfile = () => {
                   <div className="flex items-center justify-between">
                     <span>Values</span>
                     <UnitDescriptionDialog
-                      description={profileData?.values || ""}
+                      description={profile?.values || ""}
                       onSave={(values) => handleUpdateProfile({ values })}
                       title="Edit Values"
                     >
@@ -409,7 +420,7 @@ const UnitProfile = () => {
 
                 {projects.length > 0 ? (
                   <div className="divide-y divide-border">
-                    {projects.map((project: any, index: number) => (
+                    {projects.map((project, index) => (
                       <div key={index} className="py-3 sm:py-4">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
@@ -443,7 +454,9 @@ const UnitProfile = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleRemoveProject(project.id)}
+                            onClick={() => {
+                              if (project.id) handleRemoveProject(project.id);
+                            }}
                             className="text-muted-foreground hover:text-destructive flex-shrink-0"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -468,7 +481,7 @@ const UnitProfile = () => {
                   <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
                     Mission
                     <UnitDescriptionDialog
-                      description={profileData?.mission || ""}
+                      description={profile?.mission || ""}
                       onSave={(mission) => handleUpdateProfile({ mission })}
                       title="Edit Mission"
                     >
@@ -478,7 +491,7 @@ const UnitProfile = () => {
                 </div>
                 <div className="rounded-xl min-h-[100px]">
                   <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap">
-                    {profileData?.mission ||
+                    {profile?.mission ||
                       "Define your organization's mission statement - the purpose and primary objectives that drive your work."}
                   </p>
                 </div>
@@ -492,7 +505,7 @@ const UnitProfile = () => {
                   <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
                     Values
                     <UnitDescriptionDialog
-                      description={profileData?.values || ""}
+                      description={profile?.values || ""}
                       onSave={(values) => handleUpdateProfile({ values })}
                       title="Edit Values"
                     >
@@ -502,7 +515,7 @@ const UnitProfile = () => {
                 </div>
                 <div className="rounded-xl min-h-[100px]">
                   <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap">
-                    {profileData?.values ||
+                    {profile?.values ||
                       "Describe the principles and ethics that define your organization's culture and decisions."}
                   </p>
                 </div>
@@ -532,7 +545,7 @@ const UnitProfile = () => {
 
                 {socialLinks.length > 0 ? (
                   <div className="space-y-3 sm:space-y-4">
-                    {socialLinks.map((link: any, index: number) => (
+                    {socialLinks.map((link, index) => (
                       <div
                         key={index}
                         className="flex flex-col sm:grid sm:grid-cols-5 gap-2 sm:items-center"
@@ -644,7 +657,7 @@ const UnitProfile = () => {
                         msOverflowStyle: "none",
                       }}
                     >
-                      {galleryImages.map((image: string, index: number) => (
+                      {galleryImages.map((image, index) => (
                         <div
                           key={index}
                           className="relative flex-shrink-0 w-48 h-48 sm:w-64 sm:h-64 rounded-lg overflow-hidden border border-border group cursor-pointer"
@@ -690,14 +703,14 @@ const UnitProfile = () => {
       </div>
 
       {/* All Dialogs */}
-      {profileData && (
+      {profile && (
         <>
           <ImageUploadDialog
             isOpen={isAvatarDialogOpen}
             onClose={() => setIsAvatarDialogOpen(false)}
-            currentImageUrl={profileData.avatarUrl}
-            userId={profileData.id}
-            userName={profileData.name}
+            currentImageUrl={profile.avatarUrl}
+            userId={profile.id}
+            userName={profile.name}
             imageType="avatar"
             entityType="unit"
             onSuccess={handleImageSuccess}
@@ -706,9 +719,9 @@ const UnitProfile = () => {
           <ImageUploadDialog
             isOpen={isBannerDialogOpen}
             onClose={() => setIsBannerDialogOpen(false)}
-            currentImageUrl={profileData.bannerUrl}
-            userId={profileData.id}
-            userName={profileData.name}
+            currentImageUrl={profile.bannerUrl}
+            userId={profile.id}
+            userName={profile.name}
             imageType="banner"
             entityType="unit"
             onSuccess={handleImageSuccess}
@@ -717,7 +730,7 @@ const UnitProfile = () => {
           <GalleryDialog
             isOpen={isGalleryDialogOpen}
             onClose={() => setIsGalleryDialogOpen(false)}
-            userId={profileData.id}
+            userId={profile.id}
             currentImages={galleryImages}
             onSuccess={handleImageSuccess}
           />
@@ -725,7 +738,7 @@ const UnitProfile = () => {
           <GlimpseDialog
             isOpen={isGlimpseDialogOpen}
             onClose={() => setIsGlimpseDialogOpen(false)}
-            userId={profileData.id}
+            userId={profile.id}
             currentGlimpseUrl={glimpseUrl}
             onSuccess={handleImageSuccess}
           />

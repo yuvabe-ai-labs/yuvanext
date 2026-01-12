@@ -17,3 +17,16 @@ export interface InternshipApplicant {
   appliedDate?: string; // Needed for "Applied X days ago"
   profileSummary?: string; // Needed for the candidate bio text
 }
+
+export interface Applicant {
+  applicationId: string;
+  candidateName: string;
+  candidateAvatarUrl?: string;
+  internshipTitle: string;
+  status: string;
+  appliedDate?: string; // ISO String
+  profileSummary?: string;
+  candidateSkills?: string[];
+  matchScore?: number; // CamelCase
+  match_score?: number; // Snake_case fallback
+}

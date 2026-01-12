@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
   DialogContent,
@@ -16,41 +18,55 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+
+// Import Schema & Types
+import {
+  unitDetailsSchema,
+  type UnitDetailsFormValues,
+} from "@/lib/UnitDetailsDialogSchema";
+import { Profile } from "@/types/profile.types";
 
 interface UnitDetailsDialogProps {
-  // We accept both for compatibility, but they likely point to the same object now
-  profile: any;
-  unitProfile: any;
-  onUpdate: (updates: any) => void;
-  onUpdateUnit: (updates: any) => void;
+  // Accepts the data object (can handle partial data)
+  unitProfile?: Profile;
+  // Handler returns a Promise (for async mutations)
+  onUpdateUnit: (updates: UnitDetailsFormValues) => Promise<void> | void;
   children: React.ReactNode;
 }
 
 export const UnitDetailsDialog = ({
-  profile,
   unitProfile,
-  onUpdate,
   onUpdateUnit,
   children,
 }: UnitDetailsDialogProps) => {
   const [open, setOpen] = useState(false);
 
-  // Use camelCase from your new API response
-  const [formData, setFormData] = useState({
-    name: unitProfile?.name || profile?.name || "",
-    type: unitProfile?.type || "",
-    industry: unitProfile?.industry || "",
-    websiteUrl: unitProfile?.websiteUrl || "",
-    email: unitProfile?.email || profile?.email || "",
-    phone: unitProfile?.phone || profile?.phone || "",
-    address: unitProfile?.address || "",
-    isAurovillian: unitProfile?.isAurovillian || false,
+  // Initialize React Hook Form
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<UnitDetailsFormValues>({
+    resolver: zodResolver(unitDetailsSchema),
+    defaultValues: {
+      name: "",
+      type: "",
+      industry: "",
+      websiteUrl: "",
+      email: "",
+      phone: "",
+      address: "",
+      isAurovillian: false,
+    },
   });
 
-  // Update local state when props change (e.g. after a fetch)
+  // Sync form with data when modal opens or data loads
   useEffect(() => {
     if (unitProfile) {
-      setFormData({
+      reset({
         name: unitProfile.name || "",
         type: unitProfile.type || "",
         industry: unitProfile.industry || "",
@@ -61,31 +77,16 @@ export const UnitDetailsDialog = ({
         isAurovillian: unitProfile.isAurovillian || false,
       });
     }
-  }, [unitProfile]);
+  }, [unitProfile, reset, open]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Send updated fields. The new API likely handles partial updates to the single profile object.
-    const updates = {
-      name: formData.name,
-      type: formData.type,
-      industry: formData.industry,
-      websiteUrl: formData.websiteUrl,
-      email: formData.email,
-      phone: formData.phone,
-      address: formData.address,
-      isAurovillian: formData.isAurovillian,
-    };
-
-    // Call the update handler (React Query mutation from parent)
-    await onUpdateUnit(updates);
-
-    setOpen(false);
-  };
-
-  const handleChange = (field: string, value: string | boolean) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const onSubmit = async (data: UnitDetailsFormValues) => {
+    try {
+      await onUpdateUnit(data);
+      setOpen(false);
+    } catch (error) {
+      console.error("Failed to update unit details:", error);
+      // Optional: setError in form if needed
+    }
   };
 
   return (
@@ -95,110 +96,132 @@ export const UnitDetailsDialog = ({
         <DialogHeader>
           <DialogTitle>Edit Unit Details</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
+            {/* Unit Name */}
             <div className="col-span-2">
               <Label htmlFor="name">Unit Name</Label>
               <Input
                 id="name"
-                value={formData.name}
-                onChange={(e) => handleChange("name", e.target.value)}
                 placeholder="Enter unit name"
-                required
+                {...register("name")}
+              />
+              {errors.name && (
+                <p className="text-sm text-destructive mt-1">
+                  {errors.name.message}
+                </p>
+              )}
+            </div>
+
+            {/* Unit Type (Controlled) */}
+            <div>
+              <Label htmlFor="type">Unit Type</Label>
+              <Controller
+                name="type"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Startup">Startup</SelectItem>
+                      <SelectItem value="Commercial">Commercial</SelectItem>
+                      <SelectItem value="Cultural">Cultural</SelectItem>
+                      <SelectItem value="Educational">Educational</SelectItem>
+                      <SelectItem value="Service">Service</SelectItem>
+                      <SelectItem value="Community">Community</SelectItem>
+                      <SelectItem value="Farm">Farm</SelectItem>
+                      <SelectItem value="Forest">Forest</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               />
             </div>
 
-            <div>
-              <Label htmlFor="type">Unit Type</Label>
-              <Select
-                value={formData.type}
-                onValueChange={(value) => handleChange("type", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Startup">Startup</SelectItem>
-                  <SelectItem value="Commercial">Commercial</SelectItem>
-                  <SelectItem value="Cultural">Cultural</SelectItem>
-                  <SelectItem value="Educational">Educational</SelectItem>
-                  <SelectItem value="Service">Service</SelectItem>
-                  <SelectItem value="Community">Community</SelectItem>
-                  <SelectItem value="Farm">Farm</SelectItem>
-                  <SelectItem value="Forest">Forest</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
+            {/* Industry */}
             <div>
               <Label htmlFor="industry">Industry</Label>
               <Input
                 id="industry"
-                value={formData.industry}
-                onChange={(e) => handleChange("industry", e.target.value)}
                 placeholder="e.g., Technology, Education"
+                {...register("industry")}
               />
             </div>
 
+            {/* Website URL */}
             <div className="col-span-2">
               <Label htmlFor="websiteUrl">Website URL</Label>
               <Input
                 id="websiteUrl"
                 type="url"
-                value={formData.websiteUrl}
-                onChange={(e) => handleChange("websiteUrl", e.target.value)}
                 placeholder="https://example.com"
+                {...register("websiteUrl")}
               />
+              {errors.websiteUrl && (
+                <p className="text-sm text-destructive mt-1">
+                  {errors.websiteUrl.message}
+                </p>
+              )}
             </div>
 
+            {/* Email */}
             <div>
               <Label htmlFor="email">Contact Email</Label>
               <Input
                 id="email"
                 type="email"
-                value={formData.email}
-                onChange={(e) => handleChange("email", e.target.value)}
                 placeholder="contact@example.com"
+                {...register("email")}
               />
+              {errors.email && (
+                <p className="text-sm text-destructive mt-1">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
 
+            {/* Phone */}
             <div>
               <Label htmlFor="phone">Contact Phone</Label>
               <Input
                 id="phone"
                 type="tel"
-                value={formData.phone}
-                onChange={(e) => handleChange("phone", e.target.value)}
                 placeholder="+91 123 456 7890"
+                {...register("phone")}
               />
             </div>
 
+            {/* Address */}
             <div className="col-span-2">
               <Label htmlFor="address">Location</Label>
               <Input
                 id="address"
-                value={formData.address}
-                onChange={(e) => handleChange("address", e.target.value)}
                 placeholder="Full address"
+                {...register("address")}
               />
             </div>
 
+            {/* Aurovillian Checkbox (Controlled) */}
             <div className="col-span-2">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="isAurovillian"
-                  checked={formData.isAurovillian}
-                  onChange={(e) =>
-                    handleChange("isAurovillian", e.target.checked)
-                  }
-                  className="w-4 h-4 rounded border-gray-300"
-                />
-                <Label htmlFor="isAurovillian" className="cursor-pointer">
-                  Is Aurovillian Unit
-                </Label>
-              </div>
+              <Controller
+                name="isAurovillian"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="isAurovillian"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                    <Label htmlFor="isAurovillian" className="cursor-pointer">
+                      Is Aurovillian Unit
+                    </Label>
+                  </div>
+                )}
+              />
             </div>
           </div>
 
@@ -207,10 +230,13 @@ export const UnitDetailsDialog = ({
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button type="submit">Save Changes</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Save Changes"}
+            </Button>
           </div>
         </form>
       </DialogContent>

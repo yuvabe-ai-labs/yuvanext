@@ -11,7 +11,7 @@ export const getMyOffers = async (): Promise<MyOffersResponse> => {
 
     const applications = Array.isArray(data) ? data : data.applications || [];
 
-    const formatted: Offer[] = applications.map((item: any) => {
+    const formatted: Offer[] = applications.map((item) => {
       return {
         id: item.id,
         application_id: item.id,
@@ -49,7 +49,7 @@ export const getMyOffers = async (): Promise<MyOffersResponse> => {
       data: formatted,
       error: null,
     };
-  } catch (err: any) {
+  } catch (err) {
     console.error("Unhandled error fetching offers:", err);
     return { data: [], error: err.message || err };
   }
@@ -58,7 +58,7 @@ export const getMyOffers = async (): Promise<MyOffersResponse> => {
 export const updateOfferDecision = async (
   applicationId: string,
   decision: "accepted" | "rejected"
-): Promise<{ success: boolean; error?: any }> => {
+): Promise<{ success: boolean; error? }> => {
   try {
     // PUT /api/applications/{id} with offer_decision
     await axiosInstance.put(`/applications/${applicationId}`, {
@@ -66,7 +66,7 @@ export const updateOfferDecision = async (
     });
 
     return { success: true };
-  } catch (err: any) {
+  } catch (err) {
     console.error("Unhandled error updating offer:", err);
     return { success: false, error: err.message || err };
   }

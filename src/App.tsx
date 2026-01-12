@@ -11,7 +11,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { useSession } from "@/lib/auth-client";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";

@@ -11,7 +11,16 @@ export enum JobType {
 
 export interface Internship {
   id: string;
-  createdBy: string;
+  createdBy: {
+    name: string;
+    location: string;
+    address: string;
+    phone: string;
+    websiteUrl: string;
+    avatarUrl: string;
+    bannerUrl: string;
+    description: string;
+  };
   title: string;
   description: string | null;
   duration: string | null;
@@ -27,6 +36,7 @@ export interface Internship {
   language: string[];
   createdAt: string;
   updatedAt: string;
+  applicationCount?: number;
 }
 
 export interface CreateInternshipPayload {

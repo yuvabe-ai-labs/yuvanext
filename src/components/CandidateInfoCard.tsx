@@ -1,11 +1,11 @@
 import { Mail, Phone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useStudentTasks } from "@/hooks/useStudentTasks"; // Only one hook needed now
+import { useStudentTasks } from "@/hooks/useStudentTasks";
 import { calculateOverallTaskProgress } from "@/utils/taskProgress";
 
 interface CandidateInfoCardProps {
-  applicationId: string | undefined;
+  applicationId: string;
 }
 
 export default function CandidateInfoCard({

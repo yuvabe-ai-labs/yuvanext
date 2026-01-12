@@ -11,7 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { useUpdateApplicationStatus } from "@/hooks/useCandidateProfile";
+
+// 1. IMPORT THE CORRECT HOOK
+import { useInterviewMutations } from "@/hooks/useInterviews";
 
 interface ScheduleInterviewDialogProps {
   open: boolean;
@@ -19,7 +21,10 @@ interface ScheduleInterviewDialogProps {
   candidateName: string;
   candidateEmail: string;
   applicationId: string;
-  candidateProfileId: string; // Not strictly needed for API call but kept for interface compat
+  candidateProfileId: string;
+  // We need these IDs for the interview record usually
+  unitId?: string;
+  studentId?: string;
   onSuccess?: () => void;
 }
 
@@ -27,16 +32,15 @@ export default function ScheduleInterviewDialog({
   open,
   onOpenChange,
   candidateName,
-  candidateEmail,
   applicationId,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  candidateProfileId,
+  unitId = "", // You might need to pass these down
+  studentId = "", // You might need to pass these down
   onSuccess,
 }: ScheduleInterviewDialogProps) {
   const { toast } = useToast();
 
-  // 1. USE MUTATION HOOK
-  const updateStatusMutation = useUpdateApplicationStatus();
+  // 2. USE THE INTERVIEW MUTATION
+  const { createInterview } = useInterviewMutations();
 
   const [formData, setFormData] = useState({
     title: "",
@@ -46,12 +50,8 @@ export default function ScheduleInterviewDialog({
     meetingType: "zoom",
   });
 
-  // Guest emails state (Backend might not support guests directly in this endpoint version,
-  // but if notes support it, we can append there, or check if backend adds a guests field later)
-  // For now, I'll assume we just notify the main candidate based on your API doc.
   const [guestEmails, setGuestEmails] = useState<string[]>([]);
 
-  // Add/Remove Guest logic (Visual only for now unless API supports 'guests' field)
   const addEmail = (email: string) => {
     const trimmed = email.trim();
     if (
@@ -86,52 +86,43 @@ export default function ScheduleInterviewDialog({
       return;
     }
 
-    try {
-      const scheduledDate = new Date(
-        `${formData.date}T${formData.time}:00`
-      ).toISOString();
+    // 3. CALL THE CREATE INTERVIEW MUTATION
+    const scheduledDate = new Date(
+      `${formData.date}T${formData.time}:00`
+    ).toISOString();
 
-      // 2. CALL MUTATION
-      // Backend expects: applicationId, status, interviewDetails
-      updateStatusMutation.mutate(
-        {
-          applicationId,
-          status: "interviewed",
-          interviewDetails: {
-            scheduledAt: scheduledDate,
-            meetingLink: "zoom", // Backend generates link if provider is zoom
-            notes: `${formData.description}\n\nGuests: ${guestEmails.join(
-              ", "
-            )}`, // Append guests to notes
-            durationMinutes: 60,
-            provider: "zoom",
-          },
+    const fullDescription = `${
+      formData.description
+    }\n\nGuests: ${guestEmails.join(", ")}`;
+
+    createInterview.mutate(
+      {
+        application_id: applicationId,
+        scheduled_date: scheduledDate,
+        title: formData.title,
+        description: fullDescription,
+        meeting_link: "zoom", // Or handle link generation logic
+        duration_minutes: 60,
+        unit_id: unitId,
+        student_id: studentId,
+        status: "scheduled",
+      },
+      {
+        onSuccess: () => {
+          onOpenChange(false);
+          onSuccess?.();
+          // Reset form
+          setFormData({
+            title: "",
+            description: "",
+            date: "",
+            time: "",
+            meetingType: "zoom",
+          });
+          setGuestEmails([]);
         },
-        {
-          onSuccess: () => {
-            onOpenChange(false);
-            onSuccess?.();
-            // Reset form
-            setFormData({
-              title: "",
-              description: "",
-              date: "",
-              time: "",
-              meetingType: "zoom",
-            });
-            setGuestEmails([]);
-          },
-          onError: (error: any) => {
-            // Error toast handled by global handler or custom logic here
-            const msg =
-              error.response?.data?.message || "Failed to schedule interview.";
-            toast({ title: "Error", description: msg, variant: "destructive" });
-          },
-        }
-      );
-    } catch (error: any) {
-      console.error("Error preparing submission:", error);
-    }
+      }
+    );
   };
 
   const handleAddGuestKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -186,7 +177,7 @@ export default function ScheduleInterviewDialog({
             />
           </div>
 
-          {/* Guests (Visual placeholder effectively, sent as notes) */}
+          {/* Guests */}
           <div className="space-y-2">
             <Label htmlFor="guests" className="text-sm text-gray-700">
               Additional Guests (Emails)
@@ -273,10 +264,10 @@ export default function ScheduleInterviewDialog({
           <div className="flex justify-end pt-2">
             <Button
               onClick={handleSubmit}
-              disabled={updateStatusMutation.isPending}
+              disabled={createInterview.isPending}
               className="bg-[#2196F3] rounded-full text-white px-8 h-11 hover:bg-[#1976D2]"
             >
-              {updateStatusMutation.isPending
+              {createInterview.isPending
                 ? "Scheduling..."
                 : "Schedule Interview"}
             </Button>

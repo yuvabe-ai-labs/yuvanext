@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronDown } from "lucide-react";
+import { differenceInDays, parseISO } from "date-fns";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Applicant } from "@/types/applicant.types";
 
 // 1. IMPORT HOOK
 import { useInternshipApplicants } from "@/hooks/useInternshipApplicants";
@@ -22,22 +25,21 @@ const InternshipApplicants = () => {
   const { internshipId } = useParams<{ internshipId: string }>();
   const navigate = useNavigate();
 
-  // 2. USE HOOK
-  const { data: applicants = [], isLoading: loading } =
+  // 3. USE HOOK (Cast data to strict type)
+  const { data: rawApplicants = [], isLoading: loading } =
     useInternshipApplicants(internshipId);
 
-  // Removed: filteredApplications state
-  const [displayCount, setDisplayCount] = useState(6);
-  const observerTarget = useRef<HTMLDivElement>(null);
+  const applicants = rawApplicants as Applicant[];
 
+  const [displayCount, setDisplayCount] = useState(0);
+  const observerTarget = useRef<HTMLDivElement>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   // Derived Values
   const internshipTitle =
     applicants.length > 0 ? applicants[0].internshipTitle : "Internship";
 
-  //  - Diagram showing how useMemo prevents re-calculation/re-render
-  // FIX: Use useMemo instead of useEffect for filtering
+  // Filter Logic (Memoized for performance)
   const filteredApplications = useMemo(() => {
     let result = applicants;
     if (statusFilter) {
@@ -46,7 +48,7 @@ const InternshipApplicants = () => {
     return result;
   }, [applicants, statusFilter]);
 
-  // Reset display count when filter changes (using effect only for this side effect)
+  // Reset display count when filter changes
   useEffect(() => {
     setDisplayCount(6);
   }, [statusFilter]);
@@ -88,7 +90,7 @@ const InternshipApplicants = () => {
         className: "bg-red-100 text-red-700",
       },
       rejected: {
-        label: "Not Shortlisted",
+        label: "Rejected",
         className: "bg-red-100 text-red-700",
       },
       interviewed: {
@@ -97,6 +99,7 @@ const InternshipApplicants = () => {
       },
       hired: { label: "Hired", className: "bg-purple-100 text-purple-700" },
     };
+    // Default to 'applied' styling if status is unknown
     const config = statusConfig[status] || statusConfig.applied;
     return (
       <Badge className={`text-xs ${config.className}`}>{config.label}</Badge>
@@ -108,16 +111,17 @@ const InternshipApplicants = () => {
     if (score > 90) return "border-green-500";
     if (score >= 80) return "border-blue-500";
     if (score >= 60) return "border-orange-500";
-    return "border-red-500";
+    if (score > 0) return "border-red-500";
+    return "border-transparent"; // No ring if 0 or undefined
   };
 
-  const getDaysAgo = (date?: string) => {
-    if (!date) return 0; // Default to 0 if date is missing
-    const now = new Date();
-    const appliedDate = new Date(date);
-    const diffTime = Math.abs(now.getTime() - appliedDate.getTime());
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+  const getDaysAgo = (dateString?: string) => {
+    if (!dateString) return 0;
+    try {
+      return differenceInDays(new Date(), parseISO(dateString));
+    } catch {
+      return 0;
+    }
   };
 
   return (
@@ -125,6 +129,7 @@ const InternshipApplicants = () => {
       <Navbar />
 
       <main className="p-6 max-w-7xl mx-auto">
+        {/* Top Header Section */}
         <div className="flex items-center justify-between mb-8">
           <Button
             variant="ghost"
@@ -153,7 +158,7 @@ const InternshipApplicants = () => {
                 >
                   {statusFilter
                     ? statusFilter.charAt(0).toUpperCase() +
-                      statusFilter.slice(1)
+                      statusFilter.slice(1).replace("_", " ")
                     : "Filter Status"}
                   <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
                 </Button>
@@ -187,6 +192,7 @@ const InternshipApplicants = () => {
           </div>
         </div>
 
+        {/* Content Section */}
         <div className="container mx-auto px-2 md:px-10 py-2">
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -215,12 +221,8 @@ const InternshipApplicants = () => {
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredApplications.slice(0, displayCount).map((app) => {
-                  // NOTE: Backend needs to provide appliedDate
-                  // If missing, this defaults to 0
                   const daysAgo = getDaysAgo(app.appliedDate);
-
-                  // NOTE: Backend needs to provide matchScore if we want the colored rings back
-                  const matchScore = 0;
+                  const matchScore = app.matchScore || app.match_score || 0;
 
                   return (
                     <Card
@@ -229,7 +231,7 @@ const InternshipApplicants = () => {
                     >
                       <CardContent className="p-8 space-y-5">
                         <div className="flex items-center gap-5">
-                          {/* Avatar with Ring */}
+                          {/* Avatar with Ring based on Match Score */}
                           <div className="relative flex-shrink-0">
                             <Avatar
                               className={`w-20 h-20 ring-4 ${getMatchColor(
@@ -246,6 +248,12 @@ const InternshipApplicants = () => {
                                   .toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
+                            {/* Match Score Badge (Optional) */}
+                            {matchScore > 0 && (
+                              <div className="absolute -bottom-2 -right-2 bg-white rounded-full px-1.5 py-0.5 text-[10px] font-bold border shadow-sm">
+                                {matchScore}%
+                              </div>
+                            )}
                             <div className="absolute -top-2 -right-2">
                               {getStatusBadge(app.status)}
                             </div>
@@ -259,7 +267,6 @@ const InternshipApplicants = () => {
                               {app.internshipTitle}
                             </p>
 
-                            {/* Days Ago Badge - Needs 'appliedDate' from Backend */}
                             <Badge className="bg-yellow-500 text-white hover:bg-yellow-500 pointer-events-none">
                               Applied {daysAgo} {daysAgo === 1 ? "day" : "days"}{" "}
                               ago
@@ -267,14 +274,14 @@ const InternshipApplicants = () => {
                           </div>
                         </div>
 
-                        {/* Profile Summary / Bio - Needs 'profileSummary' from Backend */}
-                        <p className="text-base text-gray-700 leading-relaxed line-clamp-3">
+                        {/* Profile Summary */}
+                        <p className="text-base text-gray-700 leading-relaxed line-clamp-3 min-h-[4.5rem]">
                           {app.profileSummary ||
                             "No profile summary available."}
                         </p>
 
                         {/* Skills */}
-                        <div className="min-h-7">
+                        <div className="min-h-[30px]">
                           {app.candidateSkills &&
                           app.candidateSkills.length > 0 ? (
                             <div className="flex gap-2 overflow-hidden flex-wrap">
@@ -322,6 +329,7 @@ const InternshipApplicants = () => {
                 })}
               </div>
 
+              {/* Load More Button */}
               {displayCount < filteredApplications.length && (
                 <div
                   ref={observerTarget}

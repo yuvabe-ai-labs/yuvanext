@@ -6,7 +6,6 @@ import {
   Phone,
   MapPin,
   Heart,
-  XCircle,
   User,
   CopyCheck,
   Ban,
@@ -22,27 +21,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
-
-// 1. IMPORT HOOKS & TYPES
-import {
-  useCandidateProfile,
-  useUpdateApplicationStatus,
-} from "@/hooks/useCandidateProfile";
-import type {
-  CandidateInternship,
-  CandidateProject,
-  CandidateCourse,
-  CandidateEducation,
-  SocialLink,
-} from "@/types/profile.types";
-
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 import {
   Select,
   SelectContent,
@@ -60,9 +42,28 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { useRef, useState } from "react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+
+// 1. IMPORT HOOKS & TYPES
+import {
+  useCandidateProfile,
+  useUpdateApplicationStatus,
+} from "@/hooks/useCandidateProfile";
 import ScheduleInterviewDialog from "@/components/ScheduleInterviewDialog";
 
+// Ensure these types are exported from your types file
+import type {
+  CandidateInternship,
+  CandidateProject,
+  CandidateCourse,
+  CandidateEducation,
+  SocialLink,
+} from "@/types/profile.types";
+
+// Generic Safe Parse Helper
 const safeParse = <T,>(data: any, fallback: T): T => {
   if (!data) return fallback;
   try {
@@ -81,6 +82,7 @@ const CandidateProfile = () => {
   // 2. DATA FETCHING
   const { data, isLoading, error, refetch } = useCandidateProfile(id || "");
   const updateStatusMutation = useUpdateApplicationStatus();
+
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -93,14 +95,16 @@ const CandidateProfile = () => {
     | "not_shortlisted"
     | "interviewed"
     | "hired";
+
   const [pendingStatus, setPendingStatus] = useState<StatusType | null>(null);
 
   // --- Helpers ---
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getStatusLabel = (status: string) => {
     const statusMap: Record<string, string> = {
       applied: "Applied",
       shortlisted: "Shortlisted",
-      not_shortlisted: "Not Shortlisted", // Updated key
+      not_shortlisted: "Not Shortlisted",
       interviewed: "Interview Scheduled",
       hired: "Hired",
     };
@@ -220,7 +224,8 @@ const CandidateProfile = () => {
   // --- DATA MAPPING ---
   const { candidate, internship, application } = data;
 
-  const skills = safeParse<string[]>(candidate.skills, []);
+  // Assuming Skill can be string or object
+  const skills = safeParse<(string | { name: string })[]>(candidate.skills, []);
   const interests = safeParse<string[]>(candidate.interests, []);
 
   // Explicit mapping for nested objects (History)
@@ -493,7 +498,7 @@ const CandidateProfile = () => {
                   </h3>
                   <div className="space-y-4">
                     {skills.length > 0 ? (
-                      skills.map((skill: any, idx: number) => (
+                      skills.map((skill, idx) => (
                         <div
                           key={idx}
                           className="flex items-center justify-between"
@@ -577,7 +582,7 @@ const CandidateProfile = () => {
                   <h3 className="text-2xl font-bold mb-4">Interests</h3>
                   <div className="flex flex-wrap gap-2">
                     {interests.length > 0 ? (
-                      interests.map((interest: string, idx: number) => (
+                      interests.map((interest, idx) => (
                         <Badge
                           key={idx}
                           variant="outline"
@@ -787,7 +792,7 @@ const CandidateProfile = () => {
                   <h3 className="text-2xl font-bold mb-4">Links</h3>
                   <div className="flex flex-wrap gap-3 items-center">
                     {(() => {
-                      const getSocialIcon = (link: any) => {
+                      const getSocialIcon = (link: SocialLink) => {
                         const url = (link.url || "").toLowerCase();
                         const platform = (link.platform || "").toLowerCase();
                         if (
@@ -856,7 +861,7 @@ const CandidateProfile = () => {
                   </div>
                 </CardContent>
               </Card>
-              {/* Projects */}
+              {/* Projects - Commented out as requested */}
               {/* <Card className="rounded-3xl">
                 <CardContent className="p-6">
                   <h3 className="text-2xl font-bold mb-4">Projects</h3>

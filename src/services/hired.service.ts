@@ -1,7 +1,6 @@
 import axiosInstance from "@/config/platform-api";
 import { handleApiResponse, handleApiError } from "@/lib/api-handler";
 import type { Profile } from "@/types/profile.types";
-import type { UnitApplication } from "@/types/unit.types";
 
 // 1. Fetch Unit Profile
 export const getUnitProfile = async (): Promise<Profile> => {
@@ -13,7 +12,7 @@ export const getUnitProfile = async (): Promise<Profile> => {
   }
 };
 
-import type { HiredCandidate, HiredCandidateDTO } from "@/types/unit.types";
+import type { HiredCandidateDTO } from "@/types/unit.types";
 
 export const getHiredApplicants = async (): Promise<HiredCandidateDTO[]> => {
   try {

@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 interface UnitDescriptionDialogProps {
   description: string;
-  onSave: (description: string) => void; // Removed Promise<void> constraint for flexibility
+  onSave: (description: string) => void;
   title?: string;
   children: React.ReactNode;
 }

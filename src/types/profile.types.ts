@@ -45,7 +45,7 @@ export interface Profile {
 }
 
 export interface Project {
-  id: string;
+  id?: string;
   projectName: string; // Updated to camelCase if API sends it, check backend!
   clientName?: string;
   status?: string;

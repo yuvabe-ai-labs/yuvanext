@@ -78,11 +78,23 @@ import { useStudentTasks } from "@/hooks/useStudentTasks";
 import { calculateOverallTaskProgress } from "@/utils/taskProgress";
 import axiosInstance from "@/config/platform-api";
 
-// Helper safe parser
-const safeParse = (data: any, fallback: any) => {
+// Types
+import type { Internship } from "@/types/internships.types";
+import type {
+  CandidateTasksData,
+  StudentTask,
+} from "@/types/studentTasks.types";
+import {
+  HiredCandidateDTO,
+  UnitApplication,
+  UnitDashboardStats,
+} from "@/types/unit.types";
+
+// Helper safe parser with generics
+const safeParse = <T,>(data: unknown, fallback: T): T => {
   if (!data) return fallback;
   try {
-    return typeof data === "string" ? JSON.parse(data) : data;
+    return typeof data === "string" ? JSON.parse(data) : (data as T);
   } catch {
     return fallback;
   }
@@ -95,8 +107,8 @@ const CandidateTaskProgress = ({
   applicationId: string;
 }) => {
   const { data: tasksData } = useStudentTasks(applicationId);
-  // @ts-ignore - Assuming hook returns new structure or old, handling safely
-  const tasks = tasksData?.tasks || tasksData?.data || [];
+  // Cast based on the expected return type from the hook
+  const tasks = (tasksData?.tasks || []) as StudentTask[];
   const taskProgress = calculateOverallTaskProgress(tasks);
 
   // Get internship start and end dates
@@ -104,16 +116,13 @@ const CandidateTaskProgress = ({
     if (tasks.length === 0) return { startDate: null, endDate: null };
 
     const dates = tasks
-      .filter((task: any) => task.start_date && task.end_date)
-      .flatMap((task: any) => [
-        new Date(task.start_date),
-        new Date(task.end_date),
-      ]);
+      .filter((task) => task.start_date && task.end_date)
+      .flatMap((task) => [new Date(task.start_date), new Date(task.end_date)]);
 
     if (dates.length === 0) return { startDate: null, endDate: null };
 
-    const startDate = new Date(Math.min(...dates.map((d: any) => d.getTime())));
-    const endDate = new Date(Math.max(...dates.map((d: any) => d.getTime())));
+    const startDate = new Date(Math.min(...dates.map((d) => d.getTime())));
+    const endDate = new Date(Math.max(...dates.map((d) => d.getTime())));
 
     return { startDate, endDate };
   };
@@ -156,16 +165,20 @@ const UnitDashboard = () => {
   const [activeTab, setActiveTab] = useState("applications");
 
   // --- 1. DATA FETCHING (REACT QUERY) ---
-  const { data: applications, isLoading: dashboardLoading } =
+  const { data: rawApplications, isLoading: dashboardLoading } =
     useUnitApplications();
+  const applications = (rawApplications || []) as UnitApplication[];
 
-  const { data: stats, isLoading: statsLoading } = useUnitStats();
+  const { data: rawStats, isLoading: statsLoading } = useUnitStats();
+  const stats = rawStats as UnitDashboardStats;
+
   const { internships, loading: internshipsLoading } = useInternships();
 
   const updateInternshipMutation = useUpdateInternship();
 
-  const { data: hiredCandidates = [], isLoading: hiredLoading } =
+  const { data: rawHiredCandidates = [], isLoading: hiredLoading } =
     useHiredApplicants();
+  const hiredCandidates = rawHiredCandidates as HiredCandidateDTO[];
 
   const {
     weeklyData,
@@ -177,12 +190,20 @@ const UnitDashboard = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [jobFilter, setJobFilter] = useState("all");
   const [updating, setUpdating] = useState<string | null>(null);
-  const [selectedInternship, setSelectedInternship] = useState<any>(null);
-  const [editingInternship, setEditingInternship] = useState<any>(null);
+
+  // Typed State
+  const [selectedInternship, setSelectedInternship] =
+    useState<Internship | null>(null);
+  const [editingInternship, setEditingInternship] = useState<Internship | null>(
+    null
+  );
+  const [deletingInternship, setDeletingInternship] =
+    useState<Internship | null>(null);
+  const [activatingInternship, setActivatingInternship] =
+    useState<Internship | null>(null);
+
   const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
-  const [deletingInternship, setDeletingInternship] = useState<any>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [activatingInternship, setActivatingInternship] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   // --- 3. EFFECTS (Auto-close expired) ---
@@ -219,7 +240,7 @@ const UnitDashboard = () => {
   if (selectedInternship) {
     return (
       <InternshipDetailsView
-        internship={selectedInternship}
+        internship={selectedInternship as any} // Cast if strict type mismatch with component props
         onClose={() => setSelectedInternship(null)}
       />
     );
@@ -227,17 +248,17 @@ const UnitDashboard = () => {
 
   // --- 4. FILTERING LOGIC ---
   const filteredApplications =
-    applications?.filter((appObj: any) => {
-      const status = appObj.application?.status || appObj.status;
+    applications?.filter((appObj) => {
+      const status = appObj.application?.status || "";
       if (filterStatuses.length === 0) return true;
       return filterStatuses.includes(status);
     }) || [];
 
   const filteredHiredCandidates =
-    hiredCandidates?.filter((candidate: any) => {
+    hiredCandidates?.filter((candidate) => {
       if (!searchQuery) return true;
-      const name = candidate.candidate?.name?.toLowerCase() || "";
-      const internshipTitle = candidate.internship?.title?.toLowerCase() || "";
+      const name = candidate.applicantName?.toLowerCase() || "";
+      const internshipTitle = candidate.internshipName?.toLowerCase() || "";
       return (
         name.includes(searchQuery.toLowerCase()) ||
         internshipTitle.includes(searchQuery.toLowerCase())
@@ -257,7 +278,7 @@ const UnitDashboard = () => {
     }
   };
 
-  const handleDeleteClick = (internship: any) => {
+  const handleDeleteClick = (internship: Internship) => {
     setDeletingInternship(internship);
     setShowDeleteDialog(true);
   };
@@ -271,7 +292,7 @@ const UnitDashboard = () => {
       window.location.reload();
       setShowDeleteDialog(false);
       setDeletingInternship(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error deleting job:", err);
       alert("Failed to delete job description");
     } finally {
@@ -279,13 +300,14 @@ const UnitDashboard = () => {
     }
   };
 
-  const handleToggleStatus = async (internship: any) => {
+  const handleToggleStatus = async (internship: Internship) => {
     if (internship.status !== "active") {
       setActivatingInternship(internship);
       setEditingInternship(internship);
     } else {
       try {
         setUpdating(internship.id);
+        // Explicit cast for mutation payload as it might require full object but API supports partial
         updateInternshipMutation.mutate(
           { id: internship.id, status: "closed" } as any,
           {
@@ -294,7 +316,7 @@ const UnitDashboard = () => {
             },
           }
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error updating job status:", err);
         alert("Failed to update job status");
         setUpdating(null);
@@ -314,7 +336,7 @@ const UnitDashboard = () => {
             },
           }
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error activating job:", err);
         alert("Failed to activate job description");
         setActivatingInternship(null);
@@ -371,7 +393,7 @@ const UnitDashboard = () => {
   const getFilterDisplayText = () => {
     if (filterStatuses.length === 0) return "All Applications";
     if (filterStatuses.length === 1) {
-      const labels: any = {
+      const labels: Record<string, string> = {
         shortlisted: "Shortlisted",
         interviewed: "Interviewed",
         rejected: "Rejected",
@@ -414,7 +436,7 @@ const UnitDashboard = () => {
                   ) : (
                     <>
                       <p className="text-2xl sm:text-3xl font-bold">
-                        {stats?.total || 0}
+                        {stats?.totalApplications || 0}
                       </p>
                       <p className="text-xs text-muted-foreground">All time</p>
                     </>
@@ -439,7 +461,7 @@ const UnitDashboard = () => {
                   ) : (
                     <>
                       <p className="text-2xl sm:text-3xl font-bold">
-                        {stats?.totalJobs || 0}
+                        {stats?.totalInternships || 0}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Active & Closed
@@ -466,7 +488,7 @@ const UnitDashboard = () => {
                   ) : (
                     <>
                       <p className="text-2xl sm:text-3xl font-bold">
-                        {stats?.interviews || 0}
+                        {stats?.totalInterviews || 0}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Candidates
@@ -623,15 +645,20 @@ const UnitDashboard = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                {filteredApplications.slice(0, 9).map((appData: any) => {
-                  const appStatus = appData.application?.status;
+                {filteredApplications.slice(0, 9).map((appData) => {
+                  const appStatus = appData.application?.status || "";
                   const appId = appData.application?.id;
-                  const candidate = appData.candidate || {};
-                  const internship = appData.internship || {};
-                  const skills = safeParse(candidate.skills, []);
+                  const candidate = appData.candidate;
+                  const internship = appData.internship || { title: "" };
+
+                  // Use safeParse with strict types
+                  const skills = safeParse<(string | { name: string })[]>(
+                    candidate.skills,
+                    []
+                  );
                   const displaySkills = skills
                     .slice(0, 3)
-                    .map((s: any) => (typeof s === "string" ? s : s.name || s));
+                    .map((s) => (typeof s === "string" ? s : s.name));
 
                   return (
                     <Card
@@ -643,7 +670,7 @@ const UnitDashboard = () => {
                           <div className="relative flex-shrink-0">
                             <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500">
                               <AvatarImage
-                                src={candidate.avatarUrl || undefined}
+                                src={candidate.avatarUrl}
                                 alt={candidate.name || "User"}
                               />
                               <AvatarFallback className="text-base sm:text-lg font-semibold">
@@ -676,7 +703,7 @@ const UnitDashboard = () => {
                           </p>
                           {displaySkills.length > 0 && (
                             <div className="flex gap-2 overflow-hidden">
-                              {displaySkills.map((skill: string, i: number) => (
+                              {displaySkills.map((skill, i) => (
                                 <Badge
                                   key={i}
                                   variant="outline"
@@ -839,7 +866,7 @@ const UnitDashboard = () => {
                               Applications:
                             </span>
                             <span className="font-medium">
-                              {internship.applicationCount} Applied
+                              {internship.applicationCount || 0} Applied
                             </span>
                           </div>
                           <div className="flex justify-between text-xs sm:text-sm">
@@ -933,7 +960,7 @@ const UnitDashboard = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filteredHiredCandidates.map((hired: any, i) => (
+                {filteredHiredCandidates.map((hired, i) => (
                   <Card
                     key={i}
                     className="border border-gray-200 rounded-3xl hover:shadow-lg transition-shadow"
@@ -973,16 +1000,14 @@ const UnitDashboard = () => {
                         </div>
                       </div>
                       <CandidateTaskProgress
-                        applicationId={hired.id || hired.application_id}
-                        // startDate={hired.internshipCreatedAt}
-                        // endDate={hired.internshipClosingDate}
+                        applicationId={hired.applicationId || ""}
                       />
                       <div className="flex justify-end pt-2">
                         <Button
                           variant="outline"
                           className="rounded-full"
                           onClick={() =>
-                            handleViewCandidate(hired.id || hired.applicationId)
+                            handleViewCandidate(hired.applicationId || "")
                           }
                         >
                           View Details <ArrowRight className="w-4 h-4 ml-2" />
@@ -1002,6 +1027,7 @@ const UnitDashboard = () => {
                 Reports for this Month
               </h2>
             </div>
+
             <Card className="rounded-2xl">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -1023,29 +1049,6 @@ const UnitDashboard = () => {
                 {reportsLoading ? (
                   <div className="h-[300px] sm:h-[400px] w-full flex items-center justify-center">
                     <Skeleton className="w-full h-full" />
-                    <div className="h-full w-full relative">
-                      {[...Array(5)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="absolute w-full border-t border-gray-200"
-                          style={{ top: `${(i + 1) * 20}%` }}
-                        />
-                      ))}
-                      <div className="absolute bottom-0 left-0 right-0 h-[85%] flex items-end justify-around px-8">
-                        {[20, 10, 5, 45, 8, 15, 12].map((height, i) => (
-                          <div
-                            key={i}
-                            className="flex flex-col items-center gap-2 flex-1"
-                          >
-                            <Skeleton
-                              className="w-8 sm:w-10 rounded-t-2xl"
-                              style={{ height: `${height}%` }}
-                            />
-                            <Skeleton className="h-3 w-8" />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 ) : (
                   <ChartContainer
@@ -1200,11 +1203,12 @@ const UnitDashboard = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Note: EditInternshipDialog might expect strict types, casting to any if interface mismatch occurs until that component is refactored */}
       <EditInternshipDialog
         isOpen={!!editingInternship}
         onClose={handleEditClose}
         onSuccess={handleEditSuccess}
-        internship={editingInternship}
+        internship={editingInternship as any}
       />
       <CreateInternshipDialog
         isOpen={showCreateDialog}

@@ -3,7 +3,6 @@ export interface UnitDashboardStats {
   totalInternships: number;
   totalInterviews: number;
   hiredThisMonth: number;
-  // Backend returns this nested, but we might flatten it in the service/hook
   period?: {
     month: string;
     year: number;

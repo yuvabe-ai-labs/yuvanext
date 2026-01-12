@@ -1,13 +1,14 @@
 import { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AlertTriangle } from "lucide-react";
+
+// Components
 import PreferenceItem from "./PreferenceItem";
 import DemographicForm from "./DemographicForm";
 import VerificationUpload from "./VerificationUpload";
 import SkeletonBox from "./SkeletonBox";
-import { AlertTriangle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { preferencesSchema } from "@/lib/accountPreferenceSchema";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import {
   Select,
@@ -17,21 +18,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// NEW IMPORTS
+// Imports
+import { preferencesSchema } from "@/lib/accountPreferenceSchema";
 import { useUnitProfile } from "@/hooks/useUnitProfile";
 import { useDeactivateAccount } from "@/hooks/useSettings";
+import { authClient } from "@/lib/auth-client"; // 1. Import Auth Client
 
 export default function AccountPreferences() {
   const [activeSubView, setActiveSubView] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  // isDeactivating is now handled by the mutation status
 
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const navigate = useNavigate();
 
-  // REFACTORED HOOKS
+  // Hooks
   const { data: profile, isLoading: profileLoading } = useUnitProfile();
   const deactivateMutation = useDeactivateAccount();
 
@@ -42,11 +44,6 @@ export default function AccountPreferences() {
       contentLanguage: "English",
     },
   });
-
-  const onSubmit = (values) => {
-    console.log("Saved Preferences:", values);
-    // updateProfile({ settings: values });
-  };
 
   const openProfile = useCallback(() => {
     if (!profile) return;
@@ -61,25 +58,31 @@ export default function AccountPreferences() {
     setActiveSubView(sub);
   };
 
+  // Deactivate (Soft Delete via API)
   const executeDeactivate = () => {
     deactivateMutation.mutate(undefined, {
       onSuccess: () => setShowDeactivateModal(false),
     });
   };
 
+  // 2. Delete Permanently (Hard Delete via Better Auth)
   const executeDelete = async () => {
-    // try {
-    //   setIsDeleting(true);
-    //   const { error } = await supabase.functions.invoke("delete-user");
-    //   if (error) throw error;
-    //   await supabase.auth.signOut();
-    //   navigate("/");
-    // } catch (error) {
-    //   console.error("Error deleting account:", error);
-    //   alert("Failed to delete account. Please try again.");
-    //   setIsDeleting(false);
-    //   setShowDeleteModal(false);
-    // }
+    setIsDeleting(true);
+    try {
+      const { error } = await authClient.deleteUser();
+
+      if (error) {
+        throw error;
+      }
+
+      // Success - Redirect to home/login
+      navigate("/");
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      alert(error.message || "Failed to delete account. Please try again.");
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
   };
 
   if (loading || profileLoading) {
@@ -97,7 +100,6 @@ export default function AccountPreferences() {
     );
   }
 
-  // NOTE: Assuming these components (DemographicForm, VerificationUpload) are also refactored separately if needed.
   if (activeSubView === "demographic")
     return <DemographicForm onBack={() => setActiveSubView(null)} />;
   if (activeSubView === "verification")
@@ -184,7 +186,6 @@ export default function AccountPreferences() {
           </form>
         </Form>
       </section> */}
-
       <section className="mt-7">
         <h3 className="text-xl font-medium text-gray-800">
           Account Management
@@ -262,6 +263,7 @@ export default function AccountPreferences() {
         </div>
       )}
 
+      {/* --- CUSTOM MODAL: DELETE --- */}
       {showDeleteModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity"

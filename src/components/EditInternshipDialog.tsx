@@ -19,65 +19,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useForm, Controller } from "react-hook-form";
+// RHF Imports
+import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import axiosInstance from "@/config/platform-api"; // For AI
+import axiosInstance from "@/config/platform-api";
 import { useToast } from "@/hooks/use-toast";
-import { X, Sparkles, ChevronDown } from "lucide-react";
+import { X, Sparkles, ChevronDown, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
-// 1. IMPORT HOOK
+// Schema & Hooks
+import {
+  internshipSchema,
+  type InternshipFormValues,
+} from "@/lib/EditInternshipDialogSchema";
 import { useUpdateInternship } from "@/hooks/useInternships";
+import type { Internship } from "@/types/internships.types";
 
 interface EditInternshipDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  internship: any; // Ideally types this with your InternshipResponse interface
+  internship: Internship | null;
 }
-
-interface LanguageProficiency {
-  language: string;
-  read: boolean;
-  write: boolean;
-  speak: boolean;
-}
-
-const languageSchema = z
-  .object({
-    language: z.string().min(1, "Language is required"),
-    read: z.boolean(),
-    write: z.boolean(),
-    speak: z.boolean(),
-  })
-  .refine((data) => data.read || data.write || data.speak, {
-    message: "Select at least one proficiency (Read, Write, or Speak)",
-    path: ["read"],
-  });
-
-const formSchema = z.object({
-  title: z.string().min(1, "Job/Intern Role is required"),
-  duration: z.string().min(1, "Internship Period is required"),
-  isPaid: z.boolean(),
-  payment: z.string().optional(),
-  description: z
-    .string()
-    .min(10, "About Internship must be at least 10 characters"),
-  responsibilities: z.string().min(10, "Key Responsibilities is required"),
-  benefits: z.string().min(10, "Post Internship benefits is required"),
-  skills_required: z.string().min(1, "Skills Required is required"),
-  language_requirements: z
-    .array(languageSchema)
-    .min(1, "At least one language is required"),
-  min_age_required: z.coerce.number().min(1, "Age is required"),
-  job_type: z.enum(["full_time", "part_time", "both"]),
-  application_deadline: z.date({
-    required_error: "Application deadline is required",
-  }),
-});
-
-type FormData = z.infer<typeof formSchema>;
 
 const LANGUAGES = [
   "English",
@@ -106,15 +69,14 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
   internship,
 }) => {
   const { toast } = useToast();
-
-  // 2. USE MUTATION
   const updateInternshipMutation = useUpdateInternship();
 
   const [aiLoading, setAiLoading] = useState<string | null>(null);
-  const [languages, setLanguages] = useState<LanguageProficiency[]>([
-    { language: "", read: false, write: false, speak: false },
-  ]);
-  const [conversationHistory, setConversationHistory] = useState<any[]>([]);
+  const [conversationHistory, setConversationHistory] = useState<
+    { role: string; content: string }[]
+  >([]);
+
+  // Date Picker Local State (UI Only)
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
@@ -122,9 +84,24 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const currentDay = currentDate.getDate();
 
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
+
+  // --- RHF SETUP ---
   const {
     control,
     handleSubmit,
@@ -132,8 +109,8 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
     setValue,
     reset,
     formState: { errors, isValid },
-  } = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+  } = useForm<InternshipFormValues>({
+    resolver: zodResolver(internshipSchema),
     mode: "onChange",
     defaultValues: {
       title: "",
@@ -153,35 +130,23 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
     },
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // Use Field Array for Dynamic Languages
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "language_requirements",
+  });
+
   const isPaid = watch("isPaid");
   const jobTitle = watch("title");
   const isJobRoleFilled = jobTitle && jobTitle.trim().length > 0;
 
-  // ... (Date Picker Arrays - months, years) ...
-  const months = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
-  const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
-
-  // ... (Date Helper Functions - isDateDisabled, getAvailableDates, etc.) ...
-  const isDateDisabled = (date: any, month: any, year: any) => {
+  // --- DATE HELPERS ---
+  const isDateDisabled = (date: number, month: string, year: string) => {
     if (!month || !year) return false;
     const selectedTimestamp = new Date(
       parseInt(year),
       parseInt(month) - 1,
-      parseInt(date)
+      date
     ).setHours(0, 0, 0, 0);
     const todayTimestamp = new Date().setHours(0, 0, 0, 0);
     return selectedTimestamp < todayTimestamp;
@@ -206,25 +171,14 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
   const dates = getAvailableDates();
   const availableMonths = getAvailableMonths();
 
-  // 3. POPULATE FORM DATA (Map from Backend CamelCase)
+  // --- POPULATE FORM ---
   useEffect(() => {
     if (internship && isOpen) {
-      // Backend uses camelCase: responsibilities, benefits, skillsRequired
-      const responsibilitiesText = Array.isArray(internship.responsibilities)
-        ? internship.responsibilities.join("\n")
-        : internship.responsibilities || "";
+      // Helper to handle array vs string
+      const joinArray = (val: string[] | string | undefined) =>
+        Array.isArray(val) ? val.join("\n") : val || "";
 
-      const benefitsText = Array.isArray(internship.benefits)
-        ? internship.benefits.join("\n")
-        : internship.benefits || "";
-
-      // Correct Mapping: skillsRequired (handle both camelCase and snake_case just in case)
-      const rawSkills = internship.skillsRequired || internship.skills_required;
-      const skillsText = Array.isArray(rawSkills)
-        ? rawSkills.join("\n")
-        : rawSkills || "";
-
-      // Correct Mapping: language
+      // Handle Language Transformation (Backend string[] vs Frontend object[])
       let languageReqs = [
         { language: "", read: false, write: false, speak: false },
       ];
@@ -233,25 +187,24 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
         Array.isArray(internship.language) &&
         internship.language.length > 0
       ) {
-        // If backend returns array of strings ["English", "Tamil"]
         if (typeof internship.language[0] === "string") {
-          languageReqs = internship.language.map((lang: string) => ({
-            language: lang,
-            read: true, // Default to true for display since string doesn't have detail
-            write: true,
-            speak: true,
-          }));
+          // Legacy: ["English", "Tamil"]
+          languageReqs = (internship.language as unknown as string[]).map(
+            (lang) => ({
+              language: lang,
+              read: true,
+              write: true,
+              speak: true,
+            })
+          );
         } else {
-          // If backend returns array of objects (legacy support)
-          languageReqs = internship.language;
+          // Modern: Object structure
+          languageReqs = internship.language as any;
         }
       }
 
-      setLanguages(languageReqs);
-
-      // Correct Mapping: closingDate or application_deadline
-      const closingDateVal =
-        internship.closingDate || internship.application_deadline;
+      // Handle Date
+      const closingDateVal = internship.closingDate;
       if (closingDateVal) {
         const deadline = new Date(closingDateVal);
         setSelectedDate(deadline.getDate().toString());
@@ -259,34 +212,27 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
         setSelectedYear(deadline.getFullYear().toString());
       }
 
+      // Reset Form
       reset({
         title: internship.title || "",
         duration: internship.duration || "",
-        // Check both CamelCase and snake_case for boolean
-        isPaid:
-          internship.isPaid !== undefined
-            ? internship.isPaid
-            : internship.is_paid || false,
+        isPaid: internship.isPaid,
         payment: internship.payment || "",
         description: internship.description || "",
-        responsibilities: responsibilitiesText,
-        benefits: benefitsText,
-        skills_required: skillsText,
+        responsibilities: joinArray(internship.responsibilities),
+        benefits: joinArray(internship.benefits),
+        skills_required: joinArray(internship.skillsRequired),
         language_requirements: languageReqs,
         application_deadline: closingDateVal
           ? new Date(closingDateVal)
           : undefined,
-        // Check both CamelCase and snake_case for Min Age
-        min_age_required:
-          Number(internship.minAgeRequired || internship.min_age_required) ||
-          undefined,
-        // Check both CamelCase and snake_case for Job Type
-        job_type: internship.jobType || internship.job_type || "full_time",
-      } as any);
+        min_age_required: Number(internship.minAgeRequired) || undefined,
+        job_type: internship.jobType || "full_time",
+      });
     }
   }, [internship, isOpen, reset]);
 
-  // ... (Date Sync Effects remain same) ...
+  // Sync Date Dropdowns to Form
   useEffect(() => {
     if (selectedDate && selectedMonth && selectedYear) {
       const date = new Date(
@@ -302,43 +248,16 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
 
   useEffect(() => {
     if (selectedDate && selectedMonth && selectedYear) {
-      if (isDateDisabled(selectedDate, selectedMonth, selectedYear)) {
+      if (isDateDisabled(parseInt(selectedDate), selectedMonth, selectedYear)) {
         setSelectedDate("");
       }
     }
   }, [selectedMonth, selectedYear]);
 
-  // ... (Language Handlers remain same) ...
-  const handleAddLanguage = () => {
-    const newLanguages = [
-      ...languages,
-      { language: "", read: false, write: false, speak: false },
-    ];
-    setLanguages(newLanguages);
-    setValue("language_requirements", newLanguages, { shouldValidate: true });
-  };
+  // --- SUBMIT ---
+  const onSubmit = async (data: InternshipFormValues) => {
+    if (!internship) return;
 
-  const handleLanguageChange = (
-    index: number,
-    field: keyof LanguageProficiency,
-    value: any
-  ) => {
-    const newLanguages = [...languages];
-    newLanguages[index] = { ...newLanguages[index], [field]: value };
-    setLanguages(newLanguages);
-    setValue("language_requirements", newLanguages, { shouldValidate: true });
-  };
-
-  const handleRemoveLanguage = (index: number) => {
-    if (languages.length > 1) {
-      const newLanguages = languages.filter((_, i) => i !== index);
-      setLanguages(newLanguages);
-      setValue("language_requirements", newLanguages, { shouldValidate: true });
-    }
-  };
-
-  const onSubmit = async (data: FormData) => {
-    // 4. PREPARE PAYLOAD (Map to Backend CamelCase)
     const skillsArray = data.skills_required
       .split("\n")
       .filter((s) => s.trim());
@@ -346,17 +265,12 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
       .split("\n")
       .filter((r) => r.trim());
     const benefitsArray = data.benefits.split("\n").filter((b) => b.trim());
-
-    // Fix Payment: Ensure string, not null
     const paymentValue = data.isPaid && data.payment ? data.payment : "Unpaid";
-
-    // Fix Language: Ensure object structure matches strict type (Backend expects array of strings for PUT)
     const languageArray = data.language_requirements.map((l) => l.language);
 
-    // 5. CALL MUTATION
     updateInternshipMutation.mutate(
       {
-        id: internship.id, // ID from prop
+        id: internship.id,
         title: data.title,
         duration: data.duration,
         isPaid: data.isPaid,
@@ -375,9 +289,16 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
           onSuccess();
           onClose();
         },
-        onError: (error: any) => {
-          console.error("Validation Error Details:", error.response?.data);
-          const firstIssue = error.response?.data?.error?.issues?.[0];
+        onError: (error: unknown) => {
+          // Type guard for error response
+          const err = error as {
+            response?: {
+              data?: {
+                error?: { issues?: { path: string[]; message: string }[] };
+              };
+            };
+          };
+          const firstIssue = err.response?.data?.error?.issues?.[0];
           const errorMessage = firstIssue
             ? `${firstIssue.path.join(".")}: ${firstIssue.message}`
             : "Failed to update internship.";
@@ -392,8 +313,8 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
     );
   };
 
-  // ... (AI Assist Logic remains same - using axiosInstance) ...
-  const handleAIAssist = async (fieldName: keyof FormData) => {
+  // --- AI ASSIST ---
+  const handleAIAssist = async (fieldName: keyof InternshipFormValues) => {
     setAiLoading(fieldName as string);
 
     try {
@@ -401,40 +322,22 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
       const jobTitle = watch("title") || "this position";
       let prompt = "";
 
+      // Prompt Logic
       switch (fieldName) {
         case "description":
-          prompt = `Write a single, concise, professional paragraph describing a ${jobTitle} internship.
-Avoid introductions like "Here's a draft" or "About the internship".
-Focus only on what the internship is about and what the intern will be doing, in 5-7 lines.
-Return only the paragraph text, no bullet points or titles.${
-            currentValue
-              ? ` Current description: "${currentValue}". Please rewrite it as one clear paragraph.`
-              : ""
-          }`;
+          prompt = `Write a single, concise, professional paragraph describing a ${jobTitle} internship. Avoid introductions. Focus on the role.`;
           break;
         case "responsibilities":
-          prompt = `Write 5-7 key responsibilities for a ${jobTitle} internship.
-Each responsibility must be on a new line, without numbering or bullet characters.
-Avoid any introduction, summary, or phrases like "Here are the responsibilities".
-Return only the clean list of responsibilities.${
-            currentValue
-              ? ` Current responsibilities: "${currentValue}". Please rewrite and clean them.`
-              : ""
-          }`;
+          prompt = `Write 5-7 key responsibilities for a ${jobTitle} internship. One per line.`;
           break;
-
         case "benefits":
-          prompt = `List 4-6 post-internship benefits that a candidate would receive after completing a ${jobTitle} internship.
-Return only the clean list, one benefit per line, no extra text or introduction.`;
+          prompt = `List 4-6 post-internship benefits for ${jobTitle}. One per line.`;
           break;
-
         case "skills_required":
-          prompt = `List 5-8 essential skills required for a ${jobTitle} internship.
-Return only the clean list, one skill per line, no extra text or introduction`;
+          prompt = `List 5-8 essential skills for ${jobTitle}. One per line.`;
           break;
-
         default:
-          prompt = `Help improve the following text for a ${jobTitle} internship: ${currentValue}`;
+          prompt = `Improve this text: ${currentValue}`;
       }
 
       const updatedHistory = [
@@ -452,10 +355,8 @@ Return only the clean list, one skill per line, no extra text or introduction`;
       if (aiResponse?.response) {
         let cleanResponse = aiResponse.response
           .replace(/\*\*/g, "")
-          .replace(/\*/g, "")
           .replace(/^#+\s/gm, "")
           .replace(/^(here('|'|'s)|sure|of course|okay|let'?s).*\n/i, "")
-          .replace(/^about .*internship.*\n?/i, "")
           .trim();
 
         if (fieldName === "description") {
@@ -472,7 +373,10 @@ Return only the clean list, one skill per line, no extra text or introduction`;
             .filter((l: string) => l.length > 0)
             .join("\n");
         }
-        setValue(fieldName, cleanResponse, { shouldValidate: true });
+
+        // We know these fields are strings in our schema
+        setValue(fieldName, cleanResponse as any, { shouldValidate: true });
+
         setConversationHistory((prev) => [
           ...prev,
           { role: "ai", content: cleanResponse },
@@ -483,7 +387,7 @@ Return only the clean list, one skill per line, no extra text or introduction`;
       console.error("AI Assist error:", error);
       toast({
         title: "AI Assist Failed",
-        description: "Unable to generate AI suggestion. Please try again.",
+        description: "Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -491,29 +395,22 @@ Return only the clean list, one skill per line, no extra text or introduction`;
     }
   };
 
-  // ... (JSX Return - Form UI - remains same as your provided code, just ensured button disabled logic) ...
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[90vh] p-0">
-        <DialogHeader className="px-6 py-3"></DialogHeader>
+        <DialogHeader className="px-6 py-3">
+          <DialogTitle className="text-xl font-semibold">
+            Edit Job Description
+          </DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground mt-1">
+            Update the information about this Job/Internship
+          </DialogDescription>
+        </DialogHeader>
         <ScrollArea className="max-h-[calc(90vh-140px)]">
           <form
             onSubmit={handleSubmit(onSubmit)}
             className="px-6 space-y-6 pb-6"
           >
-            {/* ... Copy Paste your Form Fields here (Inputs, Selects, etc.) ... */}
-            {/* Example: Job/Intern Role Input */}
-            <div className="flex items-center justify-between">
-              <div>
-                <DialogTitle className="text-xl font-semibold">
-                  Edit Job Description
-                </DialogTitle>
-                <DialogDescription className="text-sm text-muted-foreground mt-1">
-                  Update the information about this Job/Internship
-                </DialogDescription>
-              </div>
-            </div>
-
             {/* Title */}
             <div className="space-y-2">
               <Label htmlFor="title" className="text-sm font-medium">
@@ -538,7 +435,7 @@ Return only the clean list, one skill per line, no extra text or introduction`;
               )}
             </div>
 
-            {/* Internship Period */}
+            {/* Duration */}
             <div className="space-y-2">
               <Label htmlFor="duration" className="text-sm font-medium">
                 Internship Period <span className="text-destructive">*</span>
@@ -572,38 +469,23 @@ Return only the clean list, one skill per line, no extra text or introduction`;
                 control={control}
                 render={({ field }) => (
                   <div className="flex items-center gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        value="full_time"
-                        checked={field.value === "full_time"}
-                        onChange={() => field.onChange("full_time")}
-                        className="w-4 h-4 accent-primary"
-                      />
-                      <span className="text-sm">Full Time</span>
-                    </label>
-
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        value="part_time"
-                        checked={field.value === "part_time"}
-                        onChange={() => field.onChange("part_time")}
-                        className="w-4 h-4 accent-primary"
-                      />
-                      <span className="text-sm">Part Time</span>
-                    </label>
-
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        value="both"
-                        checked={field.value === "both"}
-                        onChange={() => field.onChange("both")}
-                        className="w-4 h-4 accent-primary"
-                      />
-                      <span className="text-sm">Both</span>
-                    </label>
+                    {["full_time", "part_time", "both"].map((type) => (
+                      <label
+                        key={type}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <input
+                          type="radio"
+                          value={type}
+                          checked={field.value === type}
+                          onChange={() => field.onChange(type)}
+                          className="w-4 h-4 accent-primary"
+                        />
+                        <span className="text-sm capitalize">
+                          {type.replace("_", " ")}
+                        </span>
+                      </label>
+                    ))}
                   </div>
                 )}
               />
@@ -614,7 +496,7 @@ Return only the clean list, one skill per line, no extra text or introduction`;
               )}
             </div>
 
-            {/* Internship Type */}
+            {/* Paid/Unpaid */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">
                 Internship Type <span className="text-destructive">*</span>
@@ -625,7 +507,6 @@ Return only the clean list, one skill per line, no extra text or introduction`;
                   control={control}
                   render={({ field }) => (
                     <>
-                      {/* Paid Button */}
                       <div className="flex items-center gap-2">
                         <Button
                           type="button"
@@ -640,24 +521,20 @@ Return only the clean list, one skill per line, no extra text or introduction`;
                           Paid
                         </Button>
                       </div>
-
-                      {/* Show amount input when Paid is selected */}
                       {field.value && (
                         <Controller
                           name="payment"
                           control={control}
-                          render={({ field }) => (
+                          render={({ field: pField }) => (
                             <Input
-                              {...field}
+                              {...pField}
                               type="text"
-                              placeholder="e.g. 10000 or To be discussed"
+                              placeholder="Amount"
                               className="max-w-[200px]"
                             />
                           )}
                         />
                       )}
-
-                      {/* Unpaid Button */}
                       <div className="flex items-center gap-2">
                         <Button
                           type="button"
@@ -683,7 +560,7 @@ Return only the clean list, one skill per line, no extra text or introduction`;
               )}
             </div>
 
-            {/* Minimum Age Required */}
+            {/* Min Age */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">
                 Minimum Age Required <span className="text-destructive">*</span>
@@ -700,14 +577,11 @@ Return only the clean list, one skill per line, no extra text or introduction`;
                       <SelectValue placeholder="Select age" />
                     </SelectTrigger>
                     <SelectContent>
-                      {[...Array(10)].map((_, i) => {
-                        const age = 16 + i;
-                        return (
-                          <SelectItem key={age} value={String(age)}>
-                            {age}
-                          </SelectItem>
-                        );
-                      })}
+                      {[...Array(10)].map((_, i) => (
+                        <SelectItem key={16 + i} value={String(16 + i)}>
+                          {16 + i}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}
@@ -719,258 +593,154 @@ Return only the clean list, one skill per line, no extra text or introduction`;
               )}
             </div>
 
-            {/* About Internship */}
-            <div className="space-y-2">
-              <Label htmlFor="description" className="text-sm font-medium">
-                About Internship <span className="text-destructive">*</span>
-              </Label>
-              <Controller
-                name="description"
-                control={control}
-                render={({ field }) => (
-                  <div className="relative">
-                    <Textarea
-                      {...field}
-                      id="description"
-                      placeholder="Type here"
-                      className="min-h-[120px] bg-background resize-none rounded-2xl"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      className={`absolute bottom-2 right-2 rounded-full ${
-                        isJobRoleFilled
-                          ? "bg-teal-600 hover:bg-teal-700"
-                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      }`}
-                      onClick={() => handleAIAssist("description")}
-                      disabled={!isJobRoleFilled || aiLoading === "description"}
-                    >
-                      <Sparkles className="w-4 h-4 mr-1" />
-                      {aiLoading === "description"
-                        ? "Generating..."
-                        : "AI Assistant"}
-                    </Button>
-                  </div>
+            {/* Description Fields with AI */}
+            {[
+              { name: "description", label: "About Internship" },
+              { name: "responsibilities", label: "Key Responsibilities" },
+              {
+                name: "benefits",
+                label: "What you will get (Post Internship)",
+              },
+              { name: "skills_required", label: "Skills Required" },
+            ].map((area) => (
+              <div key={area.name} className="space-y-2">
+                <Label htmlFor={area.name} className="text-sm font-medium">
+                  {area.label} <span className="text-destructive">*</span>
+                </Label>
+                <Controller
+                  name={area.name as keyof InternshipFormValues}
+                  control={control}
+                  render={({ field }) => (
+                    <div className="relative">
+                      <Textarea
+                        {...field}
+                        id={area.name}
+                        placeholder="Type here"
+                        className="min-h-[120px] bg-background resize-none rounded-2xl"
+                        value={field.value as string}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        className={`absolute bottom-2 right-2 rounded-full ${
+                          isJobRoleFilled
+                            ? "bg-teal-600 hover:bg-teal-700"
+                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        }`}
+                        onClick={() =>
+                          handleAIAssist(
+                            area.name as keyof InternshipFormValues
+                          )
+                        }
+                        disabled={!isJobRoleFilled || aiLoading === area.name}
+                      >
+                        {aiLoading === area.name ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 mr-1" />
+                        )}
+                        {aiLoading === area.name
+                          ? "Generating..."
+                          : "AI Assistant"}
+                      </Button>
+                    </div>
+                  )}
+                />
+                {errors[area.name as keyof InternshipFormValues] && (
+                  <p className="text-sm text-destructive">
+                    {
+                      (errors[area.name as keyof InternshipFormValues] as any)
+                        ?.message
+                    }
+                  </p>
                 )}
-              />
-              {errors.description && (
-                <p className="text-sm text-destructive">
-                  {errors.description.message}
-                </p>
-              )}
-            </div>
+              </div>
+            ))}
 
-            {/* Key Responsibilities */}
-            <div className="space-y-2">
-              <Label htmlFor="responsibilities" className="text-sm font-medium">
-                Key Responsibilities <span className="text-destructive">*</span>
-              </Label>
-              <Controller
-                name="responsibilities"
-                control={control}
-                render={({ field }) => (
-                  <div className="relative">
-                    <Textarea
-                      {...field}
-                      id="responsibilities"
-                      placeholder="Type here"
-                      className="min-h-[120px] bg-background resize-none rounded-2xl"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      className={`absolute bottom-2 right-2 rounded-full ${
-                        isJobRoleFilled
-                          ? "bg-teal-600 hover:bg-teal-700"
-                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      }`}
-                      onClick={() => handleAIAssist("responsibilities")}
-                      disabled={
-                        !isJobRoleFilled || aiLoading === "responsibilities"
-                      }
-                    >
-                      <Sparkles className="w-4 h-4 mr-1" />
-                      {aiLoading === "responsibilities"
-                        ? "Generating..."
-                        : "AI Assistant"}
-                    </Button>
-                  </div>
-                )}
-              />
-              {errors.responsibilities && (
-                <p className="text-sm text-destructive">
-                  {errors.responsibilities.message}
-                </p>
-              )}
-            </div>
-
-            {/* Post Internship Benefits */}
-            <div className="space-y-2">
-              <Label htmlFor="benefits" className="text-sm font-medium">
-                What you will get (Post Internship){" "}
-                <span className="text-destructive">*</span>
-              </Label>
-              <Controller
-                name="benefits"
-                control={control}
-                render={({ field }) => (
-                  <div className="relative">
-                    <Textarea
-                      {...field}
-                      id="benefits"
-                      placeholder="Type here"
-                      className="min-h-[120px] bg-background resize-none rounded-2xl"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      className={`absolute bottom-2 right-2 rounded-full ${
-                        isJobRoleFilled
-                          ? "bg-teal-600 hover:bg-teal-700"
-                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      }`}
-                      onClick={() => handleAIAssist("benefits")}
-                      disabled={!isJobRoleFilled || aiLoading === "benefits"}
-                    >
-                      <Sparkles className="w-4 h-4 mr-1" />
-                      {aiLoading === "benefits"
-                        ? "Generating..."
-                        : "AI Assistant"}
-                    </Button>
-                  </div>
-                )}
-              />
-              {errors.benefits && (
-                <p className="text-sm text-destructive">
-                  {errors.benefits.message}
-                </p>
-              )}
-            </div>
-
-            {/* Skills Required */}
-            <div className="space-y-2">
-              <Label htmlFor="skills_required" className="text-sm font-medium">
-                Skills Required <span className="text-destructive">*</span>
-              </Label>
-              <Controller
-                name="skills_required"
-                control={control}
-                render={({ field }) => (
-                  <div className="relative">
-                    <Textarea
-                      {...field}
-                      id="skills_required"
-                      placeholder="Type here"
-                      className="min-h-[120px] bg-background resize-none rounded-2xl"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      className={`absolute bottom-2 right-2 rounded-full ${
-                        isJobRoleFilled
-                          ? "bg-teal-600 hover:bg-teal-700"
-                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      }`}
-                      onClick={() => handleAIAssist("skills_required")}
-                      disabled={
-                        !isJobRoleFilled || aiLoading === "skills_required"
-                      }
-                    >
-                      <Sparkles className="w-4 h-4 mr-1" />
-                      {aiLoading === "skills_required"
-                        ? "Generating..."
-                        : "AI Assistant"}
-                    </Button>
-                  </div>
-                )}
-              />
-              {errors.skills_required && (
-                <p className="text-sm text-destructive">
-                  {errors.skills_required.message}
-                </p>
-              )}
-            </div>
-
-            {/* Language Proficiency */}
+            {/* Language Proficiency (Field Array) */}
             <div className="space-y-4">
               <Label className="text-sm font-medium">
                 Language Proficiency <span className="text-destructive">*</span>
               </Label>
-              {languages.map((lang, index) => (
-                <div key={index} className="flex items-center gap-4">
-                  <Select
-                    value={lang.language}
-                    onValueChange={(value) =>
-                      handleLanguageChange(index, "language", value)
-                    }
-                  >
-                    <SelectTrigger className="w-[220px] bg-background">
-                      <SelectValue placeholder="Select Language" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LANGUAGES.map((language) => (
-                        <SelectItem key={language} value={language}>
-                          {language}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {fields.map((field, index) => (
+                <div key={field.id} className="flex items-center gap-4">
+                  <Controller
+                    control={control}
+                    name={`language_requirements.${index}.language`}
+                    render={({ field: f }) => (
+                      <Select value={f.value} onValueChange={f.onChange}>
+                        <SelectTrigger className="w-[220px] bg-background">
+                          <SelectValue placeholder="Select Language" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LANGUAGES.map((lang) => (
+                            <SelectItem key={lang} value={lang}>
+                              {lang}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
 
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`read-${index}`}
-                      checked={lang.read}
-                      onCheckedChange={(checked) =>
-                        handleLanguageChange(index, "read", checked === true)
-                      }
-                    />
-                    <label
-                      htmlFor={`read-${index}`}
-                      className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      Read
-                    </label>
-                  </div>
+                  {/* Read Checkbox */}
+                  <Controller
+                    control={control}
+                    name={`language_requirements.${index}.read`}
+                    render={({ field: f }) => (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`read-${index}`}
+                          checked={f.value}
+                          onCheckedChange={f.onChange}
+                        />
+                        <label htmlFor={`read-${index}`} className="text-sm">
+                          Read
+                        </label>
+                      </div>
+                    )}
+                  />
+                  {/* Write Checkbox */}
+                  <Controller
+                    control={control}
+                    name={`language_requirements.${index}.write`}
+                    render={({ field: f }) => (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`write-${index}`}
+                          checked={f.value}
+                          onCheckedChange={f.onChange}
+                        />
+                        <label htmlFor={`write-${index}`} className="text-sm">
+                          Write
+                        </label>
+                      </div>
+                    )}
+                  />
+                  {/* Speak Checkbox */}
+                  <Controller
+                    control={control}
+                    name={`language_requirements.${index}.speak`}
+                    render={({ field: f }) => (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`speak-${index}`}
+                          checked={f.value}
+                          onCheckedChange={f.onChange}
+                        />
+                        <label htmlFor={`speak-${index}`} className="text-sm">
+                          Speak
+                        </label>
+                      </div>
+                    )}
+                  />
 
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`write-${index}`}
-                      checked={lang.write}
-                      onCheckedChange={(checked) =>
-                        handleLanguageChange(index, "write", checked === true)
-                      }
-                    />
-                    <label
-                      htmlFor={`write-${index}`}
-                      className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      Write
-                    </label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`speak-${index}`}
-                      checked={lang.speak}
-                      onCheckedChange={(checked) =>
-                        handleLanguageChange(index, "speak", checked === true)
-                      }
-                    />
-                    <label
-                      htmlFor={`speak-${index}`}
-                      className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      Speak
-                    </label>
-                  </div>
-
-                  {languages.length > 1 && (
+                  {fields.length > 1 && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleRemoveLanguage(index)}
+                      onClick={() => remove(index)}
                     >
                       <X className="w-4 h-4" />
                     </Button>
@@ -980,7 +750,14 @@ Return only the clean list, one skill per line, no extra text or introduction`;
               <Button
                 type="button"
                 variant="link"
-                onClick={handleAddLanguage}
+                onClick={() =>
+                  append({
+                    language: "",
+                    read: false,
+                    write: false,
+                    speak: false,
+                  })
+                }
                 className="text-primary pl-0"
               >
                 Add another language
@@ -992,13 +769,12 @@ Return only the clean list, one skill per line, no extra text or introduction`;
               )}
             </div>
 
-            {/* Last date to apply */}
+            {/* Date Pickers */}
             <div className="space-y-3">
               <label className="block text-sm font-medium text-gray-700">
                 Last date to apply <span className="text-destructive">*</span>
               </label>
               <div className="flex gap-3">
-                {/* ... Date Picker Selects ... */}
                 <div className="relative flex-1">
                   <select
                     value={selectedYear}
@@ -1010,9 +786,9 @@ Return only the clean list, one skill per line, no extra text or introduction`;
                     className="w-full px-3 py-2 text-sm text-gray-500 border border-gray-300 rounded-full appearance-none bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-9"
                   >
                     <option value="">Year</option>
-                    {years.map((year) => (
-                      <option key={year} value={year} className="text-gray-700">
-                        {year}
+                    {years.map((y) => (
+                      <option key={y} value={y} className="text-gray-700">
+                        {y}
                       </option>
                     ))}
                   </select>
@@ -1029,14 +805,14 @@ Return only the clean list, one skill per line, no extra text or introduction`;
                     className="w-full px-3 py-2 text-sm text-gray-500 border border-gray-300 rounded-full appearance-none bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-9 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Month</option>
-                    {availableMonths.map((month, idx) => {
+                    {availableMonths.map((m, i) => {
                       const val =
                         selectedYear && parseInt(selectedYear) === currentYear
-                          ? currentMonth + idx
-                          : idx + 1;
+                          ? currentMonth + i
+                          : i + 1;
                       return (
-                        <option key={month} value={val}>
-                          {month}
+                        <option key={m} value={val}>
+                          {m}
                         </option>
                       );
                     })}
@@ -1051,25 +827,24 @@ Return only the clean list, one skill per line, no extra text or introduction`;
                     className="w-full px-3 py-2 text-sm text-gray-500 border border-gray-300 rounded-full appearance-none bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-9 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Date</option>
-                    {dates.map((date) => {
-                      const disabled = isDateDisabled(
-                        date,
-                        selectedMonth,
-                        selectedYear
-                      );
-                      return (
-                        <option
-                          key={date}
-                          value={date}
-                          disabled={disabled}
-                          className={
-                            disabled ? "text-gray-400" : "text-gray-700"
-                          }
-                        >
-                          {date}
-                        </option>
-                      );
-                    })}
+                    {dates.map((d) => (
+                      <option
+                        key={d}
+                        value={d}
+                        disabled={isDateDisabled(
+                          d,
+                          selectedMonth,
+                          selectedYear
+                        )}
+                        className={
+                          isDateDisabled(d, selectedMonth, selectedYear)
+                            ? "text-gray-400"
+                            : "text-gray-700"
+                        }
+                      >
+                        {d}
+                      </option>
+                    ))}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
                 </div>

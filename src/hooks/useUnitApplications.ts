@@ -6,9 +6,9 @@ export const useUnitStats = () => {
     queryKey: ["unitStats"],
     queryFn: getUnitStats,
     select: (data) => ({
-      total: data.totalApplications,
-      totalJobs: data.totalInternships,
-      interviews: data.totalInterviews,
+      totalApplications: data.totalApplications,
+      totalInternships: data.totalInternships,
+      totalInterviews: data.totalInterviews,
       hiredThisMonth: data.hiredThisMonth,
     }),
   });

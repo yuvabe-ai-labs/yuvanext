@@ -1,13 +1,11 @@
 import {
   Search,
-  Menu,
   CircleUserRound,
-  FileText,
   MessageSquare,
   HelpCircle,
   Settings,
   LogOut,
-  X,
+  Disc,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,24 +17,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/hooks/useAuth";
+import { authClient } from "@/lib/auth-client";
+import { useUnitProfile } from "@/hooks/useUnitProfile";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
 import logo from "@/assets/YuvaNext.svg";
 import logoName from "@/assets/YuvaNext_name.svg";
-import { Disc } from "@/components/ui/custom-icons";
 
 const Navbar = () => {
-  const { user, signOut } = useAuth();
+  // 1. Better Auth Session
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
+
+  // 2. React Query Hook for Profile Data
+  const { data: userProfile } = useUnitProfile();
+
   const navigate = useNavigate();
   const location = useLocation();
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [profileId, setProfileId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+
+  // 3. Extract Role & Avatar from the cached profile data
+  const userRole = userProfile?.role || null;
+  const avatarUrl = userProfile?.avatarUrl || null;
 
   const allNavItems = [
     { name: "Internships", path: "/internships" },
@@ -47,16 +51,20 @@ const Navbar = () => {
   const navItems = userRole === "unit" ? [] : allNavItems;
   const isActive = (path: string) => location.pathname === path;
 
+  // 4. Sign Out
   const handleSignOut = async () => {
-    await signOut();
-
-    if (userRole === "unit") {
-      navigate("/auth/unit/signin");
-    } else {
-      navigate("/auth/candidate/signin");
-    }
-
-    setMobileMenuOpen(false);
+    await authClient.signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          if (userRole === "unit") {
+            navigate("/auth/unit/signin");
+          } else {
+            navigate("/auth/candidate/signin");
+          }
+          setMobileMenuOpen(false);
+        },
+      },
+    });
   };
 
   const handleProfileClick = () => {
@@ -73,7 +81,6 @@ const Navbar = () => {
     setMobileMenuOpen(false);
   };
 
-  // ✅ Dynamic dashboard link based on role
   const dashboardLink = userRole === "unit" ? "/unit-dashboard" : "/dashboard";
 
   return (
@@ -99,16 +106,12 @@ const Navbar = () => {
               </Button>
             </div>
 
-            {/* ✅ Updated link based on userRole */}
             <a href={dashboardLink}>
-              {/* Mobile Logo */}
               <img
                 src={logoName}
                 className="h-10 w-auto cursor-pointer block md:hidden"
                 alt="Mobile Logo"
               />
-
-              {/* Desktop Logo */}
               <img
                 src={logo}
                 className="h-12 w-auto cursor-pointer hidden md:block"
@@ -117,7 +120,7 @@ const Navbar = () => {
             </a>
           </div>
 
-          {/* Navigation Links - Desktop Only */}
+          {/* Desktop Nav Items */}
           {navItems.length > 0 && (
             <div className="hidden lg:flex absolute left-1/2 transform -translate-x-1/2 items-center space-x-6 xl:space-x-10">
               {navItems.map((item) => (
@@ -141,7 +144,7 @@ const Navbar = () => {
           <div className="flex items-center space-x-2 sm:space-x-4 ml-auto lg:ml-0">
             <NotificationDropdown />
 
-            {/* User Avatar with Dropdown - Desktop */}
+            {/* Desktop User Menu */}
             <div className="hidden lg:block">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -156,6 +159,7 @@ const Navbar = () => {
                       <AvatarImage
                         src={avatarUrl || undefined}
                         alt={user?.email || "User"}
+                        className="object-cover"
                       />
                       <AvatarFallback className="text-sm bg-[#F8F6F2] text-gray-800">
                         {user?.email?.charAt(0).toUpperCase() ?? "U"}
@@ -171,7 +175,8 @@ const Navbar = () => {
                     <CircleUserRound className="mr-2 h-4 w-4" />
                     <span>My Profile</span>
                   </DropdownMenuItem>
-                  {userRole === "student" && (
+
+                  {userRole === "candidate" && (
                     <DropdownMenuItem
                       onClick={() => navigate("/candidate-tasks")}
                       className="cursor-pointer hover:!text-blue-500 hover:bg-transparent focus:bg-transparent transition-colors [&_svg]:hover:!text-blue-500"
@@ -248,6 +253,7 @@ const Navbar = () => {
                     <AvatarImage
                       src={avatarUrl || undefined}
                       alt={user?.email || "User"}
+                      className="object-cover"
                     />
                     <AvatarFallback className="text-sm bg-[#F8F6F2] text-gray-800">
                       {user?.email?.charAt(0).toUpperCase() ?? "U"}

@@ -12,11 +12,16 @@ import {
   getAppliedInternshipStatus,
   updateCandidateDecision,
   applyToInternship,
+  updateInternship,
+  createInternship,
 } from "@/services/internships.service";
 import {
   ApplyInternshipRequest,
   CandidateDecision,
+  UpdateInternshipPayload,
+  CreateInternshipPayload,
 } from "@/types/internships.types";
+import { useToast } from "./use-toast";
 
 export const useInternship = () => {
   return useQuery({
@@ -149,6 +154,53 @@ export const useApplyToInternship = () => {
       queryClient.invalidateQueries({
         queryKey: ["appliedInternshipStatus"],
       });
+    },
+  });
+};
+
+export const useCreateInternship = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (payload: CreateInternshipPayload) => createInternship(payload),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Internship posted successfully!",
+      });
+      // Invalidate the list so the new internship appears immediately
+      queryClient.invalidateQueries({ queryKey: ["internships"] });
+      // Also invalidate stats if you have a dashboard query
+      queryClient.invalidateQueries({ queryKey: ["unitStats"] });
+    },
+    onError: (error) => {
+      console.error("Create internship failed", error);
+      // Toast is handled in service or here, but service returns rejected promise so this fires
+    },
+  });
+};
+
+export const useUpdateInternship = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (payload: UpdateInternshipPayload) => updateInternship(payload),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Internship updated successfully!",
+      });
+
+      // Invalidate list to show updated data
+      queryClient.invalidateQueries({ queryKey: ["internships"] });
+      // If you have a detail view query, invalidate that too:
+      // queryClient.invalidateQueries({ queryKey: ["internship", id] });
+    },
+    onError: (error) => {
+      console.error("Update internship failed", error);
+      // Toast handled by error callback in component or global handler
     },
   });
 };

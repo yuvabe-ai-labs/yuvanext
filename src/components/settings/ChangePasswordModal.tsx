@@ -2,17 +2,25 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { supabase } from "@/integrations/supabase/client";
 import { X, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
+import { authClient } from "@/lib/auth-client";
 import { passwordSchema } from "@/lib/schemas";
 
 type PasswordFormData = z.infer<typeof passwordSchema>;
 
-export default function ChangePasswordModal({ isOpen, onClose }) {
+interface ChangePasswordModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function ChangePasswordModal({
+  isOpen,
+  onClose,
+}: ChangePasswordModalProps) {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
 
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
@@ -31,35 +39,19 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const onSubmit = async (data: PasswordFormData) => {
-    if (!user?.email) {
-      setError("root", {
-        message: "Unable to fetch user. Please login again.",
-      });
-      return;
-    }
+    if (!user?.email) return;
 
     try {
-      // Step 1 – Re-authenticate
-      const { error: signInErr } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: data.currentPassword,
+      // Better Auth handles the "current password" check internally
+      const { error } = await authClient.changePassword({
+        newPassword: data.newPassword,
+        currentPassword: data.currentPassword,
+        revokeOtherSessions: true, // Recommended for security
       });
 
-      if (signInErr) {
-        setError("currentPassword", {
-          message: "Current password is incorrect.",
-        });
-        return;
-      }
-
-      // Step 2 – Update password
-      const { error: updateErr } = await supabase.auth.updateUser({
-        password: data.newPassword,
-      });
-
-      if (updateErr) {
+      if (error) {
         setError("root", {
-          message: updateErr.message,
+          message: error.message || "Failed to update password",
         });
         return;
       }
@@ -73,9 +65,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
       onClose();
     } catch (err) {
       console.error(err);
-      setError("root", {
-        message: "Something went wrong. Try again.",
-      });
+      setError("root", { message: "Something went wrong. Try again." });
     }
   };
 

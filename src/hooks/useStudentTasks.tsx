@@ -1,38 +1,34 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  getStudentTasks,
-  createStudentTask,
-  deleteStudentTask,
-  updateStudentTask,
-} from "@/services/studentTasks.service";
-import type {
-  CreateTaskInput,
-  UpdateTaskInput,
-} from "@/types/candidateTasks.types";
+import axiosInstance from "@/config/platform-api";
+import { getStudentTasksByApplication } from "@/services/studentTasks.service";
 
 export const useStudentTasks = (applicationId: string | undefined) => {
   return useQuery({
     queryKey: ["studentTasks", applicationId],
-    queryFn: () => {
-      if (!applicationId)
-        return Promise.resolve({ data: [], error: "No application ID" });
-      return getStudentTasks(applicationId);
-    },
+    queryFn: () => getStudentTasksByApplication(applicationId || ""),
     enabled: !!applicationId,
   });
 };
 
+// Create a new task
 export const useCreateStudentTask = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       studentId,
       taskData,
     }: {
       studentId: string;
-      taskData: CreateTaskInput;
-    }) => createStudentTask(studentId, taskData),
+      taskData: any;
+    }) => {
+      // POST /api/tasks
+      const { data } = await axiosInstance.post("/tasks", {
+        ...taskData,
+        student_id: studentId,
+      });
+      return data;
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["studentTasks", variables.taskData.application_id],
@@ -41,32 +37,39 @@ export const useCreateStudentTask = () => {
   });
 };
 
+// Delete a task
 export const useDeleteStudentTask = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (taskId: string) => deleteStudentTask(taskId),
+    mutationFn: async (taskId: string) => {
+      // DELETE /api/tasks/{id}
+      await axiosInstance.delete(`/tasks/${taskId}`);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["studentTasks"] });
     },
   });
 };
 
+// Update a task
 export const useUpdateStudentTask = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       taskId,
       updates,
     }: {
       taskId: string;
-      updates: UpdateTaskInput;
-    }) => updateStudentTask(taskId, updates),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["studentTasks"],
-      });
+      updates: any;
+    }) => {
+      // PUT /api/tasks/{id}
+      const { data } = await axiosInstance.put(`/tasks/${taskId}`, updates);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["studentTasks"] });
     },
   });
 };

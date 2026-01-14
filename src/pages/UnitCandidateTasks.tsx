@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { format } from "date-fns";
 import Navbar from "@/components/Navbar";
 import { useStudentTasks } from "@/hooks/useStudentTasks";
 import TaskCalendar from "@/components/TaskCalendar";
 import ViewTaskModal from "@/components/ViewTaskModal";
-import type { StudentTask } from "@/types/candidateTasks.types";
+import type { StudentTask } from "@/types/studentTasks.types";
 import { Badge } from "@/components/ui/badge";
 import CandidateInfoCard from "@/components/CandidateInfoCard";
+import { format } from "date-fns";
 
 export default function UnitCandidateTasks() {
   const { applicationId } = useParams<{ applicationId: string }>();
@@ -19,9 +19,11 @@ export default function UnitCandidateTasks() {
   const [selectedTask, setSelectedTask] = useState<StudentTask | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
-  const { data: tasksResponse, isLoading: tasksLoading } =
-    useStudentTasks(applicationId);
-  const tasks = tasksResponse?.data || [];
+  // 1. FETCH DATA (Consolidated Hook)
+  const { data, isLoading: tasksLoading } = useStudentTasks(applicationId);
+
+  // 2. EXTRACT TASKS
+  const tasks = data?.tasks || [];
 
   const handleTaskClick = (task: StudentTask) => {
     setSelectedTask(task);
@@ -75,11 +77,9 @@ export default function UnitCandidateTasks() {
       <Navbar />
 
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
-        {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] min-h-[calc(100vh-300px)] gap-20">
           {/* LEFT SIDE */}
           <div className="flex flex-col gap-6">
-            {/* Back Button - EXACT LIKE REFERENCE */}
             <button
               className="mt-6 mb-2 flex items-center gap-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg px-3 py-1.5 bg-white w-fit"
               onClick={() => navigate(-1)}
@@ -90,6 +90,7 @@ export default function UnitCandidateTasks() {
 
             {/* Candidate Card */}
             <div>
+              {/* Note: This component fetches its own data using the same hook (cached) */}
               <CandidateInfoCard applicationId={applicationId} />
             </div>
 
@@ -111,7 +112,7 @@ export default function UnitCandidateTasks() {
             )}
           </div>
 
-          {/* Tasks List Sidebar */}
+          {/* RIGHT SIDE: Tasks List Sidebar */}
           <div className="w-full md:w-80 bg-white p-6 shadow-inner flex flex-col overflow-hidden border-l-4 border-gray-300 min-h-[calc(100vh-80px)]">
             <h2 className="text-2xl font-semibold text-gray-900 mb-6 flex-shrink-0">
               Tasks Overview
@@ -129,7 +130,6 @@ export default function UnitCandidateTasks() {
                     onClick={() => handleTaskClick(task)}
                     className="bg-white border border-gray-200 rounded-2xl p-4 cursor-pointer transition-all hover:shadow-md"
                   >
-                    {/* Header */}
                     <div className="flex items-start gap-3 mb-2">
                       <div
                         className="w-4 h-1 rounded-full mt-1.5 flex-shrink-0"
@@ -140,7 +140,6 @@ export default function UnitCandidateTasks() {
                           <h3 className="font-semibold text-gray-900 text-sm mb-1">
                             {task.title}
                           </h3>
-
                           <Badge
                             variant="secondary"
                             className={`${getStatusColor(
@@ -160,14 +159,12 @@ export default function UnitCandidateTasks() {
                       </div>
                     </div>
 
-                    {/* Description */}
                     {task.description && (
-                      <p className="text-xs text-gray-600 mb-3 leading-relaxed pl-7">
+                      <p className="text-xs text-gray-600 mb-3 leading-relaxed pl-7 line-clamp-2">
                         {task.description}
                       </p>
                     )}
 
-                    {/* Submission Link indicator */}
                     {task.submission_link && (
                       <div className="pl-7">
                         <Badge

@@ -8,11 +8,11 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
+import { Internship } from "@/types/internships.types";
 
 interface InternshipDetailsViewProps {
-  internship: any;
+  internship: Internship; // Use the strict type
   onClose: () => void;
 }
 
@@ -20,27 +20,26 @@ const InternshipDetailsView = ({
   internship,
   onClose,
 }: InternshipDetailsViewProps) => {
-  // Safe JSON parser
-  const safeParse = (data: any, fallback: any) => {
-    if (!data) return fallback;
-    try {
-      return typeof data === "string" ? JSON.parse(data) : data;
-    } catch {
-      return fallback;
-    }
-  };
+  // Helper to safely ensure array (API returns arrays, but good safety measure)
+  const ensureArray = (data) => (Array.isArray(data) ? data : []);
 
-  const responsibilities = safeParse(internship.responsibilities, []);
-  const requirements = safeParse(internship.requirements, []);
-  const skills = safeParse(internship.skills_required, []);
-  const benefits = safeParse(internship.benefits, []);
+  console.log("internship", internship);
+
+  // Map API fields to UI variables
+  const responsibilities = ensureArray(internship.responsibilities);
+  const skills = ensureArray(internship.skillsRequired); // Corrected: API uses 'skillsRequired'
+  const benefits = ensureArray(internship.benefits);
+
+  // NOTE: 'requirements' field is NOT present in your API response.
+  // Commenting out as requested.
+  // const requirements = safeParse(internship.requirements, []);
 
   const internshipData = {
     ...internship,
     responsibilities,
-    requirements,
     skills,
     benefits,
+    // requirements, // Commented out
   };
 
   return (
@@ -66,26 +65,37 @@ const InternshipDetailsView = ({
           {/* Header */}
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-start space-x-5">
-              <div className="w-16 h-16 bg-teal-600 text-white rounded-2xl flex items-center justify-center shadow-sm">
-                <svg
-                  className="w-8 h-8"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
-                </svg>
+              <div className="w-16 h-16 bg-teal-600 text-white rounded-2xl flex items-center justify-center shadow-sm overflow-hidden">
+                {/* Use Avatar if available, otherwise fallback to icon */}
+                {internship.createdBy?.avatarUrl ? (
+                  <img
+                    src={internship.createdBy.avatarUrl}
+                    alt="Logo"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <svg
+                    className="w-8 h-8"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
+                  </svg>
+                )}
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 mb-1">
                   {internshipData.title}
                 </h1>
                 <p className="text-lg text-gray-700 mb-3 font-medium">
-                  {internshipData.company_name}
+                  {/* Corrected: Access company name from nested createdBy object */}
+                  {internshipData.createdBy?.name || "Company Name"}
                 </p>
                 <div className="flex flex-wrap items-center gap-5 text-sm text-gray-600">
                   <div className="flex items-center">
                     <MapPin className="w-4 h-4 mr-1.5 text-gray-500" />
-                    {internshipData.location || "Not specified"}
+                    {/* Corrected: Access location from nested createdBy object */}
+                    {internshipData.createdBy?.location || "Not specified"}
                   </div>
                   <div className="flex items-center">
                     <Clock className="w-4 h-4 mr-1.5 text-gray-500" />
@@ -93,23 +103,23 @@ const InternshipDetailsView = ({
                   </div>
                   <div className="flex items-center">
                     <IndianRupee className="w-4 h-4 mr-1.5 text-gray-500" />
-                    {internshipData.payment
+                    {internshipData.isPaid
                       ? `Paid - ${internshipData.payment}`
                       : "Unpaid"}
                   </div>
                   <div className="flex items-center">
-                    {internshipData.job_type === "full_time"
+                    {internshipData.jobType === "full_time"
                       ? "Full Time"
-                      : internshipData.job_type === "part_time"
+                      : internshipData.jobType === "part_time"
                       ? "Part Time"
-                      : internshipData.job_type === "both"
+                      : internshipData.jobType === "both"
                       ? "Full Time & Part Time"
                       : "Not specified"}
                   </div>
                   {/* Minimum Age */}
-                  {internshipData.min_age_required && (
+                  {internshipData.minAgeRequired && (
                     <div className="flex items-center">
-                      Minimum Age: {internshipData.min_age_required}
+                      Minimum Age: {internshipData.minAgeRequired}
                     </div>
                   )}
                 </div>
@@ -134,50 +144,6 @@ const InternshipDetailsView = ({
               </p>
             </div>
           </div>
-
-          {/* Job Type & Min Age (TOP SECTION) */}
-          {/* <div className="mb-8 flex flex-wrap items-center gap-4">
-            {internshipData.job_type && (
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Engagement Type:
-                </h3>
-                {internshipData.job_type === "both" ? (
-                  <>
-                    <Badge className="bg-blue-100 text-blue-700 font-medium">
-                      Part-Time
-                    </Badge>
-                    <Badge className="bg-green-100 text-green-700 font-medium">
-                      Full-Time
-                    </Badge>
-                  </>
-                ) : (
-                  <Badge
-                    className={`${
-                      internshipData.job_type === "part-time"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-green-100 text-green-700"
-                    } font-medium`}
-                  >
-                    {internshipData.job_type === "part-time"
-                      ? "Part-Time"
-                      : "Full-Time"}
-                  </Badge>
-                )}
-              </div>
-            )}
-
-            {internshipData.min_age_required && (
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Minimum Age:
-                </h3>
-                <p className="text-gray-700 text-base">
-                  {internshipData.min_age_required}
-                </p>
-              </div>
-            )}
-          </div> */}
 
           {/* About the Internship */}
           <div className="border-t border-gray-200 mb-8"></div>
@@ -216,8 +182,8 @@ const InternshipDetailsView = ({
             </>
           )}
 
-          {/* Requirements */}
-          {internshipData.requirements.length > 0 && (
+          {/* Requirements - SECTION COMMENTED OUT AS FIELD MISSING IN API */}
+          {/* {internshipData.requirements.length > 0 && (
             <>
               <div className="border-t border-gray-200 mb-8"></div>
               <div className="mb-8">
@@ -240,7 +206,8 @@ const InternshipDetailsView = ({
                 </div>
               </div>
             </>
-          )}
+          )} 
+          */}
 
           {/* Benefits */}
           {internshipData.benefits.length > 0 && (
@@ -293,26 +260,30 @@ const InternshipDetailsView = ({
           {/* Additional Info */}
           <div className="border-t border-gray-200 mb-8"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {internshipData.application_deadline && (
+            {internshipData.closingDate && (
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   Application Deadline
                 </h3>
                 <p className="text-gray-700">
-                  {new Date(
-                    internshipData.application_deadline
-                  ).toLocaleDateString()}
+                  {new Date(internshipData.closingDate).toLocaleDateString()}
                 </p>
               </div>
             )}
-            {internshipData.company_email && (
+
+            {/* SECTION COMMENTED OUT: company_email is not in the API Response.
+              If you want to display an email, you might need to use internshipData.createdBy.phone 
+              or request the backend team to add an email field to the createdBy object.
+            */}
+            {/* {internshipData.company_email && (
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   Contact
                 </h3>
                 <p className="text-gray-700">{internshipData.company_email}</p>
               </div>
-            )}
+            )} 
+            */}
           </div>
         </div>
       </main>

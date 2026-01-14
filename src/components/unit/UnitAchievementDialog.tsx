@@ -1,6 +1,6 @@
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
   DialogContent,
@@ -9,10 +9,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  AchievementFormValues,
+  achievementSchema,
+} from "@/lib/unitDialogSchemas";
 
 interface UnitAchievementDialogProps {
-  onSave: (achievement: any) => Promise<void>;
+  onSave: (achievement: AchievementFormValues) => Promise<void>;
   children: React.ReactNode;
 }
 
@@ -21,75 +27,87 @@ export const UnitAchievementDialog = ({
   children,
 }: UnitAchievementDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    date: "",
-  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await onSave(formData);
-    setFormData({
+  // 2. Initialize Hook Form
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<AchievementFormValues>({
+    resolver: zodResolver(achievementSchema),
+    defaultValues: {
       title: "",
       description: "",
       date: "",
-    });
-    setOpen(false);
+    },
+  });
+
+  // 3. Handle Submit
+  const onSubmit = async (data: AchievementFormValues) => {
+    try {
+      await onSave(data);
+      reset(); // Clear form
+      setOpen(false); // Close dialog
+    } catch (error) {
+      console.error("Failed to save achievement", error);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add Achievement</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="title">Achievement Title</Label>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Title Field */}
+          <div className="space-y-2">
+            <Label htmlFor="title">
+              Achievement Title <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="title"
-              value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
               placeholder="Award or achievement name"
-              required
+              {...register("title")}
             />
+            {errors.title && (
+              <p className="text-xs text-red-500">{errors.title.message}</p>
+            )}
           </div>
-          <div>
+
+          {/* Description Field */}
+          <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
               placeholder="Describe the achievement..."
               rows={3}
+              {...register("description")}
             />
           </div>
-          <div>
+
+          {/* Date Field */}
+          <div className="space-y-2">
             <Label htmlFor="date">Date</Label>
-            <Input
-              id="date"
-              type="date"
-              value={formData.date}
-              onChange={(e) =>
-                setFormData({ ...formData, date: e.target.value })
-              }
-            />
+            <Input id="date" type="date" {...register("date")} />
           </div>
-          <div className="flex justify-end space-x-2">
+
+          {/* Actions */}
+          <div className="flex justify-end space-x-2 pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button type="submit">Add Achievement</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Add Achievement"}
+            </Button>
           </div>
         </form>
       </DialogContent>

@@ -75,7 +75,7 @@ const InternshipDetail = () => {
           });
           refetchSaved();
         },
-        onError: (error: any) => {
+        onError: (error) => {
           console.error("Error removing internship:", error);
           toast({
             title: "Error",
@@ -93,7 +93,7 @@ const InternshipDetail = () => {
           });
           refetchSaved();
         },
-        onError: (error: any) => {
+        onError: (error) => {
           console.error("Error saving internship:", error);
           toast({
             title: "Error",

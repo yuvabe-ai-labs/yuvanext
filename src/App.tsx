@@ -53,13 +53,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     // Wait for auth and profile to load
-    if (isAuthPending || profileLoading) return;
-
-    // If no session, redirect handled by render
-    if (!session) return;
-
-    // If no profile data, wait
-    if (!profile) return;
+    if (isAuthPending || profileLoading || !session || !profile) return;
 
     const currentPath = location.pathname;
     const isOnChatbot = currentPath === "/chatbot";

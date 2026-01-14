@@ -5,33 +5,6 @@ export enum TaskStatus {
   ACCEPTED = "accepted",
 }
 
-export interface Task {
-  id: string;
-  applicationId: string;
-  title: string;
-  description: string | null;
-  startDate: string | null;
-  endDate: string | null;
-  startTime: string | null;
-  endTime: string | null;
-  status: TaskStatus;
-  submittedAt: string | null;
-  reviewedBy: string | null;
-  reviewRemarks: string | null;
-  reviewedAt: string | null;
-  submissionLink: string | null;
-  applicantName: string | null;
-  applicantPhone: string | null;
-  applicantEmail: string | null;
-  internshipTitle: string | null;
-  unitName: string | null;
-  unitId: string | null;
-  color: string | null;
-  progress: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface CreateTaskPayload {
   applicationId: string;
   title: string;
@@ -44,13 +17,41 @@ export interface CreateTaskPayload {
 }
 
 export interface UpdateTaskPayload {
-  title?: string;
-  description?: string | null;
-  startDate?: string | null;
-  endDate?: string | null;
-  startTime?: string | null;
-  endTime?: string | null;
-  color?: string | null;
-  status?: TaskStatus;
-  submissionLink?: string | null;
+  taskTitle?: string;
+  taskDescription?: string | null;
+  taskStartDate?: string | null;
+  taskEndDate?: string | null;
+  taskStartTime?: string | null;
+  taskEndTime?: string | null;
+  taskColor?: string | null;
+  taskStatus?: TaskStatus;
+  taskSubmissionLink?: string | null;
+}
+
+export interface Task {
+  taskId: string;
+  taskStatus: TaskStatus;
+  taskTitle: string;
+  taskDescription: string | null;
+  taskCreatedAt: string | null;
+  taskStartDate: string | null;
+  taskEndDate: string | null;
+  taskStartTime: string | null;
+  taskEndTime: string | null;
+  taskColor: string | null;
+  taskSubmissionLink: string | null;
+}
+
+export interface ApplicationTasks {
+  applicationId: string;
+  applicantId: string;
+  applicantName: string | null;
+  applicantEmail: string | null;
+  candidateAvatarUrl: string | null;
+  candidatePhoneNumber: string | null;
+  internshipId: string;
+  internshipName: string | null;
+  internshipCreatedAt: string;
+  internshipClosingDate: string | null;
+  tasks: Task[];
 }

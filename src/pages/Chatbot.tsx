@@ -175,9 +175,24 @@ const Chatbot = () => {
         return msg;
       });
 
-      setMessages(messagesWithOptions);
+      // Preserve the initial greeting if it exists
+      const initialGreeting = messages.find((m) => m.id === "initial");
+      if (initialGreeting && initialGreetingSent) {
+        // Only add initial greeting if it's not already in the backend messages
+        const hasGreetingInBackend = messagesWithOptions.some(
+          (m) => m.content.includes("Hey,") && m.content.includes("👋")
+        );
+
+        if (!hasGreetingInBackend) {
+          setMessages([initialGreeting, ...messagesWithOptions]);
+        } else {
+          setMessages(messagesWithOptions);
+        }
+      } else {
+        setMessages(messagesWithOptions);
+      }
     }
-  }, [chatMessages, streamingText]);
+  }, [chatMessages, streamingText, initialGreetingSent]);
 
   const startChat = async () => {
     setShowChat(true);
@@ -189,7 +204,7 @@ const Chatbot = () => {
 
       const initialMessage: Message = {
         id: "initial",
-        content: `Hey, ${name}! 👋`,
+        content: `Hey, ${name}! \u{1F44B}`, // Unicode escape for waving hand emoji
         role: "assistant",
         timestamp: new Date(),
       };
@@ -226,7 +241,7 @@ const Chatbot = () => {
     if (boldMatches.length >= 2) {
       const potentialOptions = boldMatches.map((match) => match[1].trim());
 
-      // Filter out emoji-only options (like 2️⃣)
+      // Filter out emoji-only options
       const validOptions = potentialOptions.filter(
         (opt) => opt.length > 1 && !/^[\u{1F300}-\u{1F9FF}]+$/u.test(opt)
       );
@@ -241,17 +256,23 @@ const Chatbot = () => {
         if (isClusteredList) {
           options = validOptions;
 
-          // Remove the "Please pick/choose..." sentence and the options list
-          cleanText = cleanText
-            .replace(
-              /Please (pick|choose|select) one( of the following)?:.*$/is,
-              ""
-            )
-            .replace(/\*\*[^*]+\*\*/g, "")
-            .replace(/,\s*(or|and)\s*/g, "")
-            .replace(/,\s*,/g, ",")
-            .replace(/\s+/g, " ")
-            .trim();
+          // More aggressive cleaning - remove everything after the question
+          const questionMatch = cleanText.match(/^[^?]*\?/);
+          if (questionMatch) {
+            cleanText = questionMatch[0].trim();
+          } else {
+            // If no question mark, take the first sentence
+            const firstSentence = cleanText.split(/[.!]/)[0];
+            cleanText = firstSentence.trim();
+          }
+
+          // Add back "Please choose one." if needed
+          if (
+            !cleanText.toLowerCase().includes("please") &&
+            !cleanText.toLowerCase().includes("choose")
+          ) {
+            // Don't add it, keep it clean
+          }
 
           return { cleanText, options };
         }
@@ -657,7 +678,7 @@ const Chatbot = () => {
                           : "bg-transparent border-blue-500 text-blue-600"
                       }`}
                     >
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                         {renderMessageContent(message.content)}
                         {/* Show streaming cursor */}
                         {message.isStreaming && (

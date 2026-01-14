@@ -22,9 +22,13 @@ export default function MyTasks() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
-  const { data: tasks = [], isLoading } = useCandidateTasks(
+  // Fetch application data which includes metadata and tasks
+  const { data: applicationData, isLoading } = useCandidateTasks(
     applicationId || ""
   );
+
+  // Extract the inner tasks array for the calendar and sidebar
+  const tasks = applicationData?.tasks || [];
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
@@ -76,11 +80,8 @@ export default function MyTasks() {
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
       <Navbar />
-
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
-        {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] min-h-[calc(100vh-80px)] gap-20">
-          {/* Calendar Section */}
           <div>
             <button
               className="mb-4 mt-6 flex items-center gap-2 text-gray-600 hover:text-gray-800 
@@ -107,7 +108,6 @@ export default function MyTasks() {
             )}
           </div>
 
-          {/* Remarks Sidebar */}
           <div className="w-full md:w-80 bg-white p-6 shadow-inner flex flex-col overflow-hidden border-l-4 border-gray-300">
             <h2 className="text-2xl font-semibold text-gray-900 mb-6 flex-shrink-0">
               Remarks
@@ -123,55 +123,42 @@ export default function MyTasks() {
               <div className="space-y-3 overflow-y-auto flex-grow pr-2">
                 {tasks.map((task) => (
                   <div
-                    key={task.id}
+                    key={task.taskId}
                     onClick={() => handleTaskClick(task)}
                     className="bg-white border border-gray-200 rounded-2xl p-4 cursor-pointer transition-all hover:shadow-md"
                   >
                     <div className="flex items-start gap-3 mb-2">
                       <div
                         className="w-4 h-1 rounded-full mt-1.5 flex-shrink-0"
-                        style={{ backgroundColor: task.color || "#3B82F6" }}
+                        style={{ backgroundColor: task.taskColor || "#3B82F6" }}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <h3 className="font-semibold text-gray-900 text-sm mb-1">
-                            {task.title}
+                          <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate">
+                            {task.taskTitle}
                           </h3>
-
                           <Badge
                             variant="secondary"
                             className={`${getStatusColor(
-                              task.status
+                              task.taskStatus
                             )} text-white text-[10px] px-2 py-0.5`}
                           >
-                            {getStatusLabel(task.status)}
+                            {getStatusLabel(task.taskStatus)}
                           </Badge>
                         </div>
-
-                        {task.endDate && (
+                        {task.taskEndDate && (
                           <p className="text-xs text-gray-500 flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full border-2 border-orange-400"></span>
-                            Due on {format(new Date(task.endDate), "do MMMM")}
+                            Due on{" "}
+                            {format(new Date(task.taskEndDate), "do MMMM")}
                           </p>
                         )}
                       </div>
                     </div>
-
-                    {task.description && (
+                    {task.taskDescription && (
                       <p className="text-xs text-gray-600 mb-3 leading-relaxed pl-7">
-                        {task.description}
+                        {task.taskDescription}
                       </p>
-                    )}
-
-                    {task.reviewRemarks && (
-                      <div className="pl-7 mb-3">
-                        <p className="text-[11px] font-medium text-gray-700 mb-1">
-                          Remarks
-                        </p>
-                        <p className="text-xs text-gray-600 leading-relaxed">
-                          {task.reviewRemarks}
-                        </p>
-                      </div>
                     )}
                   </div>
                 ))}
@@ -181,7 +168,6 @@ export default function MyTasks() {
         </div>
       </div>
 
-      {/* Add Task Modal */}
       {session?.user?.id && (
         <AddTaskModal
           isOpen={isAddModalOpen}

@@ -107,39 +107,6 @@ export default function OfferCard({ application }: OfferCardProps) {
         )}
       </div>
 
-      {/* Progress Bar - Only for Accepted Offers */}
-      {isAccepted && (
-        <div className="mb-5">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-base font-semibold text-gray-800">
-              Projects Progress
-            </h3>
-            <span className="text-base font-semibold text-gray-800">
-              {taskProgress}%
-            </span>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="w-full h-6 bg-gray-200 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${taskProgress}%` }}
-            />
-          </div>
-
-          {/* Dates */}
-          <div className="flex justify-between items-center mt-2">
-            <span className="text-sm text-gray-500">
-              Started:{" "}
-              {startDate ? format(startDate, "dd/MM/yyyy") : "Not started"}
-            </span>
-            <span className="text-sm text-gray-500">
-              Ends: {endDate ? format(endDate, "dd/MM/yyyy") : "No end date"}
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Details */}
       {!isAccepted && (
         <div className="space-y-3 mb-5">

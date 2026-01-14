@@ -1,5 +1,6 @@
 import axiosInstance from "@/config/platform-api";
 import type {
+  ApplicationTasks,
   CreateTaskPayload,
   Task,
   UpdateTaskPayload,
@@ -9,13 +10,16 @@ import { handleApiResponse, handleApiError } from "@/lib/api-handler";
 // Get candidate tasks by applicationId
 export const getCandidateTasks = async (
   applicationId: string
-): Promise<Task[]> => {
+): Promise<ApplicationTasks> => {
   try {
-    const response = await axiosInstance.get("/tasks", {
-      params: { applicationId },
-    });
+    const response = await axiosInstance.get(
+      `/tasks/application/${applicationId}`
+    );
 
-    return handleApiResponse<Task[]>(response, []);
+    return handleApiResponse<ApplicationTasks>(
+      response,
+      {} as ApplicationTasks
+    );
   } catch (error) {
     return handleApiError(error, "Failed to fetch candidate tasks");
   }

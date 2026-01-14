@@ -1,8 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import type { Tables } from '@/integrations/supabase/types';
+import axiosInstance from '@/config/platform-api';
 
-type Internship = Tables<'internships'>;
+// Internship interface
+export interface Internship {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+  [key: string]: any;
+}
 
 interface InternshipFilters {
   units: string[];
@@ -22,60 +29,50 @@ export const useInfiniteInternships = (filters: InternshipFilters) => {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
 
-  console.log('[useInfiniteInternships] Filters:', filters);
-  console.log('[useInfiniteInternships] Page:', page);
-
-  const fetchInternships = async (pageNum: number) => {
+  const fetchInternships = useCallback(async (pageNum: number) => {
     try {
       setLoading(pageNum === 0);
       setError(null);
 
-      let query = supabase
-        .from('internships')
-        .select('*')
-        .eq('status', 'active');
+      // GET /api/internships with query params for filters and pagination
+      const params: any = {
+        page: pageNum,
+        limit: PAGE_SIZE,
+        status: 'active',
+      };
 
-      // Apply filters
+      // Add filters to params
       if (filters.units.length > 0) {
-        query = query.in('company_name', filters.units);
+        params.units = filters.units.join(',');
       }
-
       if (filters.industries.length > 0) {
-        query = query.in('location', filters.industries);
+        params.industries = filters.industries.join(',');
       }
-
       if (filters.postingDate.from) {
-        query = query.gte('posted_date', filters.postingDate.from);
+        params.posted_from = filters.postingDate.from;
       }
-
       if (filters.postingDate.to) {
-        query = query.lte('posted_date', filters.postingDate.to);
+        params.posted_to = filters.postingDate.to;
       }
 
-      // Pagination
-      const from = pageNum * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
+      const { data } = await axiosInstance.get('/internships', { params });
 
-      const { data, error: fetchError } = await query
-        .order('posted_date', { ascending: false })
-        .range(from, to);
-
-      if (fetchError) throw fetchError;
+      const fetchedInternships = Array.isArray(data) ? data : data.internships || [];
 
       if (pageNum === 0) {
-        setInternships(data || []);
+        setInternships(fetchedInternships);
       } else {
-        setInternships((prev) => [...prev, ...(data || [])]);
+        setInternships((prev) => [...prev, ...fetchedInternships]);
       }
 
-      setHasMore((data?.length || 0) === PAGE_SIZE);
+      setHasMore(fetchedInternships.length === PAGE_SIZE);
     } catch (err: any) {
       console.error('[useInfiniteInternships] Error:', err);
       setError(err.message || 'Failed to fetch internships');
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   // Reset when filters change
   useEffect(() => {
@@ -92,6 +89,7 @@ export const useInfiniteInternships = (filters: InternshipFilters) => {
     filters.postingDate.from,
     filters.postingDate.to,
     filters.interestAreas.join(','),
+    fetchInternships,
   ]);
 
   const loadMore = useCallback(() => {
@@ -100,7 +98,7 @@ export const useInfiniteInternships = (filters: InternshipFilters) => {
       setPage(nextPage);
       fetchInternships(nextPage);
     }
-  }, [loading, hasMore, page]);
+  }, [loading, hasMore, page, fetchInternships]);
 
   return {
     internships,

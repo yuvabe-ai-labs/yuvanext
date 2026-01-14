@@ -1,13 +1,11 @@
 import {
   Search,
-  Menu,
   CircleUserRound,
-  FileText,
   MessageSquare,
   HelpCircle,
   Settings,
   LogOut,
-  X,
+  Disc,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useSession } from "@/lib/auth-client";
+import { authClient } from "@/lib/auth-client";
 import { useProfile } from "@/hooks/useProfile";
 import { UserRole } from "@/types/profiles.types";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -27,10 +25,9 @@ import { useState } from "react";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
 import logo from "@/assets/YuvaNext.svg";
 import logoName from "@/assets/YuvaNext_name.svg";
-import { Disc } from "@/components/ui/custom-icons";
 
 const Navbar = () => {
-  const { data: session, signOut } = useSession();
+  const { data: session } = authClient.useSession();
   const { data: profileData, isLoading: profileLoading } = useProfile();
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,8 +50,9 @@ const Navbar = () => {
   const navItems = userRole === UserRole.UNIT ? [] : allNavItems;
   const isActive = (path: string) => location.pathname === path;
 
+  // 4. Sign Out
   const handleSignOut = async () => {
-    await signOut();
+    await authClient.signOut();
 
     if (userRole === UserRole.UNIT) {
       navigate("/auth/unit/signin");
@@ -108,14 +106,11 @@ const Navbar = () => {
 
             {/* Updated link based on userRole */}
             <a href={dashboardLink}>
-              {/* Mobile Logo */}
               <img
                 src={logoName}
                 className="h-10 w-auto cursor-pointer block md:hidden"
                 alt="Mobile Logo"
               />
-
-              {/* Desktop Logo */}
               <img
                 src={logo}
                 className="h-12 w-auto cursor-pointer hidden md:block"
@@ -124,7 +119,7 @@ const Navbar = () => {
             </a>
           </div>
 
-          {/* Navigation Links - Desktop Only */}
+          {/* Desktop Nav Items */}
           {navItems.length > 0 && (
             <div className="hidden lg:flex absolute left-1/2 transform -translate-x-1/2 items-center space-x-6 xl:space-x-10">
               {navItems.map((item) => (
@@ -148,7 +143,7 @@ const Navbar = () => {
           <div className="flex items-center space-x-2 sm:space-x-4 ml-auto lg:ml-0">
             <NotificationDropdown />
 
-            {/* User Avatar with Dropdown - Desktop */}
+            {/* Desktop User Menu */}
             <div className="hidden lg:block">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

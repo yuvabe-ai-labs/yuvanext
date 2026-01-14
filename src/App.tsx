@@ -12,10 +12,13 @@ import {
 } from "react-router-dom";
 import { useSession } from "@/lib/auth-client";
 import { useEffect } from "react";
+import { NuqsAdapter } from "nuqs/adapters/react-router";
 import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
+import UnitDashboard from "./pages/UnitDashboard";
+// import Chatbot from "./pages/Chatbot";
 import Chatbot from "./pages/Chatbot";
 import Internships from "./pages/Internships";
 import Courses from "./pages/Courses";
@@ -28,17 +31,15 @@ import InternshipApplicants from "./pages/InternshipApplicants";
 import NotFound from "./pages/NotFound";
 import UnitProfile from "@/pages/UnitProfile";
 import InternshipDetail from "./pages/InternshipDetail";
-import AuthCallback from "@/hooks/AuthCallback";
 import RecommendedInternships from "./pages/RecommendedInternships";
 import ForgotPassword from "./pages/ForgotPassword";
-import CheckEmail from "./components/CheckEmail";
 import ResetPassword from "./pages/ResetPassword";
 import CandidateTasks from "./pages/CandidateTasks";
 import MyTasks from "./pages/MyTasks";
 import UnitCandidateTasks from "./pages/UnitCandidateTasks";
 import Settings from "./pages/Settings";
+import AuthCallback from "@/hooks/AuthCallback";
 import ScrollToTop from "@/components/ScrollToTop";
-import { NuqsAdapter } from "nuqs/adapters/react-router";
 import { useProfile } from "@/hooks/useProfile";
 
 const queryClient = new QueryClient();
@@ -46,7 +47,7 @@ const queryClient = new QueryClient();
 // Protected Route component with onboarding check
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { data: session, isPending: isAuthPending } = useSession();
-  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { data: profile, isLoading: isProfileLoading } = useProfile();
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -81,7 +82,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     session,
     isAuthPending,
     profile,
-    profileLoading,
+    isProfileLoading,
     location.pathname,
     navigate,
   ]);
@@ -95,7 +96,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  // If not authenticated, redirect to Landing
+  // If validated session exists, render children. Otherwise, redirect to Landing.
   return session ? <>{children}</> : <Navigate to="/" replace />;
 };
 
@@ -108,6 +109,8 @@ const App = () => (
         <ScrollToTop />
         <NuqsAdapter>
           <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Landing />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route
               path="/chatbot"
@@ -123,6 +126,7 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
+            {/* Protected Routes */}
             <Route
               path="/internships/:id"
               element={
@@ -139,6 +143,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            {/* Dashboards */}
             <Route
               path="/dashboard"
               element={
@@ -147,6 +152,15 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/unit-dashboard"
+              element={
+                <ProtectedRoute>
+                  <UnitDashboard />
+                </ProtectedRoute>
+              }
+            />
+            {/* Common Resources */}
             <Route
               path="/internships"
               element={
@@ -179,15 +193,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/candidate/:id"
-              element={
-                <ProtectedRoute>
-                  <CandidateProfile />
-                </ProtectedRoute>
-              }
-            />
-
+            {/* Profiles */}
             <Route
               path="/profile"
               element={
@@ -204,11 +210,12 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            {/* Candidate Views */}
             <Route
-              path="/all-applications"
+              path="/candidate/:id"
               element={
                 <ProtectedRoute>
-                  <AllApplications />
+                  <CandidateProfile />
                 </ProtectedRoute>
               }
             />
@@ -221,18 +228,28 @@ const App = () => (
               }
             />
             <Route
-              path="/internship-applicants/:internshipId"
-              element={
-                <ProtectedRoute>
-                  <InternshipApplicants />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/my-tasks/:applicationId"
               element={
                 <ProtectedRoute>
                   <MyTasks />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Unit Management Views */}
+            <Route
+              path="/all-applications"
+              element={
+                <ProtectedRoute>
+                  <AllApplications />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/internship-applicants/:internshipId"
+              element={
+                <ProtectedRoute>
+                  <InternshipApplicants />
                 </ProtectedRoute>
               }
             />
@@ -244,6 +261,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            {/* Settings & Misc */}
             <Route
               path="/settings"
               element={
@@ -252,6 +270,15 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            {/* <Route
+              path="/chatbot"
+              element={
+                <ProtectedRoute>
+                  <Chatbot />
+                </ProtectedRoute>
+              }
+            /> 
+            */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </NuqsAdapter>

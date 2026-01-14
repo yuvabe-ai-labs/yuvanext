@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-// 1. IMPORT THE BETTER AUTH CLIENT
 import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/components/ui/use-toast";
 import signupIllustrate from "@/assets/signinillustion.png";
@@ -10,7 +9,7 @@ import { Arrow } from "@/components/ui/custom-icons";
 import unitIllustration from "@/assets/unit_illstration.png";
 
 const SignIn = () => {
-  const { role } = useParams<{ role: string }>();
+  const { role } = useParams<{ role: string }>(); // This is the role from URL, e.g., /auth/unit/signin
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,11 +27,10 @@ const SignIn = () => {
     e.preventDefault();
     setLoading(true);
 
-    // 2. USE BETTER AUTH SIGN IN
     const { data, error } = await authClient.signIn.email({
       email: email,
       password: password,
-      rememberMe: keepLoggedIn, // This persists the session token effectively
+      rememberMe: keepLoggedIn,
     });
 
     if (error) {
@@ -41,11 +39,9 @@ const SignIn = () => {
       let errorTitle = "Sign in failed";
 
       if (error.status === 401) {
-        // Status 401: Unauthorized (Wrong Credentials)
         errorMessage =
           "Incorrect email or password. Please check your credentials.";
       } else if (error.status === 403) {
-        // Status 403: Forbidden (Email not verified)
         errorMessage =
           "Please check your email and verify your account before signing in.";
         errorTitle = "Verification Required";
@@ -63,21 +59,26 @@ const SignIn = () => {
         title: "Welcome back!",
         description: "You have successfully signed in.",
       });
-      // Redirect to dashboard
-      navigate("/dashboard");
+
+      const userRole = data?.user?.role;
+
+      if (userRole === "unit") {
+        navigate("/unit-dashboard");
+      } else {
+        navigate("/dashboard");
+      }
     }
 
     setLoading(false);
   };
 
-  // 3. UPDATED OAUTH HANDLER
   const handleOAuthSignIn = async (provider: "google" | "apple") => {
     setLoading(true);
     if (role) localStorage.setItem("pendingRole", role);
 
     const { data, error } = await authClient.signIn.social({
       provider: provider,
-      callbackURL: "/dashboard", // Redirect destination after social login
+      callbackURL: "/dashboard",
     });
 
     if (error) {
@@ -89,8 +90,6 @@ const SignIn = () => {
         variant: "destructive",
       });
     }
-
-    // Note: Social Auth usually triggers a full page redirect, so setLoading(false) might not run if successful.
     setLoading(false);
   };
 

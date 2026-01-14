@@ -1,49 +1,31 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertTriangle } from "lucide-react";
 
 // Components
 import PreferenceItem from "./PreferenceItem";
 import DemographicForm from "./DemographicForm";
 import VerificationUpload from "./VerificationUpload";
 import SkeletonBox from "./SkeletonBox";
-import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { DeactivateModal, DeleteModal } from "./ActionModals"; // Import Modals
 
-// Imports
-import { preferencesSchema } from "@/lib/accountPreferenceSchema";
+// Hooks
 import { useUnitProfile } from "@/hooks/useUnitProfile";
-import { useDeactivateAccount } from "@/hooks/useSettings";
-import { authClient } from "@/lib/auth-client"; // 1. Import Auth Client
+import { useDeactivateAccount, useDeleteAccount } from "@/hooks/useSettings"; // Import new hook
 
 export default function AccountPreferences() {
   const [activeSubView, setActiveSubView] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
   const navigate = useNavigate();
 
-  // Hooks
+  // 1. Data Hooks
   const { data: profile, isLoading: profileLoading } = useUnitProfile();
-  const deactivateMutation = useDeactivateAccount();
 
-  const form = useForm({
-    resolver: zodResolver(preferencesSchema),
-    defaultValues: {
-      language: "English",
-      contentLanguage: "English",
-    },
-  });
+  // 2. Action Hooks
+  const deactivateMutation = useDeactivateAccount();
+  const deleteMutation = useDeleteAccount();
 
   const openProfile = useCallback(() => {
     if (!profile) return;
@@ -56,33 +38,6 @@ export default function AccountPreferences() {
     await new Promise((r) => setTimeout(r, 400));
     setLoading(false);
     setActiveSubView(sub);
-  };
-
-  // Deactivate (Soft Delete via API)
-  const executeDeactivate = () => {
-    deactivateMutation.mutate(undefined, {
-      onSuccess: () => setShowDeactivateModal(false),
-    });
-  };
-
-  // 2. Delete Permanently (Hard Delete via Better Auth)
-  const executeDelete = async () => {
-    setIsDeleting(true);
-    try {
-      const { error } = await authClient.deleteUser();
-
-      if (error) {
-        throw error;
-      }
-
-      // Success - Redirect to home/login
-      navigate("/");
-    } catch (error) {
-      console.error("Error deleting account:", error);
-      alert(error.message || "Failed to delete account. Please try again.");
-      setIsDeleting(false);
-      setShowDeleteModal(false);
-    }
   };
 
   if (loading || profileLoading) {
@@ -115,77 +70,14 @@ export default function AccountPreferences() {
           title="Name, Skills and Interests"
           onClick={openProfile}
         />
-
-        {/* CONDITIONAL RENDER: Only show Demographic for Candidates */}
         {profile?.role === "candidate" && (
           <PreferenceItem
             title="Personal Demographic Information"
             onClick={() => openSubViewWithLoad("demographic")}
           />
         )}
-
-        {/* <PreferenceItem
-          title="Verifications"
-          onClick={() => openSubViewWithLoad("verification")}
-        /> */}
       </div>
 
-      {/* <section className="mt-7">
-        <h3 className="text-xl font-medium text-gray-800">
-          General Preferences
-        </h3>
-        <Form {...form}>
-          <form onChange={form.handleSubmit(onSubmit)} className="font-medium">
-            <FormField
-              control={form.control}
-              name="language"
-              render={({ field }) => (
-                <FormItem className="text-base text-gray-600 border-b border-gray-200 py-5 flex justify-between items-center space-y-0">
-                  <div className="flex items-center">Language</div>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="border rounded px-3 py-2 w-full md:w-60 h-10 focus:ring-2 focus:ring-blue-500">
-                        <SelectValue placeholder="Select Language" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="English">English</SelectItem>
-                      <SelectItem value="Hindi">Hindi</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="contentLanguage"
-              render={({ field }) => (
-                <FormItem className="text-base text-gray-600 border-b border-gray-200 py-5 flex justify-between items-center space-y-0">
-                  <div className="flex items-center">Content Language</div>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="border rounded px-3 py-2 w-full md:w-60 h-10 focus:ring-2 focus:ring-blue-500">
-                        <SelectValue placeholder="Select Language" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="English">English</SelectItem>
-                      <SelectItem value="Hindi">Hindi</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
-          </form>
-        </Form>
-      </section> */}
       <section className="mt-7">
         <h3 className="text-xl font-medium text-gray-800">
           Account Management
@@ -193,130 +85,37 @@ export default function AccountPreferences() {
         <div className="font-medium">
           <button
             onClick={() => setShowDeactivateModal(true)}
-            disabled={deactivateMutation.isPending || isDeleting}
-            className="w-full text-left text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer hover:bg-gray-50 disabled:opacity-50"
+            className="w-full text-left text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer hover:bg-gray-50"
           >
             Deactivate Account
           </button>
           <button
             onClick={() => setShowDeleteModal(true)}
-            disabled={isDeleting || deactivateMutation.isPending}
-            className="w-full text-left text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer hover:bg-gray-50 disabled:opacity-50"
+            className="w-full text-left text-base text-red-500 border-b border-gray-200 py-5 flex justify-between cursor-pointer hover:bg-gray-50"
           >
             Delete Account
           </button>
         </div>
       </section>
 
-      {/* --- CUSTOM MODAL: DEACTIVATE --- */}
-      {showDeactivateModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity"
-          onClick={() =>
-            !deactivateMutation.isPending && setShowDeactivateModal(false)
-          }
-        >
-          <div
-            className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden transform transition-all"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="p-3 bg-yellow-100 rounded-full">
-                  <AlertTriangle className="w-6 h-6 text-yellow-600" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Deactivate Account?
-                </h3>
-              </div>
-              <p className="text-gray-600 mb-6 leading-relaxed">
-                Are you sure? You can reactivate your account by logging in
-                anytime within the next{" "}
-                <span className="font-semibold text-gray-800">6 months</span>.
-                After that, it will be permanently deleted.
-              </p>
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  onClick={() => setShowDeactivateModal(false)}
-                  disabled={deactivateMutation.isPending}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={executeDeactivate}
-                  disabled={deactivateMutation.isPending}
-                  className="px-4 py-2 text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
-                >
-                  {deactivateMutation.isPending ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    "Yes, Deactivate"
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* --- MODALS --- */}
+      <DeactivateModal
+        isOpen={showDeactivateModal}
+        onClose={() => setShowDeactivateModal(false)}
+        onConfirm={() =>
+          deactivateMutation.mutate(undefined, {
+            onSuccess: () => setShowDeactivateModal(false),
+          })
+        }
+        isLoading={deactivateMutation.isPending}
+      />
 
-      {/* --- CUSTOM MODAL: DELETE --- */}
-      {showDeleteModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity"
-          onClick={() => !isDeleting && setShowDeleteModal(false)}
-        >
-          <div
-            className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden transform transition-all"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="p-3 bg-red-100 rounded-full">
-                  <AlertTriangle className="w-6 h-6 text-red-600" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Delete Permanently?
-                </h3>
-              </div>
-              <p className="text-gray-600 mb-6 leading-relaxed">
-                This action{" "}
-                <span className="font-bold text-gray-900">
-                  cannot be undone
-                </span>
-                . This will permanently delete your account and remove your data
-                from our servers immediately.
-              </p>
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  disabled={isDeleting}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={executeDelete}
-                  disabled={isDeleting}
-                  className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
-                >
-                  {isDeleting ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Deleting...
-                    </>
-                  ) : (
-                    "Delete Account"
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={() => deleteMutation.mutate()}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }

@@ -23,12 +23,12 @@ export const useNotifications = () => {
       // GET /api/notifications (from provided endpoints)
       const { data } = await axiosInstance.get("/notifications");
 
-      const typedData = (Array.isArray(data) ? data : data.notifications || []).map(
-        (n: any) => ({
-          ...n,
-          type: n.type as "info" | "success" | "warning",
-        })
-      );
+      const typedData = (
+        Array.isArray(data) ? data : data.notifications || []
+      ).map((n: any) => ({
+        ...n,
+        type: n.type as "info" | "success" | "warning",
+      }));
 
       setNotifications(typedData);
       setUnreadCount(typedData.filter((n) => !n.is_read).length);

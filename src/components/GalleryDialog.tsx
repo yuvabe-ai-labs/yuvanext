@@ -8,15 +8,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2, X, ZoomIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import axiosInstance from "@/config/platform-api"; // Import Axios
-import { useUpdateUnitProfile } from "@/hooks/useUnitProfile"; // Import mutation hook
+import { useGalleryOperations } from "@/hooks/useUnitProfile";
 
 interface GalleryDialogProps {
   isOpen: boolean;
   onClose: () => void;
   userId: string;
   currentImages: string[];
-  onSuccess: () => void; // This triggers refetch in parent
+  onSuccess: () => void;
 }
 
 export const GalleryDialog = ({
@@ -26,73 +25,64 @@ export const GalleryDialog = ({
   currentImages,
   onSuccess,
 }: GalleryDialogProps) => {
-  const [uploading, setUploading] = useState(false);
+  // UI State
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [viewImage, setViewImage] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // Use the mutation hook to update the profile data after upload
-  const updateProfileMutation = useUpdateUnitProfile();
+  // Logic Hook
+  const { uploadImages, deleteImage, isProcessing } = useGalleryOperations(
+    currentImages,
+    userId
+  );
 
   const maxFileSize = 5242880; // 5MB
   const maxFiles = 10;
 
+  // --- Handlers ---
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
 
-    if (files.length + currentImages.length > maxFiles) {
+    if (files.length + currentImages.length + selectedFiles.length > maxFiles) {
       toast({
-        title: "Too many images",
-        description: `You can only have up to ${maxFiles} images in your gallery`,
+        title: "Limit Exceeded",
+        description: `You can only have up to ${maxFiles} images.`,
         variant: "destructive",
       });
       return;
     }
 
     const validFiles: File[] = [];
-    const newPreviewUrls: string[] = [];
+    const newPreviews: string[] = [];
 
     files.forEach((file) => {
       if (file.size > maxFileSize) {
         toast({
           title: "File too large",
-          description: `${file.name} is too large. Max size is 5MB`,
+          description: `${file.name} > 5MB`,
           variant: "destructive",
         });
         return;
       }
-
-      if (
-        ![
-          "image/png",
-          "image/jpg",
-          "image/jpeg",
-          "image/gif",
-          "image/webp",
-        ].includes(file.type)
-      ) {
+      if (!file.type.startsWith("image/")) {
         toast({
-          title: "Invalid file type",
-          description: `${file.name} is not a supported image format`,
+          title: "Invalid File",
+          description: `${file.name} is not an image`,
           variant: "destructive",
         });
         return;
       }
 
       validFiles.push(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        newPreviewUrls.push(reader.result as string);
-        if (newPreviewUrls.length === validFiles.length) {
-          setPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
-        }
-      };
-      reader.readAsDataURL(file);
+      newPreviews.push(URL.createObjectURL(file));
     });
 
     setSelectedFiles((prev) => [...prev, ...validFiles]);
+    setPreviewUrls((prev) => [...prev, ...newPreviews]);
   };
 
   const removeSelectedFile = (index: number) => {
@@ -103,82 +93,18 @@ export const GalleryDialog = ({
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
 
-    try {
-      setUploading(true);
-      const uploadedUrls: string[] = [];
+    await uploadImages.mutateAsync(selectedFiles);
 
-      // Upload each file to the backend
-      for (const file of selectedFiles) {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("type", "gallery");
-        formData.append("userId", userId);
-
-        // POST /api/upload (Backend handles storage logic)
-        const response = await axiosInstance.put("/profile", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-
-        if (response.data.url) {
-          uploadedUrls.push(response.data.url);
-        }
-      }
-
-      // Update galleryImages in profile via API
-      const newGalleryImages = [...currentImages, ...uploadedUrls];
-
-      // Use the mutation hook to update the profile
-      await updateProfileMutation.mutateAsync({
-        galleryImages: newGalleryImages,
-      });
-
-      setSelectedFiles([]);
-      setPreviewUrls([]);
-      onSuccess();
-      onClose();
-    } catch (error: any) {
-      console.error("Error uploading gallery images:", error);
-      toast({
-        title: "Upload failed",
-        description: error.response?.data?.message || "Failed to upload images",
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-    }
+    // Cleanup on success
+    setSelectedFiles([]);
+    setPreviewUrls([]);
+    onSuccess();
+    onClose();
   };
 
-  const handleDeleteExisting = async (
-    imageUrl: string,
-    event: React.MouseEvent
-  ) => {
-    event.stopPropagation();
-
-    try {
-      setUploading(true);
-
-      // Call Backend to delete file (Optional, strictly speaking we just need to unlink it from profile)
-      // await axiosInstance.delete("/upload", { data: { url: imageUrl } });
-
-      // Update database list
-      const newGalleryImages = currentImages.filter((img) => img !== imageUrl);
-
-      await updateProfileMutation.mutateAsync({
-        galleryImages: newGalleryImages,
-      });
-
-      toast({ title: "Success", description: "Image deleted successfully" });
-      onSuccess();
-    } catch (error: any) {
-      console.error("Error deleting gallery image:", error);
-      toast({
-        title: "Delete failed",
-        description: "Failed to delete image",
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-    }
+  const handleDelete = async (imageUrl: string) => {
+    await deleteImage.mutateAsync(imageUrl);
+    onSuccess();
   };
 
   return (
@@ -190,7 +116,7 @@ export const GalleryDialog = ({
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            {/* Current Gallery Images */}
+            {/* 1. Existing Gallery Grid */}
             {currentImages.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold mb-3">
@@ -200,26 +126,32 @@ export const GalleryDialog = ({
                   {currentImages.map((imageUrl, index) => (
                     <div
                       key={index}
-                      className="relative group aspect-square rounded-lg overflow-hidden border"
+                      className="relative group aspect-square rounded-lg overflow-hidden border bg-gray-100"
                     >
                       <img
                         src={imageUrl}
-                        alt={`Gallery ${index + 1}`}
+                        alt={`Gallery ${index}`}
                         className="w-full h-full object-cover"
                       />
+
+                      {/* Hover Actions */}
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                         <button
-                          onClick={(e) => setViewImage(imageUrl)}
-                          className="p-2 bg-white/90 rounded-full hover:bg-white"
+                          onClick={() => setViewImage(imageUrl)}
+                          className="p-2 bg-white/90 rounded-full hover:bg-white transition-colors"
                         >
-                          <ZoomIn className="w-4 h-4" />
+                          <ZoomIn className="w-4 h-4 text-gray-800" />
                         </button>
                         <button
-                          onClick={(e) => handleDeleteExisting(imageUrl, e)}
-                          disabled={uploading}
-                          className="p-2 bg-red-500/90 text-white rounded-full hover:bg-red-500 disabled:opacity-50"
+                          onClick={() => handleDelete(imageUrl)}
+                          disabled={isProcessing}
+                          className="p-2 bg-red-500/90 text-white rounded-full hover:bg-red-500 disabled:opacity-50 transition-colors"
                         >
-                          <X className="w-4 h-4" />
+                          {deleteImage.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <X className="w-4 h-4" />
+                          )}
                         </button>
                       </div>
                     </div>
@@ -228,7 +160,7 @@ export const GalleryDialog = ({
               </div>
             )}
 
-            {/* Upload New Images */}
+            {/* 2. Upload Section */}
             {currentImages.length < maxFiles && (
               <div>
                 <h3 className="text-sm font-semibold mb-3">
@@ -236,35 +168,37 @@ export const GalleryDialog = ({
                 </h3>
 
                 <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
+                  onClick={() => !isProcessing && fileInputRef.current?.click()}
+                  className={`border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center transition-colors ${
+                    isProcessing
+                      ? "opacity-50 cursor-not-allowed"
+                      : "cursor-pointer hover:border-primary hover:bg-gray-50"
+                  }`}
                 >
                   <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground mb-1">
                     Click to upload or drag and drop
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    PNG, JPG, JPEG, GIF, WEBP - up to 5MB each
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Max {maxFiles - currentImages.length} more images
+                    PNG, JPG, WEBP - Max 5MB
                   </p>
                 </div>
 
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/png,image/jpg,image/jpeg,image/gif,image/webp"
+                  accept="image/*"
                   multiple
                   onChange={handleFileSelect}
                   className="hidden"
+                  disabled={isProcessing}
                 />
 
-                {/* Preview Selected Files */}
+                {/* 3. Preview Staged Files */}
                 {selectedFiles.length > 0 && (
                   <div className="mt-4">
                     <h4 className="text-sm font-medium mb-2">
-                      Selected Files ({selectedFiles.length})
+                      Selected ({selectedFiles.length})
                     </h4>
                     <div className="grid grid-cols-3 gap-4">
                       {previewUrls.map((url, index) => (
@@ -274,7 +208,7 @@ export const GalleryDialog = ({
                         >
                           <img
                             src={url}
-                            alt={`Preview ${index + 1}`}
+                            alt="Preview"
                             className="w-full h-full object-cover"
                           />
                           <button
@@ -291,12 +225,12 @@ export const GalleryDialog = ({
               </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4">
+            {/* 4. Footer Actions */}
+            <div className="flex gap-3 pt-4 border-t">
               <Button
                 variant="outline"
                 onClick={onClose}
-                disabled={uploading}
+                disabled={isProcessing}
                 className="flex-1"
               >
                 Cancel
@@ -304,18 +238,16 @@ export const GalleryDialog = ({
               {selectedFiles.length > 0 && (
                 <Button
                   onClick={handleUpload}
-                  disabled={uploading}
+                  disabled={isProcessing}
                   className="flex-1"
                 >
-                  {uploading ? (
+                  {uploadImages.isPending ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
                       Uploading...
                     </>
                   ) : (
-                    `Upload ${selectedFiles.length} Image${
-                      selectedFiles.length > 1 ? "s" : ""
-                    }`
+                    `Upload ${selectedFiles.length} Images`
                   )}
                 </Button>
               )}
@@ -324,21 +256,20 @@ export const GalleryDialog = ({
         </DialogContent>
       </Dialog>
 
-      {/* Image Viewer Dialog */}
+      {/* Image Viewer Overlay */}
       <Dialog open={!!viewImage} onOpenChange={() => setViewImage(null)}>
-        <DialogContent className="sm:max-w-4xl">
-          {/* Same as your code */}
-          <div className="relative">
+        <DialogContent className="sm:max-w-4xl bg-transparent border-none shadow-none p-0">
+          <div className="relative flex justify-center items-center h-full">
             <img
               src={viewImage || ""}
-              alt="Full size preview"
-              className="w-full h-auto max-h-[80vh] object-contain"
+              alt="Full view"
+              className="max-w-full max-h-[85vh] rounded-lg shadow-2xl"
             />
             <button
               onClick={() => setViewImage(null)}
-              className="absolute top-2 right-2 p-2 bg-black/50 text-white rounded-full hover:bg-black/70"
+              className="absolute -top-10 right-0 p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6" />
             </button>
           </div>
         </DialogContent>

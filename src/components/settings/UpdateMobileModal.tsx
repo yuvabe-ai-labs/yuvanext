@@ -4,10 +4,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useProfileData } from "@/hooks/useProfileData";
-import { phoneSchema } from "@/lib/schemas";
-
-type PhoneFormData = z.infer<typeof phoneSchema>;
+// 1. Import your new hooks
+import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { phoneSchema, type PhoneFormData } from "@/lib/schemas";
 
 interface UpdateMobileModalProps {
   isOpen: boolean;
@@ -19,7 +18,8 @@ export default function UpdateMobileModal({
   onClose,
 }: UpdateMobileModalProps) {
   const { toast } = useToast();
-  const { profile, updateProfile, refetch } = useProfileData();
+  const { data: profile } = useProfile();
+  const updateProfileMutation = useUpdateProfile();
 
   const {
     register,
@@ -45,17 +45,18 @@ export default function UpdateMobileModal({
 
   const onSubmit = async (data: PhoneFormData) => {
     try {
-      // Store with +91 (recommended)
+      // Store with +91
       const phoneWithCountryCode = `+91${data.phone}`;
 
-      await updateProfile({ phone: phoneWithCountryCode });
+      // 4. Execute mutation (mutateAsync lets us await success/fail)
+      await updateProfileMutation.mutateAsync({ phone: phoneWithCountryCode });
 
       toast({
         title: "Mobile Updated",
         description: "Your mobile number has been updated successfully.",
       });
 
-      refetch();
+      // Query invalidation in the hook handles refetching automatically
       onClose();
     } catch (err) {
       console.error("Error updating mobile:", err);

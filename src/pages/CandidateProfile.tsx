@@ -61,7 +61,7 @@ import type {
   CandidateCourse,
   CandidateEducation,
   SocialLink,
-} from "@/types/profile.types";
+} from "@/types/profiles.types";
 
 // Generic Safe Parse Helper
 const safeParse = <T,>(data: any, fallback: T): T => {

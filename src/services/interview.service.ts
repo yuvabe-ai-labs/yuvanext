@@ -48,7 +48,8 @@ export const updateInterview = async (
 // Delete Interview
 export const deleteInterview = async (id: string): Promise<void> => {
   try {
-    await axiosInstance.delete(`/interviews/${id}`);
+    const response = await axiosInstance.delete(`/interviews/${id}`);
+    return handleApiResponse<void>(response, undefined);
   } catch (error) {
     return handleApiError(error, "Failed to delete interview");
   }

@@ -80,7 +80,7 @@ const Internship = () => {
     setActiveDateRange("");
   };
 
-  const parsePgTimestamp = (ts: any): Date => {
+  const parsePgTimestamp = (ts): Date => {
     if (ts instanceof Date) return ts;
     if (!ts) return new Date(NaN);
     let s = String(ts).trim();
@@ -444,7 +444,7 @@ const FilterSection = ({
   onToggle,
   showAll,
   setShowAll,
-}: any) => {
+}) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -550,7 +550,7 @@ const PostingDateFilter = ({
   activeDateRange,
   onSelectDate,
   onDateChange,
-}: any) => (
+}) => (
   <div>
     <Label className="text-sm font-semibold text-muted-foreground mb-3 block">
       Posting Date

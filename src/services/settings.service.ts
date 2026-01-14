@@ -3,6 +3,7 @@ import { handleApiResponse, handleApiError } from "@/lib/api-handler";
 import type {
   NotificationSettings,
   DeactivateAccountResponse,
+  NotificationSettingsResponse,
 } from "@/types/settings.types";
 
 // Deactivate Account
@@ -35,13 +36,16 @@ export const getNotificationSettings =
 // UPDATE settings
 export const updateNotificationSettings = async (
   payload: NotificationSettings
-): Promise<any> => {
+): Promise<NotificationSettingsResponse> => {
   try {
     const response = await axiosInstance.patch(
       "/settings/notifications",
       payload
     );
-    return handleApiResponse(response, {});
+    return handleApiResponse<NotificationSettingsResponse>(response, {
+      status_code: 200,
+      message: "Success",
+    });
   } catch (error) {
     return handleApiError(error, "Failed to update notification settings");
   }

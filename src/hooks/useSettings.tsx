@@ -34,7 +34,7 @@ export const useUpdateNotifications = () => {
       // Invalidate the specific settings query, NOT the profile query
       queryClient.invalidateQueries({ queryKey: ["notificationSettings"] });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       console.error("Update failed", error);
       toast({
         title: "Error",
@@ -60,11 +60,39 @@ export const useDeactivateAccount = () => {
       await authClient.signOut();
       navigate("/login");
     },
-    onError: (error: any) => {
+    onError: (error) => {
       console.error("Deactivation failed", error);
       toast({
         title: "Error",
         description: error.message || "Failed to deactivate account",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useDeleteAccount = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await authClient.deleteUser();
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Account Deleted",
+        description: "We are sorry to see you go.",
+      });
+      navigate("/");
+    },
+    onError: (error) => {
+      console.error("Error deleting account:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete account.",
         variant: "destructive",
       });
     },

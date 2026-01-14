@@ -12,5 +12,5 @@ export interface NotificationSettings {
 export interface NotificationSettingsResponse {
   status_code: number;
   message: string;
-  data: NotificationSettings;
+  data?: NotificationSettings;
 }

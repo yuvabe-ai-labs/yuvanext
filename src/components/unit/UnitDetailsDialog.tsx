@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -24,13 +24,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   unitDetailsSchema,
   type UnitDetailsFormValues,
-} from "@/lib/UnitDetailsDialogSchema";
-import { Profile } from "@/types/profile.types";
+} from "@/lib/unitDialogSchemas";
+import { Profile } from "@/types/profiles.types"; // Updated path based on previous context
 
 interface UnitDetailsDialogProps {
-  // Accepts the data object (can handle partial data)
   unitProfile?: Profile;
-  // Handler returns a Promise (for async mutations)
   onUpdateUnit: (updates: UnitDetailsFormValues) => Promise<void> | void;
   children: React.ReactNode;
 }
@@ -47,10 +45,22 @@ export const UnitDetailsDialog = ({
     register,
     handleSubmit,
     control,
-    reset,
     formState: { errors, isSubmitting },
   } = useForm<UnitDetailsFormValues>({
     resolver: zodResolver(unitDetailsSchema),
+    // Use 'values' to automatically sync form with prop changes
+    values: unitProfile
+      ? {
+          name: unitProfile.name || "",
+          type: unitProfile.type || "",
+          industry: unitProfile.industry || "",
+          websiteUrl: unitProfile.websiteUrl || "",
+          email: unitProfile.email || "",
+          phone: unitProfile.phone || "",
+          address: unitProfile.address || "",
+          isAurovillian: unitProfile.isAurovillian || false,
+        }
+      : undefined,
     defaultValues: {
       name: "",
       type: "",
@@ -63,29 +73,12 @@ export const UnitDetailsDialog = ({
     },
   });
 
-  // Sync form with data when modal opens or data loads
-  useEffect(() => {
-    if (unitProfile) {
-      reset({
-        name: unitProfile.name || "",
-        type: unitProfile.type || "",
-        industry: unitProfile.industry || "",
-        websiteUrl: unitProfile.websiteUrl || "",
-        email: unitProfile.email || "",
-        phone: unitProfile.phone || "",
-        address: unitProfile.address || "",
-        isAurovillian: unitProfile.isAurovillian || false,
-      });
-    }
-  }, [unitProfile, reset, open]);
-
   const onSubmit = async (data: UnitDetailsFormValues) => {
     try {
       await onUpdateUnit(data);
       setOpen(false);
     } catch (error) {
       console.error("Failed to update unit details:", error);
-      // Optional: setError in form if needed
     }
   };
 

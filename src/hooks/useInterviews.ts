@@ -35,7 +35,7 @@ export const useInterviewMutations = () => {
       });
       queryClient.invalidateQueries({ queryKey: ["interviews"] });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
         title: "Error",
         description: error.message,
@@ -54,7 +54,7 @@ export const useInterviewMutations = () => {
       });
       queryClient.invalidateQueries({ queryKey: ["interviews"] });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
         title: "Error",
         description: error.message,
@@ -73,7 +73,7 @@ export const useInterviewMutations = () => {
       });
       queryClient.invalidateQueries({ queryKey: ["interviews"] });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
         title: "Error",
         description: error.message,

@@ -57,16 +57,7 @@ export interface CreatedBy {
 
 export interface Internship {
   id: string;
-  createdBy: {
-    name: string;
-    location: string;
-    address: string;
-    phone: string;
-    websiteUrl: string;
-    avatarUrl: string;
-    bannerUrl: string;
-    description: CreatedBy;
-  };
+  createdBy: CreatedBy;
   title: string;
   description: string | null;
   duration: string | null;
@@ -82,6 +73,7 @@ export interface Internship {
   language: string[];
   createdAt: string;
   updatedAt: string;
+  applicationCount?: number;
 }
 
 export interface SavedInternships {
@@ -119,4 +111,44 @@ export interface AppliedInternshipStatus {
   avatarUrl: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateInternshipPayload {
+  title: string;
+  duration: string;
+  isPaid: boolean;
+  payment: string;
+  description: string;
+  responsibilities: string[];
+  benefits: string[];
+  skillsRequired: string[];
+  language: string[];
+  closingDate: string;
+  minAgeRequired: string;
+  jobType: "full_time" | "part_time" | "both";
+  status: "active";
+}
+
+export interface UpdateInternshipPayload {
+  id: string;
+  title: string;
+  duration: string;
+  isPaid: boolean;
+  payment: string;
+  description: string;
+  responsibilities: string[];
+  benefits: string[];
+  skillsRequired: string[];
+  language: string[];
+  closingDate: string;
+  minAgeRequired: string;
+  jobType: "full_time" | "part_time" | "both";
+  status?: "active" | "closed";
+}
+
+// Optional: Response type if needed
+export interface InternshipResponse {
+  status_code: number;
+  message: string;
+  data: object;
 }

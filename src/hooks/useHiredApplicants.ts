@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { getHiredApplicants, getUnitProfile } from "@/services/hired.service";
+import { getHiredApplicants } from "@/services/hired.service";
+import { getProfile } from "@/services/profile.service";
 
 // Hook 1: Get Profile Info (Unit Name/Avatar)
 export const useUnitProfile = () => {
   return useQuery({
     queryKey: ["unitProfile"],
-    queryFn: getUnitProfile,
+    queryFn: getProfile,
     // Optional: Select only specific fields if you want to mimic the old state exactly
     select: (data) => ({
       unit_name: data.name || "Unit",

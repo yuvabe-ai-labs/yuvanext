@@ -19,7 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useForm, Controller } from "react-hook-form";
+// FIX: Imported useFieldArray
+import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { X, Sparkles, ChevronDown, Loader2 } from "lucide-react";
@@ -35,7 +36,6 @@ import { AISectionType } from "@/types/ai.types";
 import {
   createInternshipSchema,
   type InternshipFormValues,
-  type LanguageProficiency,
 } from "@/lib/CreateInternshipDialogSchema";
 
 interface CreateInternshipDialogProps {
@@ -77,12 +77,9 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
   const generateContentMutation = useGenerateContent();
 
   const [aiLoadingField, setAiLoadingField] = useState<string | null>(null);
-  const [languages, setLanguages] = useState<LanguageProficiency[]>([
-    { language: "", read: false, write: false, speak: false },
-  ]);
-  const [isPaidState, setIsPaidState] = useState<boolean | null>(null);
 
-  // 3. USE IMPORTED SCHEMA AND TYPE
+  // Removed redundant useState for isPaidState, use watch() instead if needed for UI logic
+
   const {
     control,
     handleSubmit,
@@ -110,37 +107,16 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
     },
   });
 
+  // FIX: useFieldArray for dynamic language fields
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "language_requirements",
+  });
+
   const jobTitle = watch("title");
   const isJobRoleFilled = jobTitle && jobTitle.trim().length > 0;
 
-  const handleAddLanguage = () => {
-    const newLanguages = [
-      ...languages,
-      { language: "", read: false, write: false, speak: false },
-    ];
-    setLanguages(newLanguages);
-    setValue("language_requirements", newLanguages, { shouldValidate: true });
-  };
-
-  const handleLanguageChange = (
-    index: number,
-    field: keyof LanguageProficiency,
-    value: string | boolean
-  ) => {
-    const newLanguages = [...languages];
-    newLanguages[index] = { ...newLanguages[index], [field]: value };
-    setLanguages(newLanguages);
-    setValue("language_requirements", newLanguages, { shouldValidate: true });
-  };
-
-  const handleRemoveLanguage = (index: number) => {
-    if (languages.length > 1) {
-      const newLanguages = languages.filter((_, i) => i !== index);
-      setLanguages(newLanguages);
-      setValue("language_requirements", newLanguages, { shouldValidate: true });
-    }
-  };
-
+  // AI Assist Handler
   const handleAIAssist = async (fieldName: keyof InternshipFormValues) => {
     if (!jobTitle) {
       toast({ title: "Please enter a Job Role first", variant: "destructive" });
@@ -214,7 +190,10 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
       .split("\n")
       .filter((r) => r.trim());
     const benefitsArray = data.benefits.split("\n").filter((b) => b.trim());
+
+    // Simply map from form data
     const languageArray = data.language_requirements.map((l) => l.language);
+
     const paymentValue = data.isPaid && data.payment ? data.payment : "Unpaid";
 
     createInternshipMutation.mutate(
@@ -242,6 +221,7 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
     );
   };
 
+  // Date Picker Logic
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
@@ -436,7 +416,7 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
               )}
             </div>
 
-            {/* Internship Type */}
+            {/* Internship Type (Paid/Unpaid) */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">
                 Internship Type <span className="text-destructive">*</span>
@@ -451,10 +431,7 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
                         <Button
                           type="button"
                           size="sm"
-                          onClick={() => {
-                            field.onChange(true);
-                            setIsPaidState(true);
-                          }}
+                          onClick={() => field.onChange(true)}
                           className={`rounded-full px-6 border border-black ${
                             field.value
                               ? "bg-gray-200 text-black hover:bg-gray-300"
@@ -468,9 +445,9 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
                         <Controller
                           name="payment"
                           control={control}
-                          render={({ field }) => (
+                          render={({ field: paymentField }) => (
                             <Input
-                              {...field}
+                              {...paymentField}
                               type="text"
                               placeholder="e.g. 10,000 or To be discussed"
                               className="max-w-[200px]"
@@ -482,10 +459,7 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
                         <Button
                           type="button"
                           size="sm"
-                          onClick={() => {
-                            field.onChange(false);
-                            setIsPaidState(false);
-                          }}
+                          onClick={() => field.onChange(false)}
                           className={`rounded-full px-6 border border-black ${
                             !field.value
                               ? "bg-gray-200 text-black hover:bg-gray-300"
@@ -733,79 +707,109 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
               )}
             </div>
 
-            {/* Language Proficiency */}
+            {/* Language Proficiency - REFACTORED */}
             <div className="space-y-4">
               <Label className="text-sm font-medium">
                 Language Proficiency <span className="text-destructive">*</span>
               </Label>
-              {languages.map((lang, index) => (
-                <div key={index} className="flex items-center gap-4">
-                  <Select
-                    value={lang.language}
-                    onValueChange={(value) =>
-                      handleLanguageChange(index, "language", value)
-                    }
-                  >
-                    <SelectTrigger className="w-[220px] bg-background">
-                      <SelectValue placeholder="Select Language" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LANGUAGES.map((language) => (
-                        <SelectItem key={language} value={language}>
-                          {language}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      checked={lang.read}
-                      onCheckedChange={(c) =>
-                        handleLanguageChange(index, "read", c === true)
-                      }
-                    />
-                    <label className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      Read
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      checked={lang.write}
-                      onCheckedChange={(c) =>
-                        handleLanguageChange(index, "write", c === true)
-                      }
-                    />
-                    <label className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      Write
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      checked={lang.speak}
-                      onCheckedChange={(c) =>
-                        handleLanguageChange(index, "speak", c === true)
-                      }
-                    />
-                    <label className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      Speak
-                    </label>
-                  </div>
-                  {languages.length > 1 && (
+
+              {/* FIX: Map over 'fields' from useFieldArray */}
+              {fields.map((field, index) => (
+                <div key={field.id} className="flex items-center gap-4">
+                  {/* Language Selection */}
+                  <Controller
+                    control={control}
+                    name={`language_requirements.${index}.language`}
+                    render={({ field: selectField }) => (
+                      <Select
+                        value={selectField.value}
+                        onValueChange={selectField.onChange}
+                      >
+                        <SelectTrigger className="w-[220px] bg-background">
+                          <SelectValue placeholder="Select Language" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LANGUAGES.map((language) => (
+                            <SelectItem key={language} value={language}>
+                              {language}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+
+                  {/* Read Checkbox */}
+                  <Controller
+                    control={control}
+                    name={`language_requirements.${index}.read`}
+                    render={({ field: cbField }) => (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          checked={cbField.value}
+                          onCheckedChange={cbField.onChange}
+                        />
+                        <label className="text-sm font-normal">Read</label>
+                      </div>
+                    )}
+                  />
+
+                  {/* Write Checkbox */}
+                  <Controller
+                    control={control}
+                    name={`language_requirements.${index}.write`}
+                    render={({ field: cbField }) => (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          checked={cbField.value}
+                          onCheckedChange={cbField.onChange}
+                        />
+                        <label className="text-sm font-normal">Write</label>
+                      </div>
+                    )}
+                  />
+
+                  {/* Speak Checkbox */}
+                  <Controller
+                    control={control}
+                    name={`language_requirements.${index}.speak`}
+                    render={({ field: cbField }) => (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          checked={cbField.value}
+                          onCheckedChange={cbField.onChange}
+                        />
+                        <label className="text-sm font-normal">Speak</label>
+                      </div>
+                    )}
+                  />
+
+                  {/* Remove Button (Only if more than 1) */}
+                  {fields.length > 1 && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleRemoveLanguage(index)}
+                      onClick={() => remove(index)} // Use remove from useFieldArray
                     >
                       <X className="w-4 h-4" />
                     </Button>
                   )}
                 </div>
               ))}
+
               <Button
                 type="button"
                 variant="link"
-                onClick={handleAddLanguage}
+                // Use append from useFieldArray
+                onClick={() =>
+                  append({
+                    language: "",
+                    read: false,
+                    write: false,
+                    speak: false,
+                  })
+                }
                 className="text-primary pl-0"
               >
                 Add another language

@@ -7,10 +7,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Upload, Trash2, Loader2 } from "lucide-react";
+import { Upload, Trash2, Loader2, Video } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import axiosInstance from "@/config/platform-api";
-import { useUpdateUnitProfile } from "@/hooks/useUnitProfile";
+// 1. Import the specific operations hook
+import { useTestimonialOperations } from "@/hooks/useUnitProfile";
 
 interface GlimpseDialogProps {
   isOpen: boolean;
@@ -29,11 +29,15 @@ export const GlimpseDialog = ({
 }: GlimpseDialogProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const updateProfileMutation = useUpdateUnitProfile();
+  // 2. Use the specialized hook for Testimonials
+  const { uploadTestimonial, deleteTestimonial } = useTestimonialOperations();
+
+  // Combined loading state
+  const isProcessing =
+    uploadTestimonial.isPending || deleteTestimonial.isPending;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -65,62 +69,40 @@ export const GlimpseDialog = ({
     if (!selectedFile) return;
 
     try {
-      setUploading(true);
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("type", "glimpse");
-      formData.append("userId", userId);
+      // 3. Use the new mutation (POST /api/profile/testimonial)
+      await uploadTestimonial.mutateAsync(selectedFile);
 
-      const response = await axiosInstance.put("/profile", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      const publicUrl = response.data.url;
-
-      // Update Profile
-      await updateProfileMutation.mutateAsync({ galleryVideos: publicUrl });
-
+      // Note: The hook invalidates the query, so the UI updates automatically
       setSelectedFile(null);
       setPreviewUrl(null);
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Upload failed", error);
-      toast({
-        title: "Error",
-        description: "Failed to upload video",
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
+      // Toast is handled by the hook, but extra logging is fine
     }
   };
 
   const handleDelete = async () => {
+    if (!currentGlimpseUrl) return;
+
     try {
-      setUploading(true);
-      // await axiosInstance.delete("/upload", { data: { url: currentGlimpseUrl } }); // Optional
+      // 4. Use the new mutation (DELETE /api/profile/testimonial)
+      await deleteTestimonial.mutateAsync(currentGlimpseUrl);
 
-      await updateProfileMutation.mutateAsync({ galleryVideos: null });
-
-      toast({ title: "Deleted", description: "Glimpse video deleted." });
       onSuccess();
       onClose();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete video",
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
+      console.error("Delete failed", error);
     }
   };
 
   const handleClose = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
-    onClose();
+    if (!isProcessing) {
+      setSelectedFile(null);
+      setPreviewUrl(null);
+      onClose();
+    }
   };
 
   return (
@@ -131,8 +113,9 @@ export const GlimpseDialog = ({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Video Preview Area */}
           {(previewUrl || currentGlimpseUrl) && (
-            <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+            <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-gray-200">
               <video
                 src={previewUrl || currentGlimpseUrl || ""}
                 controls
@@ -140,25 +123,39 @@ export const GlimpseDialog = ({
               >
                 Your browser does not support the video tag.
               </video>
+
+              {/* Delete button only shows for existing server URL, not new local preview */}
               {!previewUrl && currentGlimpseUrl && (
                 <button
                   type="button"
                   onClick={handleDelete}
-                  disabled={uploading}
-                  className="absolute top-2 right-2 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full disabled:opacity-50"
+                  disabled={isProcessing}
+                  className="absolute top-2 right-2 p-2 bg-red-500/80 hover:bg-red-600 text-white rounded-full disabled:opacity-50 transition-colors"
+                  title="Remove Video"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  {deleteTestimonial.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
                 </button>
               )}
             </div>
           )}
 
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+          {/* Upload Area */}
+          <div
+            className={`border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition-colors ${
+              isProcessing
+                ? "opacity-50 pointer-events-none"
+                : "hover:bg-gray-50"
+            }`}
+          >
             <input
               type="file"
               ref={fileInputRef}
               onChange={handleFileSelect}
-              accept="video/*"
+              accept="video/mp4,video/webm,video/quicktime"
               className="hidden"
             />
             <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
@@ -170,21 +167,33 @@ export const GlimpseDialog = ({
             </p>
             <Button
               type="button"
+              variant={selectedFile ? "outline" : "default"}
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
+              disabled={isProcessing}
             >
-              Choose Video
+              {selectedFile ? "Change Video" : "Choose Video"}
             </Button>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={uploading}>
+          <Button
+            variant="outline"
+            onClick={handleClose}
+            disabled={isProcessing}
+          >
             Cancel
           </Button>
           {selectedFile && (
-            <Button onClick={handleUpload} disabled={uploading}>
-              {uploading ? "Uploading..." : "Upload Video"}
+            <Button onClick={handleUpload} disabled={isProcessing}>
+              {uploadTestimonial.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                "Save & Upload"
+              )}
             </Button>
           )}
         </DialogFooter>

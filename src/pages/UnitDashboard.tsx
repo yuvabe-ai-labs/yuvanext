@@ -68,7 +68,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Hooks
-import { useInternships, useUpdateInternship } from "@/hooks/useInternships";
+import { useInternship, useUpdateInternship } from "@/hooks/useInternships";
 import { useUnitStats, useUnitApplications } from "@/hooks/useUnitApplications";
 import { useUnitReports } from "@/hooks/useUnitReports";
 import { useHiredApplicants } from "@/hooks/useHiredApplicants";
@@ -172,7 +172,7 @@ const UnitDashboard = () => {
   const { data: rawStats, isLoading: statsLoading } = useUnitStats();
   const stats = rawStats as UnitDashboardStats;
 
-  const { internships, loading: internshipsLoading } = useInternships();
+  const { data: internships, isLoading: internshipsLoading } = useInternship();
 
   const updateInternshipMutation = useUpdateInternship();
 
@@ -240,7 +240,7 @@ const UnitDashboard = () => {
   if (selectedInternship) {
     return (
       <InternshipDetailsView
-        internship={selectedInternship as any} // Cast if strict type mismatch with component props
+        internship={selectedInternship}
         onClose={() => setSelectedInternship(null)}
       />
     );
@@ -1208,7 +1208,7 @@ const UnitDashboard = () => {
         isOpen={!!editingInternship}
         onClose={handleEditClose}
         onSuccess={handleEditSuccess}
-        internship={editingInternship as any}
+        internship={editingInternship}
       />
       <CreateInternshipDialog
         isOpen={showCreateDialog}

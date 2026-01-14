@@ -5,10 +5,6 @@ import type {
   CandidateTasksData,
   StudentTask,
 } from "@/types/studentTasks.types";
-  CreateTaskInput,
-  UpdateTaskInput,
-  StudentTasksResponse,
-} from "@/types/candidateTasks.types";
 
 export const getStudentTasksByApplication = async (
   applicationId: string

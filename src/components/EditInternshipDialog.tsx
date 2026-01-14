@@ -189,17 +189,15 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
       ) {
         if (typeof internship.language[0] === "string") {
           // Legacy: ["English", "Tamil"]
-          languageReqs = (internship.language as unknown as string[]).map(
-            (lang) => ({
-              language: lang,
-              read: true,
-              write: true,
-              speak: true,
-            })
-          );
+          languageReqs = internship.language.map((lang) => ({
+            language: lang,
+            read: true,
+            write: true,
+            speak: true,
+          }));
         } else {
           // Modern: Object structure
-          languageReqs = internship.language as any;
+          languageReqs = internship.language;
         }
       }
 
@@ -212,7 +210,6 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
         setSelectedYear(deadline.getFullYear().toString());
       }
 
-      // Reset Form
       reset({
         title: internship.title || "",
         duration: internship.duration || "",
@@ -375,7 +372,7 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
         }
 
         // We know these fields are strings in our schema
-        setValue(fieldName, cleanResponse as any, { shouldValidate: true });
+        setValue(fieldName, cleanResponse, { shouldValidate: true });
 
         setConversationHistory((prev) => [
           ...prev,
@@ -648,10 +645,7 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
                 />
                 {errors[area.name as keyof InternshipFormValues] && (
                   <p className="text-sm text-destructive">
-                    {
-                      (errors[area.name as keyof InternshipFormValues] as any)
-                        ?.message
-                    }
+                    {errors[area.name as keyof InternshipFormValues]?.message}
                   </p>
                 )}
               </div>

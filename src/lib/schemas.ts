@@ -31,6 +31,8 @@ export const phoneSchema = z.object({
     .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"),
 });
 
+export type PhoneFormData = z.infer<typeof phoneSchema>;
+
 export const passwordSchema = z
   .object({
     currentPassword: z.string().min(1, "Current password is required"),

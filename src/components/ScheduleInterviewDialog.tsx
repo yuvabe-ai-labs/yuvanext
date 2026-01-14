@@ -12,17 +12,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
-// 1. IMPORT THE CORRECT HOOK
+// 1. Imports for RHF + Zod
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+
 import { useInterviewMutations } from "@/hooks/useInterviews";
+import {
+  ScheduleFormValues,
+  scheduleInterviewSchema,
+} from "@/lib/scheduleInterviewSchema";
 
 interface ScheduleInterviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   candidateName: string;
-  candidateEmail: string;
+  candidateEmail?: string;
   applicationId: string;
-  candidateProfileId: string;
-  // We need these IDs for the interview record usually
+  candidateProfileId?: string;
   unitId?: string;
   studentId?: string;
   onSuccess?: () => void;
@@ -33,23 +40,30 @@ export default function ScheduleInterviewDialog({
   onOpenChange,
   candidateName,
   applicationId,
-  unitId = "", // You might need to pass these down
-  studentId = "", // You might need to pass these down
+  unitId = "",
+  studentId = "",
   onSuccess,
 }: ScheduleInterviewDialogProps) {
   const { toast } = useToast();
-
-  // 2. USE THE INTERVIEW MUTATION
   const { createInterview } = useInterviewMutations();
 
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    date: "",
-    time: "",
-    meetingType: "zoom",
+  // 3. Initialize Form
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<ScheduleFormValues>({
+    resolver: zodResolver(scheduleInterviewSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      date: "",
+      time: "",
+    },
   });
 
+  // Guest emails state (Keeping as local state for the "Chip" UI interaction)
   const [guestEmails, setGuestEmails] = useState<string[]>([]);
 
   const addEmail = (email: string) => {
@@ -67,41 +81,31 @@ export default function ScheduleInterviewDialog({
     setGuestEmails(guestEmails.filter((g) => g !== email));
   };
 
-  const handleSubmit = async () => {
-    // Validation
-    if (!formData.date || !formData.time) {
-      toast({
-        title: "Missing Information",
-        description: "Please provide date and time",
-        variant: "destructive",
-      });
-      return;
+  const handleAddGuestKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (["Enter", " ", ","].includes(e.key)) {
+      e.preventDefault();
+      addEmail(e.currentTarget.value);
+      e.currentTarget.value = "";
     }
-    if (!formData.title) {
-      toast({
-        title: "Missing Information",
-        description: "Please provide a title",
-        variant: "destructive",
-      });
-      return;
-    }
+  };
 
-    // 3. CALL THE CREATE INTERVIEW MUTATION
+  // 4. Submit Handler
+  const onSubmit = (data: ScheduleFormValues) => {
     const scheduledDate = new Date(
-      `${formData.date}T${formData.time}:00`
+      `${data.date}T${data.time}:00`
     ).toISOString();
 
     const fullDescription = `${
-      formData.description
+      data.description || ""
     }\n\nGuests: ${guestEmails.join(", ")}`;
 
     createInterview.mutate(
       {
         application_id: applicationId,
         scheduled_date: scheduledDate,
-        title: formData.title,
-        description: fullDescription,
-        meeting_link: "zoom", // Or handle link generation logic
+        title: data.title,
+        description: fullDescription.trim(),
+        meeting_link: "zoom",
         duration_minutes: 60,
         unit_id: unitId,
         student_id: studentId,
@@ -111,26 +115,11 @@ export default function ScheduleInterviewDialog({
         onSuccess: () => {
           onOpenChange(false);
           onSuccess?.();
-          // Reset form
-          setFormData({
-            title: "",
-            description: "",
-            date: "",
-            time: "",
-            meetingType: "zoom",
-          });
+          reset();
           setGuestEmails([]);
         },
       }
     );
-  };
-
-  const handleAddGuestKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (["Enter", " ", ","].includes(e.key)) {
-      e.preventDefault();
-      addEmail(e.currentTarget.value);
-      e.currentTarget.value = "";
-    }
   };
 
   return (
@@ -144,7 +133,7 @@ export default function ScheduleInterviewDialog({
           </div>
         </DialogHeader>
 
-        <div className="px-6 pb-6 space-y-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="px-6 pb-6 space-y-5">
           {/* Title */}
           <div className="space-y-2">
             <Label htmlFor="title" className="text-sm text-gray-700">
@@ -153,12 +142,12 @@ export default function ScheduleInterviewDialog({
             <Input
               id="title"
               placeholder="e.g., Technical Interview"
-              value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
               className="h-11"
+              {...register("title")}
             />
+            {errors.title && (
+              <p className="text-xs text-red-500">{errors.title.message}</p>
+            )}
           </div>
 
           {/* Description */}
@@ -169,11 +158,8 @@ export default function ScheduleInterviewDialog({
             <Textarea
               id="description"
               placeholder="Agenda or notes..."
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
               className="min-h-[100px] resize-none"
+              {...register("description")}
             />
           </div>
 
@@ -190,6 +176,7 @@ export default function ScheduleInterviewDialog({
                 >
                   {email}
                   <button
+                    type="button"
                     onClick={() => handleRemoveGuest(email)}
                     className="hover:text-red-500"
                   >
@@ -218,14 +205,13 @@ export default function ScheduleInterviewDialog({
                 <Input
                   id="date"
                   type="date"
-                  value={formData.date}
-                  onChange={(e) =>
-                    setFormData({ ...formData, date: e.target.value })
-                  }
                   className="h-11 pl-10"
-                  required
+                  {...register("date")}
                 />
               </div>
+              {errors.date && (
+                <p className="text-xs text-red-500">{errors.date.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="time" className="text-sm text-gray-700">
@@ -236,14 +222,13 @@ export default function ScheduleInterviewDialog({
                 <Input
                   id="time"
                   type="time"
-                  value={formData.time}
-                  onChange={(e) =>
-                    setFormData({ ...formData, time: e.target.value })
-                  }
                   className="h-11 pl-10"
-                  required
+                  {...register("time")}
                 />
               </div>
+              {errors.time && (
+                <p className="text-xs text-red-500">{errors.time.message}</p>
+              )}
             </div>
           </div>
 
@@ -263,8 +248,8 @@ export default function ScheduleInterviewDialog({
           {/* Save Button */}
           <div className="flex justify-end pt-2">
             <Button
-              onClick={handleSubmit}
-              disabled={createInterview.isPending}
+              type="submit"
+              disabled={createInterview.isPending || isSubmitting}
               className="bg-[#2196F3] rounded-full text-white px-8 h-11 hover:bg-[#1976D2]"
             >
               {createInterview.isPending
@@ -272,7 +257,7 @@ export default function ScheduleInterviewDialog({
                 : "Schedule Interview"}
             </Button>
           </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

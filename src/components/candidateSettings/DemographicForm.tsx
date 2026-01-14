@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { ChevronLeft } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,47 +10,44 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
 
-// NEW IMPORTS: Use our standardized hooks
+// Hooks
 import { useUnitProfile, useUpdateUnitProfile } from "@/hooks/useUnitProfile";
 
 export default function DemographicForm({ onBack }: { onBack: () => void }) {
   // 1. Fetch Profile Data
   const { data: profile, isLoading: loading } = useUnitProfile();
 
-  // 2. Mutation Hook for updates
+  // 2. Mutation Hook
   const updateProfileMutation = useUpdateUnitProfile();
 
+  // 3. Initialize Form with 'values' prop (Replaces useEffect)
   const form = useForm({
     resolver: zodResolver(demographicSchema),
     defaultValues: {
       gender: "",
       disability: "No",
     },
+    // RHF automatically populates form when 'profile' loads
+    values: profile
+      ? {
+          gender: profile.gender || "",
+          // Map boolean from API to "Yes"/"No" string for UI
+          disability: profile.isDifferentlyAbled ? "Yes" : "No",
+        }
+      : undefined,
   });
-
-  // 3. Populate Form
-  useEffect(() => {
-    if (profile) {
-      // Assuming 'gender' and 'isDifferentlyAbled' (or similar) are in the unified profile object now.
-      // Adjust property names based on your exact API response if different.
-      form.setValue("gender", profile.gender || "");
-      // If disability status is stored in profile (e.g. isDifferentlyAbled boolean)
-      // We map boolean to "Yes"/"No" string for the select input
-      form.setValue("disability", profile.isDifferentlyAbled ? "Yes" : "No");
-    }
-  }, [profile, form]);
 
   const onSubmit = async (data: any) => {
     try {
-      // 4. Update Profile via Mutation
-      // We map the form "Yes"/"No" back to boolean for the API
       await updateProfileMutation.mutateAsync({
         gender: data.gender,
-        isDifferentlyAbled: data.disability === "Yes", // Map string to boolean
+        // Map string from UI back to boolean for API
+        isDifferentlyAbled: data.disability === "Yes",
       });
-
-      // Optional: Add success toast here if not handled by hook, or just rely on hook
+      // Optionally go back after save
+      // onBack();
     } catch (error) {
       console.error("Failed to save demographic data:", error);
     }
@@ -63,7 +59,7 @@ export default function DemographicForm({ onBack }: { onBack: () => void }) {
         onClick={onBack}
         className="text-base text-gray-600 font-medium flex items-center gap-1 hover:text-gray-900 mb-6"
       >
-        <ChevronLeft /> Back
+        <ChevronLeft className="w-5 h-5" /> Back
       </button>
 
       <div className="space-y-5">
@@ -172,15 +168,15 @@ export default function DemographicForm({ onBack }: { onBack: () => void }) {
             </div>
 
             <div className="flex justify-center pt-4">
-              <button
+              <Button
                 type="submit"
-                className="bg-blue-500 hover:bg-blue-600 text-white px-10 py-2 rounded-full font-medium transition disabled:opacity-50"
+                className="bg-blue-500 hover:bg-blue-600 text-white px-10 py-2 rounded-full font-medium transition"
                 disabled={updateProfileMutation.isPending}
               >
                 {updateProfileMutation.isPending
                   ? "Saving..."
                   : "Agree and save"}
-              </button>
+              </Button>
             </div>
           </form>
         </Form>

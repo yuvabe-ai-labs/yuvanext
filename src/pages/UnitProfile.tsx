@@ -20,17 +20,17 @@ import {
   Camera,
 } from "lucide-react";
 
-// 1. IMPORT CUSTOM HOOKS
-import { useUnitProfile, useUpdateUnitProfile } from "@/hooks/useUnitProfile";
+// 1. IMPORT HOOKS
+import {
+  useUnitProfile,
+  useUpdateUnitProfile,
+  useAvatarOperations,
+  useBannerOperations,
+} from "@/hooks/useUnitProfile";
 import { useSession } from "@/lib/auth-client";
 
-// 2. IMPORT YOUR TYPES
-import type {
-  Profile,
-  Project,
-  SocialLink,
-  // Add other types if needed for specific props
-} from "@/types/profile.types"; // Adjust path if needed
+// 2. IMPORT TYPES
+import type { Profile, Project, SocialLink } from "@/types/profiles.types";
 
 // Components
 import { UnitDetailsDialog } from "@/components/unit/UnitDetailsDialog";
@@ -42,17 +42,21 @@ import { GlimpseDialog } from "@/components/GlimpseDialog";
 import { CircularProgress } from "@/components/CircularProgress";
 import { ImageUploadDialog } from "@/components/ImageUploadDialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  type ProjectFormValues, // Import the type here
+} from "@/lib/unitDialogSchemas";
 
 const UnitProfile = () => {
   const { data: session } = useSession();
   const user = session?.user;
 
   // 3. USE REACT QUERY HOOKS WITH TYPE
-  // The hook should ideally return 'Profile | undefined'
   const { data: profileData, isLoading, refetch } = useUnitProfile();
+  const { uploadAvatar, deleteAvatar } = useAvatarOperations();
+  const { uploadBanner, deleteBanner } = useBannerOperations();
 
   // Cast strictly if the hook returns a generic type, otherwise rely on hook inference
-  const profile = profileData as Profile;
+  const profile = profileData as Profile | undefined;
 
   const updateMutation = useUpdateUnitProfile();
 
@@ -65,19 +69,23 @@ const UnitProfile = () => {
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // 4. ACTION HANDLERS (Typed with your interfaces)
+  // 4. ACTION HANDLERS
 
+  // Update Profile fields (Mission, Values, Description, etc.)
   const handleUpdateProfile = (updates: Partial<Profile>) => {
     updateMutation.mutate(updates);
   };
 
-  const handleAddProject = (projectData: Omit<Project, "id">) => {
+  // Add Project
+  const handleAddProject = (projectData: ProjectFormValues) => {
     const currentProjects = profile?.projects || [];
-    // Backend likely assigns ID, but optimistic UI might need a temp ID or wait for refetch
-    const updatedProjects = [...currentProjects, { ...projectData }];
+    // Optimistic update logic handled by React Query cache or refetch
+    // For now, assume backend adds it and we refetch or we send full array
+    const updatedProjects = [...currentProjects, projectData] as Project[];
     updateMutation.mutate({ projects: updatedProjects });
   };
 
+  // Remove Project
   const handleRemoveProject = (projectId: string) => {
     if (!projectId) return;
     const currentProjects = profile?.projects || [];
@@ -85,21 +93,24 @@ const UnitProfile = () => {
     updateMutation.mutate({ projects: updatedProjects });
   };
 
+  // Update Social Links
   const handleUpdateSocialLinks = (links: SocialLink[]) => {
     updateMutation.mutate({ socialLinks: [...links] });
   };
 
+  // Remove Social Link
   const handleRemoveSocialLink = (linkId: string) => {
     const currentLinks = profile?.socialLinks || [];
     const updatedLinks = currentLinks.filter((l) => l.id !== linkId);
     updateMutation.mutate({ socialLinks: updatedLinks });
   };
 
+  // Refetch after image uploads
   const handleImageSuccess = () => {
     refetch();
   };
 
-  // 5. DATA MAPPING (Using your Profile interface fields)
+  // 5. DATA MAPPING (Safe Defaults)
   const projects = profile?.projects || [];
   const galleryImages = profile?.galleryImages || [];
   const socialLinks = profile?.socialLinks || [];
@@ -186,9 +197,7 @@ const UnitProfile = () => {
                     {profile?.name || "Unit Name"}
                   </h1>
                   <UnitDetailsDialog
-                    // profile={profile} // Pass full profile object
-                    unitProfile={profile} // Keep for compatibility if dialog expects it
-                    // onUpdate={handleUpdateProfile}
+                    unitProfile={profile}
                     onUpdateUnit={handleUpdateProfile}
                   >
                     <Pencil className="w-4 h-4 text-muted-foreground cursor-pointer hover:text-primary" />
@@ -255,6 +264,7 @@ const UnitProfile = () => {
           </CardContent>
         </Card>
 
+        {/* Sidebar & Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 sm:gap-4">
           {/* Left Sidebar - Quick Links */}
           <div className="lg:col-span-1 mb-4 lg:mb-0">
@@ -268,9 +278,7 @@ const UnitProfile = () => {
                   <div className="flex items-center justify-between">
                     <span>Unit Details</span>
                     <UnitDetailsDialog
-                      // profile={profile}
                       unitProfile={profile}
-                      // onUpdate={handleUpdateProfile}
                       onUpdateUnit={handleUpdateProfile}
                     >
                       <Button
@@ -402,7 +410,7 @@ const UnitProfile = () => {
 
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-2 sm:space-y-4">
-            {/* Projects */}
+            {/* Projects Section */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -474,7 +482,7 @@ const UnitProfile = () => {
               </CardContent>
             </Card>
 
-            {/* Mission */}
+            {/* Mission Section */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -498,7 +506,7 @@ const UnitProfile = () => {
               </CardContent>
             </Card>
 
-            {/* Values */}
+            {/* Values Section */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center mb-4">
@@ -522,7 +530,7 @@ const UnitProfile = () => {
               </CardContent>
             </Card>
 
-            {/* Social Links */}
+            {/* Social Links Section */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -580,7 +588,7 @@ const UnitProfile = () => {
               </CardContent>
             </Card>
 
-            {/* Glimpse of the Unit */}
+            {/* Glimpse of the Unit Section */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -620,7 +628,7 @@ const UnitProfile = () => {
               </CardContent>
             </Card>
 
-            {/* Gallery */}
+            {/* Gallery Section */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -702,9 +710,10 @@ const UnitProfile = () => {
         </div>
       </div>
 
-      {/* All Dialogs */}
+      {/* All Upload & Details Dialogs */}
       {profile && (
         <>
+          {/* Avatar Dialog */}
           <ImageUploadDialog
             isOpen={isAvatarDialogOpen}
             onClose={() => setIsAvatarDialogOpen(false)}
@@ -714,8 +723,12 @@ const UnitProfile = () => {
             imageType="avatar"
             entityType="unit"
             onSuccess={handleImageSuccess}
+            onUpload={(file) => uploadAvatar.mutateAsync(file)}
+            onDelete={() => deleteAvatar.mutateAsync()}
+            isProcessing={uploadAvatar.isPending || deleteAvatar.isPending}
           />
 
+          {/* Banner Dialog */}
           <ImageUploadDialog
             isOpen={isBannerDialogOpen}
             onClose={() => setIsBannerDialogOpen(false)}
@@ -725,6 +738,9 @@ const UnitProfile = () => {
             imageType="banner"
             entityType="unit"
             onSuccess={handleImageSuccess}
+            onUpload={(file) => uploadBanner.mutateAsync(file)}
+            onDelete={() => deleteBanner.mutateAsync()}
+            isProcessing={uploadBanner.isPending || deleteBanner.isPending}
           />
 
           <GalleryDialog

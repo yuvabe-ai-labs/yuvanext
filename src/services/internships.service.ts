@@ -8,6 +8,9 @@ import type {
   CandidateDecision,
   ApiMessageResponse,
   ApplyInternshipRequest,
+  CreateInternshipPayload,
+  InternshipResponse,
+  UpdateInternshipPayload,
 } from "@/types/internships.types";
 import { handleApiResponse, handleApiError } from "@/lib/api-handler";
 
@@ -35,10 +38,6 @@ export const createInternship = async (
     return handleApiError(error, "Failed to create internship");
   }
 };
-
-import type {
-  UpdateInternshipPayload, // Import the new type
-} from "@/types/internships.types";
 
 export const updateInternship = async (
   payload: UpdateInternshipPayload
@@ -80,25 +79,6 @@ export const getRemommendedInternships = async (): Promise<Internship[]> => {
     return handleApiError(error, "Failed to fetch recommended internships");
   }
 };
-
-// export const getRemommendedInternships = async (): Promise<Internship[]> => {
-//   try {
-//     const response = await axiosInstance.get("/internships/recommended");
-
-//     // Handle the nested structure: data.data.internships
-//     const apiData = response.data;
-
-//     // If the response has the expected structure
-//     if (apiData?.data?.internships && Array.isArray(apiData.data.internships)) {
-//       return apiData.data.internships;
-//     }
-
-//     // Fallback to handleApiResponse for other structures
-//     return handleApiResponse<Internship[]>(response, []);
-//   } catch (error) {
-//     return handleApiError(error, "Failed to fetch recommended internships");
-//   }
-// };
 
 // Get Saved internships
 

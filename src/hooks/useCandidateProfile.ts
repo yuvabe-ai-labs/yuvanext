@@ -4,7 +4,7 @@ import {
   updateApplicationStatus,
 } from "@/services/profile.service";
 import { useToast } from "@/hooks/use-toast";
-import type { UpdateApplicationStatusPayload } from "@/types/profile.types";
+import type { UpdateApplicationStatusPayload } from "@/types/profiles.types";
 
 export const useCandidateProfile = (applicationId: string) => {
   return useQuery({
@@ -35,7 +35,7 @@ export const useUpdateApplicationStatus = () => {
       queryClient.invalidateQueries({ queryKey: ["candidateProfile"] }); // broad invalidation or specific ID
       queryClient.invalidateQueries({ queryKey: ["unitApplications"] });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       console.error("Update status failed", error);
     },
   });

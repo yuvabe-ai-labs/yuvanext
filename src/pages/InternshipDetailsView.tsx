@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 
 interface InternshipDetailsViewProps {
-  internship: any;
+  internship;
   onClose: () => void;
 }
 
@@ -25,7 +25,7 @@ const InternshipDetailsView = ({
   onClose,
 }: InternshipDetailsViewProps) => {
   // Parse JSON fields safely
-  const safeParse = (data: any, fallback: any) => {
+  const safeParse = (data, fallback) => {
     if (!data) return fallback;
     try {
       return typeof data === "string" ? JSON.parse(data) : data;

@@ -1,6 +1,6 @@
 import axiosInstance from "@/config/platform-api";
 import { handleApiResponse, handleApiError } from "@/lib/api-handler";
-import type { Profile } from "@/types/profile.types";
+import type { Profile } from "@/types/profiles.types";
 
 // 1. Fetch Unit Profile
 export const getUnitProfile = async (): Promise<Profile> => {
@@ -11,18 +11,15 @@ export const getUnitProfile = async (): Promise<Profile> => {
     return handleApiError(error, "Failed to fetch profile");
   }
 };
-
 import type { HiredCandidateDTO } from "@/types/unit.types";
 
 export const getHiredApplicants = async (): Promise<HiredCandidateDTO[]> => {
   try {
-    // 1. CALL THE NEW ENDPOINT
-    // Using '/unit/tasks' as discussed for the tasks endpoint
+    // Using '/tasks' as requested
     const response = await axiosInstance.get("/tasks");
 
-    // 2. RETURN RAW DATA
-    // We return the raw data directly without formatting, as requested
-    return response.data?.data || [];
+    // Safely unwrap data with a fallback of []
+    return handleApiResponse<HiredCandidateDTO[]>(response, []);
   } catch (error) {
     return handleApiError(error, "Failed to fetch hired applicants");
   }

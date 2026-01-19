@@ -1,7 +1,8 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
-import { authClient } from "@/lib/auth-client"; // Only need authClient here
+import { authClient } from "@/lib/auth-client";
+import { env } from "@/env";
 
-const API_BASE_URL = `${import.meta.env.VITE_BETTER_AUTH_URL}/api`;
+const API_BASE_URL = `${env.VITE_API_URL}/api`;
 
 // Create Axios instance
 const axiosInstance = axios.create({
@@ -10,12 +11,12 @@ const axiosInstance = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true, // Critical: Send cookies for Better Auth
+  withCredentials: true,
 });
 
 axiosInstance.interceptors.request.use(
   (config) => config,
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 // Response interceptor: Handle authentication errors
@@ -54,7 +55,7 @@ axiosInstance.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 async function handleSignOut(): Promise<void> {

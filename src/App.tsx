@@ -41,6 +41,7 @@ import Settings from "./pages/Settings";
 import AuthCallback from "@/hooks/AuthCallback";
 import ScrollToTop from "@/components/ScrollToTop";
 import { useProfile } from "@/hooks/useProfile";
+import EnvironmentIndicator from "@/components/EnvironmentIndicator";
 
 const queryClient = new QueryClient();
 
@@ -54,7 +55,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     // Wait for auth and profile to load
-    if (isAuthPending || profileLoading || !session || !profile) return;
+    if (isAuthPending || isProfileLoading || !session || !profile) return;
 
     const currentPath = location.pathname;
     const isOnChatbot = currentPath === "/chatbot";
@@ -88,7 +89,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   ]);
 
   // Show loading spinner while checking auth and profile
-  if (isAuthPending || (session && profileLoading)) {
+  if (isAuthPending || (session && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-muted flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -105,6 +106,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <EnvironmentIndicator />
       <BrowserRouter>
         <ScrollToTop />
         <NuqsAdapter>

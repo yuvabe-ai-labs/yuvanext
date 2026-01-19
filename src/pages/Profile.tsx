@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-// import Navbar from "@/components/Navbar";
+import Navbar from "@/components/Navbar";
 import {
   Mail,
   Phone,
@@ -75,7 +75,7 @@ const Profile = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        {/* <Navbar /> */}
+        <Navbar />
         <div className="relative h-48 bg-gradient-to-r from-primary to-primary-foreground">
           <div className="absolute inset-0 bg-black/20" />
         </div>
@@ -121,7 +121,7 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* <Navbar /> */}
+      <Navbar />
 
       {/* Hero Background */}
       <div className="relative h-[17.625rem] bg-gradient-to-r from-primary to-primary-foreground">

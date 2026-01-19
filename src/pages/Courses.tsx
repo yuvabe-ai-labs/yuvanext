@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CalendarIcon, Search, Clock, ChevronLeft } from "lucide-react";
-// import Navbar from "@/components/Navbar";
+import Navbar from "@/components/Navbar";
 import { useCourses } from "@/hooks/useCourses";
 import { useSession } from "@/lib/auth-client";
 import { formatDistanceToNow } from "date-fns";
@@ -192,7 +192,7 @@ const Courses = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* <Navbar /> */}
+      <Navbar />
       <div className="container px-4 sm:px-6 lg:px-[7.5rem] py-4 lg:py-10">
         <div className="flex flex-col lg:flex-row gap-5">
           {/* Left Sidebar - Filters */}

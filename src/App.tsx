@@ -19,6 +19,7 @@ import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
 import UnitDashboard from "./pages/UnitDashboard";
 // import Chatbot from "./pages/Chatbot";
+import Chatbot from "./pages/Chatbot";
 import Internships from "./pages/Internships";
 import Courses from "./pages/Courses";
 import Units from "./pages/Units";
@@ -42,6 +43,8 @@ import ScrollToTop from "@/components/ScrollToTop";
 import { useProfile } from "@/hooks/useProfile";
 
 const queryClient = new QueryClient();
+
+// Protected Route component with onboarding check
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { data: session, isPending: isAuthPending } = useSession();
   const { data: profile, isLoading: isProfileLoading } = useProfile();
@@ -50,26 +53,29 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
 
   useEffect(() => {
-    // 1. Wait for Auth and Profile to load
-    if (isAuthPending || isProfileLoading) return;
+    // Wait for auth and profile to load
+    if (isAuthPending || profileLoading || !session || !profile) return;
 
-    // 2. If no session, the render return below handles the redirect to "/"
-    if (!session) return;
+    const currentPath = location.pathname;
+    const isOnChatbot = currentPath === "/chatbot";
 
-    // 3. Role-Based Redirects
-    // Ensure profile exists before checking role
-    if (profile) {
-      const role = profile.role;
-      const path = location.pathname;
-
-      // Candidate trying to access Unit Dashboard
-      if (role === "candidate" && path.startsWith("/unit-dashboard")) {
-        navigate("/dashboard", { replace: true });
+    // Check onboarding status
+    if (profile.onboardingCompleted === true) {
+      // Onboarding completed - redirect away from chatbot to dashboard
+      if (isOnChatbot) {
+        // Redirect based on role
+        if (profile.role === "candidate") {
+          navigate("/dashboard", { replace: true });
+        } else if (profile.role === "unit") {
+          navigate("/unit-dashboard", { replace: true });
+        } else {
+          navigate("/dashboard", { replace: true });
+        }
       }
-
-      // Unit trying to access Candidate Dashboard
-      if (role === "unit" && path === "/dashboard") {
-        navigate("/unit-dashboard", { replace: true });
+    } else {
+      // Onboarding NOT completed - redirect to chatbot
+      if (!isOnChatbot) {
+        navigate("/chatbot", { replace: true });
       }
     }
   }, [
@@ -81,8 +87,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     navigate,
   ]);
 
-  // Show loading spinner while Auth or Profile is fetching
-  if (isAuthPending || (session && isProfileLoading)) {
+  // Show loading spinner while checking auth and profile
+  if (isAuthPending || (session && profileLoading)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-muted flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -106,6 +112,15 @@ const App = () => (
             {/* Public Routes */}
             <Route path="/" element={<Landing />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route
+              path="/chatbot"
+              element={
+                <ProtectedRoute>
+                  <Chatbot />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/" element={<Landing />} />
             <Route path="/auth/:role/signin" element={<SignIn />} />
             <Route path="/auth/:role/signup" element={<SignUp />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />

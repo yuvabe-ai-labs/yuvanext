@@ -23,7 +23,6 @@ export const useCreateTask = () => {
 
   return useMutation({
     mutationFn: (payload: CreateTaskPayload) => createTask(payload),
-
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["candidateTasks", variables.applicationId],
@@ -43,7 +42,6 @@ export const useUpdateTask = (applicationId: string) => {
       taskId: string;
       payload: UpdateTaskPayload;
     }) => updateTask(taskId, payload),
-
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["candidateTasks", applicationId],
@@ -57,7 +55,6 @@ export const useDeleteTask = (applicationId: string) => {
 
   return useMutation({
     mutationFn: (taskId: string) => deleteTask(taskId),
-
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["candidateTasks", applicationId],

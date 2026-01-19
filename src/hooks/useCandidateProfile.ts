@@ -1,89 +1,42 @@
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
-
-type Application = Tables<"applications">;
-type Internship = Tables<"internships">;
-type Profile = Tables<"profiles">;
-type StudentProfile = Tables<"student_profiles">;
-
-export interface CandidateData {
-  application: Application;
-  internship: Internship;
-  profile: Profile;
-  studentProfile: StudentProfile;
-}
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  getCandidateProfile,
+  updateApplicationStatus,
+} from "@/services/profile.service";
+import { useToast } from "@/hooks/use-toast";
+import type { UpdateApplicationStatusPayload } from "@/types/profiles.types";
 
 export const useCandidateProfile = (applicationId: string) => {
-  const [data, setData] = useState<CandidateData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  return useQuery({
+    queryKey: ["candidateProfile", applicationId],
+    queryFn: () => getCandidateProfile(applicationId),
+    enabled: !!applicationId,
+    retry: 1,
+  });
+};
 
-  const fetchCandidateData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+export const useUpdateApplicationStatus = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-      // Fetch application details
-      const { data: application, error: appError } = await supabase
-        .from("applications")
-        .select("*")
-        .eq("id", applicationId)
-        .single();
-
-      if (appError) throw appError;
-      if (!application) {
-        setError("Application not found");
-        return;
-      }
-
-      // Fetch internship details
-      const { data: internship, error: internshipError } = await supabase
-        .from("internships")
-        .select("*")
-        .eq("id", application.internship_id)
-        .single();
-
-      if (internshipError) throw internshipError;
-
-      // Fetch student profile
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", application.student_id)
-        .single();
-
-      if (profileError) throw profileError;
-
-      // Fetch student details
-      const { data: studentProfile, error: studentProfileError } =
-        await supabase
-          .from("student_profiles")
-          .select("*")
-          .eq("profile_id", application.student_id)
-          .single();
-
-      if (studentProfileError) throw studentProfileError;
-
-      setData({
-        application,
-        internship,
-        profile,
-        studentProfile,
+  return useMutation({
+    mutationFn: (payload: UpdateApplicationStatusPayload) =>
+      updateApplicationStatus(payload),
+    onSuccess: (_, variables) => {
+      const isInterview = variables.status === "interviewed";
+      toast({
+        title: isInterview ? "Interview Scheduled" : "Status Updated",
+        description: isInterview
+          ? "Interview scheduled and candidate notified."
+          : "Application status updated successfully.",
       });
-    } catch (error) {
-      console.error("Error fetching candidate data:", error);
-      setError("Failed to fetch candidate data");
-    } finally {
-      setLoading(false);
-    }
-  }, [applicationId]);
 
-  useEffect(() => {
-    if (applicationId) {
-      fetchCandidateData();
-    }
-  }, [applicationId, fetchCandidateData]);
-
-  return { data, loading, error, refetch: fetchCandidateData };
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ["candidateProfile"] }); // broad invalidation or specific ID
+      queryClient.invalidateQueries({ queryKey: ["unitApplications"] });
+    },
+    onError: (error) => {
+      console.error("Update status failed", error);
+    },
+  });
 };

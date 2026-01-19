@@ -1,6 +1,4 @@
-import { useEffect } from "react";
 import { ChevronLeft } from "lucide-react";
-import { useProfileData } from "@/hooks/useProfileData";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { demographicSchema } from "@/lib/demographicFormSchema";
@@ -12,45 +10,44 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
 
-export default function DemographicForm({ onBack }) {
-  const {
-    profile,
-    studentProfile,
-    loading,
-    updateProfile,
-    updateStudentProfile,
-  } = useProfileData();
+// Hooks
+import { useUnitProfile, useUpdateUnitProfile } from "@/hooks/useUnitProfile";
 
+export default function DemographicForm({ onBack }: { onBack: () => void }) {
+  // 1. Fetch Profile Data
+  const { data: profile, isLoading: loading } = useUnitProfile();
+
+  // 2. Mutation Hook
+  const updateProfileMutation = useUpdateUnitProfile();
+
+  // 3. Initialize Form with 'values' prop (Replaces useEffect)
   const form = useForm({
     resolver: zodResolver(demographicSchema),
     defaultValues: {
-      gender: profile?.gender || "",
-      disability: studentProfile?.is_differently_abled ? "Yes" : "No",
+      gender: "",
+      disability: "No",
     },
+    // RHF automatically populates form when 'profile' loads
+    values: profile
+      ? {
+          gender: profile.gender || "",
+          // Map boolean from API to "Yes"/"No" string for UI
+          disability: profile.isDifferentlyAbled ? "Yes" : "No",
+        }
+      : undefined,
   });
 
-  useEffect(() => {
-    if (profile) {
-      form.setValue("gender", profile.gender || "");
-    }
-    if (studentProfile) {
-      form.setValue(
-        "disability",
-        studentProfile.is_differently_abled ? "Yes" : "No"
-      );
-    }
-  }, [profile, studentProfile, form]);
-
-  const onSubmit = async (data) => {
+  const onSubmit = async (data: any) => {
     try {
-      // Update Gender in Profile
-      await updateProfile({ gender: data.gender });
-
-      // Update Disability in Student Profile
-      await updateStudentProfile({
-        is_differently_abled: data.disability === "Yes",
+      await updateProfileMutation.mutateAsync({
+        gender: data.gender,
+        // Map string from UI back to boolean for API
+        isDifferentlyAbled: data.disability === "Yes",
       });
+      // Optionally go back after save
+      // onBack();
     } catch (error) {
       console.error("Failed to save demographic data:", error);
     }
@@ -62,7 +59,7 @@ export default function DemographicForm({ onBack }) {
         onClick={onBack}
         className="text-base text-gray-600 font-medium flex items-center gap-1 hover:text-gray-900 mb-6"
       >
-        <ChevronLeft /> Back
+        <ChevronLeft className="w-5 h-5" /> Back
       </button>
 
       <div className="space-y-5">
@@ -171,13 +168,15 @@ export default function DemographicForm({ onBack }) {
             </div>
 
             <div className="flex justify-center pt-4">
-              <button
+              <Button
                 type="submit"
-                className="bg-blue-500 hover:bg-blue-600 text-white px-10 py-2 rounded-full font-medium transition disabled:opacity-50"
-                disabled={form.formState.isSubmitting}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-10 py-2 rounded-full font-medium transition"
+                disabled={updateProfileMutation.isPending}
               >
-                {form.formState.isSubmitting ? "Saving..." : "Agree and save"}
-              </button>
+                {updateProfileMutation.isPending
+                  ? "Saving..."
+                  : "Agree and save"}
+              </Button>
             </div>
           </form>
         </Form>

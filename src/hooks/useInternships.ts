@@ -1,130 +1,206 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import type { Tables } from "@/integrations/supabase/types";
-import type { DatabaseProfile } from "@/types/profile";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  getInternships,
+  getInternshipById,
+  getRemommendedInternships,
+  getSavedInternships,
+  getAppliedInternships,
+  getSaveAndAppliedCount,
+  saveInternship,
+  removeSavedInternship,
+  getInternshipShareLink,
+  getAppliedInternshipStatus,
+  updateCandidateDecision,
+  applyToInternship,
+  updateInternship,
+  createInternship,
+} from "@/services/internships.service";
+import {
+  ApplyInternshipRequest,
+  CandidateDecision,
+  UpdateInternshipPayload,
+  CreateInternshipPayload,
+} from "@/types/internships.types";
+import { useToast } from "./use-toast";
 
-type Internship = Tables<"internships">;
-
-export const useIntern = () => {
-  const [internships, setInternships] = useState<Internship[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchInternships = async () => {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from("internships")
-          .select("*")
-          .eq("status", "active")
-          .order("created_at", { ascending: false });
-
-        if (error) throw error;
-        setInternships(data || []);
-      } catch (error) {
-        console.error("Error fetching internships:", error);
-        setError("Failed to fetch internships");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchInternships();
-  }, []);
-
-  return { internships, loading, error };
+export const useInternship = () => {
+  return useQuery({
+    queryKey: ["internships"],
+    queryFn: getInternships,
+  });
 };
 
-export const useInternships = () => {
-  const { user } = useAuth();
-  const [internships, setInternships] = useState<Internship[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [profile, setProfile] = useState<DatabaseProfile | null>(null);
+export const useInternshipById = (id: string) => {
+  return useQuery({
+    queryKey: ["internship", id],
+    queryFn: () => getInternshipById(id),
+    enabled: !!id,
+  });
+};
 
-  useEffect(() => {
-    const fetchProfileAndInternships = async () => {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
+export const useRemommendedInternships = () => {
+  return useQuery({
+    queryKey: ["recommendedInternships"],
+    queryFn: getRemommendedInternships,
+  });
+};
 
-      try {
-        setLoading(true);
-        setError(null);
+export const useSavedInternships = () => {
+  return useQuery({
+    queryKey: ["savedInternships"],
+    queryFn: getSavedInternships,
+  });
+};
 
-        // 1. First, fetch the user's profile to get the profile ID
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
+export const useAppliedInternships = () => {
+  return useQuery({
+    queryKey: ["appliedInternships"],
+    queryFn: getAppliedInternships,
+  });
+};
 
-        if (profileError) throw profileError;
+export const useSaveAndAppliedCount = () => {
+  return useQuery({
+    queryKey: ["savedAndAppliedInternships"],
+    queryFn: getSaveAndAppliedCount,
+  });
+};
 
-        if (!profileData) {
-          setError("Profile not found");
-          setLoading(false);
-          return;
-        }
+export const useSaveInternship = () => {
+  const queryClient = useQueryClient();
 
-        setProfile(profileData as unknown as DatabaseProfile);
+  return useMutation({
+    mutationFn: (internshipId: string) => saveInternship(internshipId),
 
-        // 2. Fetch internships created by this profile with status 'active' or 'closed'
-        const { data, error: internshipsError } = await supabase
-          .from("internships")
-          .select("*")
-          .eq("created_by", profileData.id)
-          .in("status", ["active", "closed"])
-          .order("created_at", { ascending: false });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["savedInternships"] });
+      queryClient.invalidateQueries({
+        queryKey: ["savedAndAppliedInternships"],
+      });
+    },
+  });
+};
 
-        if (internshipsError) throw internshipsError;
+export const useRemoveSavedInternship = () => {
+  const queryClient = useQueryClient();
 
-        setInternships(data || []);
-      } catch (err: any) {
-        console.error("Error fetching internships:", err);
-        setError(err.message || "Failed to fetch internships");
-      } finally {
-        setLoading(false);
-      }
-    };
+  return useMutation({
+    mutationFn: (internshipId: string) => removeSavedInternship(internshipId),
 
-    fetchProfileAndInternships();
-  }, [user?.id]);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["savedInternships"] });
+      queryClient.invalidateQueries({
+        queryKey: ["savedAndAppliedInternships"],
+      });
+    },
+  });
+};
 
-  // Optional: Add a refetch function for manual refresh
-  const refetch = async () => {
-    if (!user || !profile) return;
+export const useInternshipShareLink = () => {
+  return useMutation({
+    mutationFn: (internshipId: string) => getInternshipShareLink(internshipId),
+  });
+};
 
-    try {
-      setLoading(true);
-      setError(null);
+export const useAppliedInternshipStatus = () => {
+  return useQuery({
+    queryKey: ["appliedInternshipStatus"],
+    queryFn: getAppliedInternshipStatus,
+  });
+};
 
-      const { data, error: internshipsError } = await supabase
-        .from("internships")
-        .select("*")
-        .eq("created_by", profile.id)
-        .in("status", ["active", "closed"])
-        .order("created_at", { ascending: false });
+export const useUpdateCandidateDecision = () => {
+  const queryClient = useQueryClient();
 
-      if (internshipsError) throw internshipsError;
+  return useMutation({
+    mutationFn: ({
+      applicationId,
+      decision,
+    }: {
+      applicationId: string;
+      decision: CandidateDecision;
+    }) => updateCandidateDecision(applicationId, decision),
 
-      setInternships(data || []);
-    } catch (err: any) {
-      console.error("Error refetching internships:", err);
-      setError(err.message || "Failed to refetch internships");
-    } finally {
-      setLoading(false);
-    }
-  };
+    onSuccess: () => {
+      // refresh application-related data
+      queryClient.invalidateQueries({
+        queryKey: ["appliedInternships"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["appliedInternshipStatus"],
+      });
+    },
+  });
+};
 
-  return {
-    internships,
-    loading,
-    error,
-    profile,
-    refetch,
-  };
+export const useApplyToInternship = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      internshipId,
+      data,
+    }: {
+      internshipId: string;
+      data: ApplyInternshipRequest;
+    }) => applyToInternship(internshipId, data),
+
+    onSuccess: () => {
+      // Invalidate and refetch applied internships data
+      queryClient.invalidateQueries({ queryKey: ["appliedInternships"] });
+      queryClient.invalidateQueries({
+        queryKey: ["savedAndAppliedInternships"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["appliedInternshipStatus"],
+      });
+    },
+  });
+};
+
+export const useCreateInternship = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (payload: CreateInternshipPayload) => createInternship(payload),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Internship posted successfully!",
+      });
+      // Invalidate the list so the new internship appears immediately
+      queryClient.invalidateQueries({ queryKey: ["internships"] });
+      // Also invalidate stats if you have a dashboard query
+      queryClient.invalidateQueries({ queryKey: ["unitStats"] });
+    },
+    onError: (error) => {
+      console.error("Create internship failed", error);
+      // Toast is handled in service or here, but service returns rejected promise so this fires
+    },
+  });
+};
+
+export const useUpdateInternship = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (payload: UpdateInternshipPayload) => updateInternship(payload),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Internship updated successfully!",
+      });
+
+      // Invalidate list to show updated data
+      queryClient.invalidateQueries({ queryKey: ["internships"] });
+      // If you have a detail view query, invalidate that too:
+      // queryClient.invalidateQueries({ queryKey: ["internship", id] });
+    },
+    onError: (error) => {
+      console.error("Update internship failed", error);
+      // Toast handled by error callback in component or global handler
+    },
+  });
 };

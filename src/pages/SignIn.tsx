@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/components/ui/use-toast";
 import signupIllustrate from "@/assets/signinillustion.png";
 import signinLogo from "@/assets/signinLogo.svg";
@@ -9,11 +9,10 @@ import { Arrow } from "@/components/ui/custom-icons";
 import unitIllustration from "@/assets/unit_illstration.png";
 
 const SignIn = () => {
-  const { role } = useParams<{ role: string }>();
+  const { role } = useParams<{ role: string }>(); // This is the role from URL, e.g., /auth/unit/signin
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signIn, signInWithOAuth } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
@@ -28,30 +27,30 @@ const SignIn = () => {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await signIn(email, password, keepLoggedIn, role);
+    const { data, error } = await authClient.signIn.email({
+      email: email,
+      password: password,
+      rememberMe: keepLoggedIn,
+    });
 
     if (error) {
       let errorMessage =
         error.message || "Something went wrong. Please try again.";
+      let errorTitle = "Sign in failed";
 
-      if (
-        errorMessage.includes("Edge Function returned a non-2xx status code") ||
-        errorMessage.toLowerCase().includes("invalid") ||
-        errorMessage.toLowerCase().includes("incorrect") ||
-        errorMessage.toLowerCase().includes("credentials")
-      ) {
+      if (error.status === 401) {
         errorMessage =
-          "Incorrect email or password. Please check your credentials and try again.";
-      } else if (
-        errorMessage.includes("Email not confirmed") ||
-        errorMessage.includes("email_not_confirmed")
-      ) {
+          "Incorrect email or password. Please check your credentials.";
+      } else if (error.status === 403) {
         errorMessage =
           "Please check your email and verify your account before signing in.";
+        errorTitle = "Verification Required";
+      } else if (error.status === 429) {
+        errorMessage = "Too many login attempts. Please try again later.";
       }
 
       toast({
-        title: "Sign in failed",
+        title: errorTitle,
         description: errorMessage,
         variant: "destructive",
       });
@@ -60,7 +59,14 @@ const SignIn = () => {
         title: "Welcome back!",
         description: "You have successfully signed in.",
       });
-      navigate("/dashboard");
+
+      const userRole = data?.user?.role;
+
+      if (userRole === "unit") {
+        navigate("/unit-dashboard");
+      } else {
+        navigate("/dashboard");
+      }
     }
 
     setLoading(false);
@@ -70,28 +76,20 @@ const SignIn = () => {
     setLoading(true);
     if (role) localStorage.setItem("pendingRole", role);
 
-    const { error } = await signInWithOAuth(provider);
+    const { data, error } = await authClient.signIn.social({
+      provider: provider,
+      callbackURL: "/dashboard",
+    });
 
     if (error) {
       localStorage.removeItem("pendingRole");
-
-      let errorMessage =
-        error.message || "Authentication failed. Please try again.";
-
-      if (
-        errorMessage.includes("Edge Function returned a non-2xx status code")
-      ) {
-        errorMessage =
-          "Authentication failed. Please try again or use a different sign-in method.";
-      }
-
       toast({
         title: "Sign in failed",
-        description: errorMessage,
+        description:
+          error.message || "Authentication failed. Please try again.",
         variant: "destructive",
       });
     }
-
     setLoading(false);
   };
 
@@ -106,15 +104,12 @@ const SignIn = () => {
             className="w-full h-full object-cover"
           />
 
-          {/* Center content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-8">
-            {/* Logo */}
             <img src={signinLogo} alt="Sign in Logo" className="w-32 h-auto" />
 
             {role === "unit" && (
               <div className="relative flex items-center justify-center p-6">
                 <Arrow className="absolute w-[650px] h-[650px] text-white opacity-95 bottom-10" />
-
                 <img
                   src={unitIllustration}
                   alt="Unit Illustration"
@@ -123,13 +118,11 @@ const SignIn = () => {
               </div>
             )}
 
-            {/* Text */}
             <p className="text-white text-base font-medium max-w-xl leading-relaxed">
               {illustrationText}
             </p>
           </div>
 
-          {/* Footer */}
           <div className="absolute bottom-4 left-0 right-0 flex justify-between px-6 text-white/80 text-xs">
             <a
               href="https://www.yuvanext.com/privacy-policy"
@@ -147,7 +140,6 @@ const SignIn = () => {
       <div className="flex-1 flex items-center justify-center bg-white px-4 sm:px-6">
         <div className="w-full max-w-[474px]">
           <div className="bg-white rounded-[15px] px-6 sm:px-12 md:px-[40px] py-8 sm:py-12 w-full">
-            {/* Header */}
             <div className="text-center mb-8">
               <h1
                 className="text-[24px] font-bold leading-[35px] mb-2"
@@ -171,9 +163,7 @@ const SignIn = () => {
               </p>
             </div>
 
-            {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Email */}
               <div>
                 <label
                   htmlFor="email"
@@ -196,7 +186,6 @@ const SignIn = () => {
                 </div>
               </div>
 
-              {/* Password */}
               <div>
                 <label
                   htmlFor="password"
@@ -227,7 +216,6 @@ const SignIn = () => {
                 </div>
               </div>
 
-              {/* Keep me logged in + Forgot Password */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <input
@@ -255,7 +243,6 @@ const SignIn = () => {
                 </Link>
               </div>
 
-              {/* Button */}
               <button
                 type="submit"
                 disabled={loading}
@@ -266,7 +253,6 @@ const SignIn = () => {
               </button>
             </form>
 
-            {/* Footer */}
             <div className="text-center mt-6">
               <span className="text-[13px]" style={{ color: "#9CA3AF" }}>
                 Don't have an account?{" "}

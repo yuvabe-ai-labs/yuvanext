@@ -1,13 +1,17 @@
-import { Link, Navigate } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { GraduationCap, Building } from "lucide-react";
-import yuvanextIllustration from "@/assets/stepup-illustration.jpg";
+import { Navigate } from "react-router-dom";
+import { env } from "@/env";
 
 const Landing = () => {
-  window.location.href = "https://yuvanext.com";
+  const isProduction = env.VITE_STAGE_TYPE === "production";
 
-  return null;
+  if (isProduction) {
+    // Redirecting to an external URL
+    window.location.href = "https://yuvanext.com";
+    return null;
+  }
+
+  // For development or staging, redirect using React Router
+  return <Navigate to="/auth/candidate/signin" />;
 };
 
 export default Landing;

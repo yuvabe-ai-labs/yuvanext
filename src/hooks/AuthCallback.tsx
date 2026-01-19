@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/components/ui/use-toast";
 
 const AuthCallback = () => {
@@ -28,22 +28,22 @@ const AuthCallback = () => {
           return;
         }
 
-        // Get the session from the URL hash (for email verification)
-        const { data, error } = await supabase.auth.getSession();
+        // Get the session from Better Auth
+        const { data: sessionData, error } = await authClient.getSession();
 
         if (error) {
           console.error("Error getting session:", error);
           toast({
             title: "Authentication Error",
-            description: error.message,
+            description: error.message || "Failed to authenticate",
             variant: "destructive",
           });
-          navigate("/auth/student/signin");
+          navigate("/auth/candidate/signin");
           return;
         }
 
-        if (data.session) {
-          console.log("User authenticated successfully:", data.session.user.id);
+        if (sessionData?.session) {
+          console.log("User authenticated successfully:", sessionData.user?.id);
           toast({
             title: "Email Verified!",
             description:
@@ -60,7 +60,7 @@ const AuthCallback = () => {
             title: "Verification Complete",
             description: "Please sign in to continue.",
           });
-          navigate("/auth/student/signin");
+          navigate("/auth/candidate/signin");
         }
       } catch (error: any) {
         console.error("Callback error:", error);
@@ -69,7 +69,7 @@ const AuthCallback = () => {
           description: "Something went wrong. Please try signing in.",
           variant: "destructive",
         });
-        navigate("/auth/student/signin");
+        navigate("/auth/candidate/signin");
       }
     };
 

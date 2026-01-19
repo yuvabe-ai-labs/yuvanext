@@ -1,16 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useAuth } from "@/hooks/useAuth";
+import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/components/ui/use-toast";
-import { CheckCircle } from "lucide-react";
-import signupIllustration from "@/assets/signup-illustration.png";
+import { CheckCircle, Eye, EyeOff } from "lucide-react";
+import { Arrow } from "@/components/ui/custom-icons";
 import signupIllustrate from "@/assets/signinillustion.png";
 import signinLogo from "@/assets/signinLogo.svg";
-import { Eye, EyeOff } from "lucide-react";
-import { Arrow } from "@/components/ui/custom-icons";
 import unitIllustration from "@/assets/unit_illstration.png";
 
 const SignUp = () => {
@@ -20,7 +15,6 @@ const SignUp = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signUp, signInWithOAuth } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
@@ -72,31 +66,39 @@ const SignUp = () => {
 
     setLoading(true);
 
-    const { error } = await signUp(
-      email,
-      password,
-      fullName,
-      role,
-      isUnitRole ? companyWebsite : undefined
-    );
+    // 2. USE BETTER AUTH SIGN UP
+    const { data, error } = await authClient.signUp.email({
+      email: email,
+      password: password,
+      name: fullName,
+      metadata: {
+        role: role,
+        companyWebsite: isUnitRole ? companyWebsite : undefined,
+      },
+    });
 
     if (error) {
-      // Check if user already exists
-      if (
-        error.message.includes("already registered") ||
-        error.message.includes("User already registered") ||
-        error.message.toLowerCase().includes("already exists")
-      ) {
+      // Check for specific error messages (Better Auth API structure)
+      if (error.status === 409) {
+        // Status 409: Conflict (User already exists)
         toast({
           title: "Account already exists",
           description:
             "This email is already registered. Please sign in instead.",
           variant: "destructive",
         });
+      } else if (error.status === 429) {
+        // Status 429: Rate Limit
+        toast({
+          title: "Too many attempts",
+          description: "Please wait a moment before trying again.",
+          variant: "destructive",
+        });
       } else {
+        // Fallback for 500 or 400
         toast({
           title: "Sign up failed",
-          description: error.message,
+          description: error.message || "An unknown error occurred.",
           variant: "destructive",
         });
       }
@@ -106,6 +108,7 @@ const SignUp = () => {
         description:
           "Please check your email to verify your account then sign in to continue.",
       });
+
       // Redirect to sign-in page after successful signup
       setTimeout(() => {
         navigate(`/auth/${role || "student"}/signin`);
@@ -115,21 +118,16 @@ const SignUp = () => {
     setLoading(false);
   };
 
+  // 3. UPDATED OAUTH HANDLER (Though currently unused in your JSX)
   const handleOAuthSignUp = async (provider: "google" | "apple") => {
-    // Store the role for profile creation after OAuth
     if (role) {
       localStorage.setItem("pendingRole", role);
     }
 
-    const { error } = await signInWithOAuth(provider);
-    if (error) {
-      localStorage.removeItem("pendingRole");
-      toast({
-        title: "Sign up failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+    await authClient.signIn.social({
+      provider: provider,
+      callbackURL: `/auth/${role || "student"}/signin`, // Optional: where to go after auth
+    });
   };
 
   return (
@@ -145,13 +143,11 @@ const SignUp = () => {
 
           {/* Center content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-8">
-            {/* Logo */}
             <img src={signinLogo} alt="Sign in Logo" className="w-32 h-auto" />
 
             {isUnitRole && (
               <div className="relative flex items-center justify-center p-6">
                 <Arrow className="absolute w-[650px] h-[650px] text-white opacity-95 bottom-10" />
-
                 <img
                   src={unitIllustration}
                   alt="Unit Illustration"
@@ -160,13 +156,11 @@ const SignUp = () => {
               </div>
             )}
 
-            {/* Text */}
             <p className="text-white text-base font-medium max-w-xl leading-relaxed">
               {illustrationText}
             </p>
           </div>
 
-          {/* Footer */}
           <div className="absolute bottom-4 left-0 right-0 flex justify-between px-6 text-white/80 text-xs">
             <a
               href="https://www.yuvanext.com/privacy-policy"
@@ -183,16 +177,13 @@ const SignUp = () => {
       {/* Right Side - Form */}
       <div className="flex-1 flex items-center justify-center bg-white px-4 sm:px-6">
         <div className="w-full max-w-[474px]">
-          {/* Card Container */}
           <div className="bg-white rounded-[15px] px-6 sm:px-12 md:px-[40px] py-8 sm:py-12 w-full">
-            {/* Header */}
             <div className="text-center mb-8">
               <h1
                 className="text-[24px] font-bold leading-[35px] mb-2"
                 style={{
                   color: "#1F2A37",
-                  fontFamily:
-                    "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                  fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                 }}
               >
                 Create your account
@@ -201,25 +192,22 @@ const SignUp = () => {
                 className="text-[14px] leading-[15px]"
                 style={{
                   color: "#9CA3AF",
-                  fontFamily:
-                    "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                  fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                 }}
               >
                 Please enter your details below
               </p>
             </div>
 
-            {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Full Name / Company Name */}
+              {/* Full Name */}
               <div>
                 <label
                   htmlFor="fullName"
                   className="block text-[14px] leading-[11px] mb-2"
                   style={{
                     color: "#4B5563",
-                    fontFamily:
-                      "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                    fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                   }}
                 >
                   {isUnitRole ? "Company Name *" : "Full Name *"}
@@ -235,15 +223,14 @@ const SignUp = () => {
                     onChange={(e) => setFullName(e.target.value)}
                     className="w-full text-[13px] leading-[11px] outline-none bg-transparent placeholder-[#9CA3AF]"
                     style={{
-                      fontFamily:
-                        "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                      fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                     }}
                     required
                   />
                 </div>
               </div>
 
-              {/* Company Website (only for unit role) */}
+              {/* Company Website */}
               {isUnitRole && (
                 <div>
                   <label
@@ -251,8 +238,7 @@ const SignUp = () => {
                     className="block text-[14px] leading-[11px] mb-2"
                     style={{
                       color: "#4B5563",
-                      fontFamily:
-                        "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                      fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                     }}
                   >
                     Company Website
@@ -266,23 +252,21 @@ const SignUp = () => {
                       onChange={(e) => setCompanyWebsite(e.target.value)}
                       className="w-full text-[13px] leading-[11px] outline-none bg-transparent placeholder-[#9CA3AF]"
                       style={{
-                        fontFamily:
-                          "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                        fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                       }}
                     />
                   </div>
                 </div>
               )}
 
-              {/* Email Address */}
+              {/* Email */}
               <div>
                 <label
                   htmlFor="email"
                   className="block text-[14px] leading-[11px] mb-2"
                   style={{
                     color: "#4B5563",
-                    fontFamily:
-                      "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                    fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                   }}
                 >
                   Email Address *
@@ -295,10 +279,7 @@ const SignUp = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full text-[13px] leading-[11px] outline-none bg-transparent placeholder-[#9CA3AF]"
-                    style={{
-                      fontFamily:
-                        "'Lato', system-ui, -apple-system, sans-serif",
-                    }}
+                    style={{ fontFamily: "'Lato', sans-serif" }}
                     required
                   />
                 </div>
@@ -331,7 +312,6 @@ const SignUp = () => {
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
-
                 {/* Password strength checklist (2 columns) */}
                 {password && (
                   <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
@@ -357,29 +337,25 @@ const SignUp = () => {
                 )}
               </div>
 
-              {/* Sign Up Button */}
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full h-[35px] rounded-lg flex items-center justify-center text-[14px] font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
                 style={{
                   backgroundColor: "#76A9FA",
-                  fontFamily:
-                    "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                  fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                 }}
               >
                 {loading ? "Creating account..." : "Sign up"}
               </button>
             </form>
 
-            {/* Sign In Link */}
             <div className="text-center mt-6">
               <span
                 className="text-[13px] leading-4"
                 style={{
                   color: "#9CA3AF",
-                  fontFamily:
-                    "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                  fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                 }}
               >
                 Already have an account?{" "}
@@ -388,8 +364,7 @@ const SignUp = () => {
                   className="text-[14px] leading-4 font-medium hover:underline"
                   style={{
                     color: "#3F83F8",
-                    fontFamily:
-                      "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                    fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                   }}
                 >
                   Sign In

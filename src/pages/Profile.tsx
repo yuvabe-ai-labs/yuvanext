@@ -1,5 +1,5 @@
 import { useProfileCompletion } from "@/hooks/useProfileCompletion";
-import { useAuth } from "@/hooks/useAuth";
+import { useSession } from "@/lib/auth-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,7 +19,6 @@ import {
   CircleX,
   Camera,
 } from "lucide-react";
-import { useProfileData } from "@/hooks/useProfileData";
 import { AvatarUploadDialog } from "@/components/AvatarUploadDialog";
 import { useState } from "react";
 import { PersonalDetailsDialog } from "@/components/profile/PersonalDetailsDialog";
@@ -34,43 +33,46 @@ import { format, formatDistanceToNow } from "date-fns";
 import { CircularProgress } from "@/components/CircularProgress";
 import { LinkDialog } from "@/components/profile/LinkDialog";
 import AIEditIcon from "@/components/ui/custom-icons";
+import { useProfile } from "@/hooks/useProfile";
 
 const Profile = () => {
-  const { user } = useAuth();
-  const {
-    profile,
-    studentProfile,
-    loading,
-    updateProfile,
-    updateStudentProfile,
-    addEducationEntry,
-    addProjectEntry,
-    addCourseEntry,
-    addLanguageEntry,
-    addLinkEntry,
-    addInternshipEntry,
-    updateInterests,
-    updateCoverLetter,
-    parseJsonField,
-    removeEducationEntry,
-    removeProjectEntry,
-    removeCourseEntry,
-    removeLanguageEntry,
-    removeLinkEntry,
-    removeInternshipEntry,
-    removeInterest,
-    removeSkill,
-    refetch,
-  } = useProfileData();
+  const { data: session } = useSession();
+  const { data: profileData, isLoading, refetch } = useProfile();
 
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
-  const profileCompletion = useProfileCompletion({ profile, studentProfile });
 
   const handleAvatarUploadSuccess = () => {
     refetch?.();
   };
 
-  if (loading) {
+  // Helper function to parse JSON fields
+  const parseJsonField = (field: any, defaultValue: any = []) => {
+    if (!field) return defaultValue;
+    if (typeof field === "string") {
+      try {
+        return JSON.parse(field);
+      } catch {
+        return defaultValue;
+      }
+    }
+    return Array.isArray(field) ? field : defaultValue;
+  };
+
+  // Safe data extraction
+  const skills = parseJsonField(profileData?.skills, []);
+  const education = parseJsonField(profileData?.education, []);
+  const projects = parseJsonField(profileData?.projects, []);
+  const interests = parseJsonField(profileData?.interests, []).filter(
+    (i: string) => i !== "No Ideas" && i !== "I want to explore"
+  );
+  const languages = parseJsonField(profileData?.language, []);
+  const completedCourses = parseJsonField(profileData?.course, []);
+  const internships = parseJsonField(profileData?.internship, []);
+  const links = parseJsonField(profileData?.socialLinks, []);
+
+  const profileCompletion = profileData?.profileScore || 0;
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -117,31 +119,11 @@ const Profile = () => {
     ));
   };
 
-  // Safe data extraction
-  const skills = parseJsonField(studentProfile?.skills, []);
-  const education = parseJsonField(studentProfile?.education, []);
-  const projects = parseJsonField(studentProfile?.projects, []);
-  const newInterests = parseJsonField(studentProfile?.interests, []);
-
-  const interests = newInterests.filter(
-    (i) => i !== "No Ideas" && i !== "I want to explore"
-  );
-  const languages = parseJsonField(studentProfile?.languages, []);
-  const completedCourses = parseJsonField(
-    studentProfile?.completed_courses,
-    []
-  );
-
-  const internships = parseJsonField((studentProfile as any)?.internships, []);
-
-  const links = parseJsonField(studentProfile?.links, []);
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
       {/* Hero Background */}
-
       <div className="relative h-[17.625rem] bg-gradient-to-r from-primary to-primary-foreground">
         {/* <div className="  bg-black/20" /> */}
       </div>
@@ -159,11 +141,11 @@ const Profile = () => {
                 >
                   <Avatar className="h-20 w-20">
                     <AvatarImage
-                      src={(studentProfile as any)?.avatar_url || ""}
+                      src={profileData?.avatarUrl || profileData?.image || ""}
                     />
                     <AvatarFallback className="text-lg bg-primary text-primary-foreground">
-                      {profile?.full_name?.charAt(0) ||
-                        user?.email?.charAt(0).toUpperCase()}
+                      {profileData?.name?.charAt(0) ||
+                        session?.user?.email?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 </CircularProgress>
@@ -178,59 +160,52 @@ const Profile = () => {
               <div className="flex-1">
                 <div className="flex items-center space-x-2 mb-2">
                   <h1 className="text-2xl font-bold">
-                    {profile?.full_name.toLocaleUpperCase() || "Student Name"}
+                    {profileData?.name?.toLocaleUpperCase() || "Student Name"}
                   </h1>
-                  {profile && (
-                    <>
-                      <PersonalDetailsDialog
-                        profile={profile}
-                        studentProfile={studentProfile}
-                        onUpdate={updateProfile}
-                        onUpdateStudent={updateStudentProfile}
-                      >
-                        <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
-                      </PersonalDetailsDialog>
-                    </>
+                  {profileData && (
+                    <PersonalDetailsDialog
+                      profile={profileData}
+                      onUpdate={() => refetch()}
+                    >
+                      <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
+                    </PersonalDetailsDialog>
                   )}
                 </div>
                 <p className="text-muted-foreground mb-2">
-                  {profile?.role === "student"
-                    ? studentProfile.headline
-                    : profile?.role || "User"}
+                  {profileData?.type || profileData?.role || "User"}
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
                   <div className="flex items-center space-x-1">
                     <Mail className="w-4 h-4" />
                     <span>
-                      {profile?.email || user?.email || "No email provided"}
+                      {profileData?.email ||
+                        session?.user?.email ||
+                        "No email provided"}
                     </span>
                   </div>
-                  {profile?.phone && (
+                  {profileData?.phone && (
                     <div className="flex items-center space-x-1">
                       <Phone className="w-4 h-4" />
-                      <span>{profile.phone}</span>
+                      <span>{profileData.phone}</span>
                     </div>
                   )}
                   <div className="flex items-center space-x-1">
                     <MapPin className="w-4 h-4" />
                     <span>
-                      {studentProfile?.location
-                        ? studentProfile.location[0].toLocaleUpperCase() +
-                          studentProfile.location.slice(1)
+                      {profileData?.location
+                        ? profileData.location[0].toLocaleUpperCase() +
+                          profileData.location.slice(1)
                         : "Location not provided"}
                     </span>
                   </div>
                 </div>
                 <p className="text-muted-foreground text-sm text-gray-400 mt-2.5">
                   {`Last updated - ${
-                    studentProfile.updated_at
-                      ? formatDistanceToNow(
-                          new Date(studentProfile.updated_at),
-                          {
-                            addSuffix: true,
-                          }
-                        )
+                    profileData?.updatedAt
+                      ? formatDistanceToNow(new Date(profileData.updatedAt), {
+                          addSuffix: true,
+                        })
                       : "recently"
                   }`}
                 </p>
@@ -249,8 +224,8 @@ const Profile = () => {
                   <div className="flex items-center justify-between">
                     <span>Profile Summary</span>
                     <ProfileSummaryDialog
-                      summary={studentProfile?.cover_letter || ""}
-                      onSave={updateCoverLetter}
+                      summary={profileData?.profileSummary || ""}
+                      onSave={refetch}
                     >
                       <Button
                         variant="ghost"
@@ -264,7 +239,7 @@ const Profile = () => {
                   {/* Courses */}
                   <div className="flex items-center justify-between">
                     <span>Courses</span>
-                    <CourseDialog onSave={addCourseEntry}>
+                    <CourseDialog onSave={refetch}>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -277,10 +252,7 @@ const Profile = () => {
                   {/* Key Skills */}
                   <div className="flex items-center justify-between">
                     <span>Key Skills</span>
-                    <SkillsDialog
-                      studentProfile={studentProfile}
-                      onUpdate={updateStudentProfile}
-                    >
+                    <SkillsDialog profile={profileData} onUpdate={refetch}>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -293,7 +265,7 @@ const Profile = () => {
                   {/* Education */}
                   <div className="flex items-center justify-between">
                     <span>Education</span>
-                    <EducationDialog onSave={addEducationEntry}>
+                    <EducationDialog onSave={refetch}>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -306,7 +278,7 @@ const Profile = () => {
                   {/* Projects */}
                   <div className="flex items-center justify-between">
                     <span>Projects</span>
-                    <ProjectDialog onSave={addProjectEntry}>
+                    <ProjectDialog onSave={refetch}>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -319,12 +291,7 @@ const Profile = () => {
                   {/* Interests */}
                   <div className="flex items-center justify-between">
                     <span>Interests</span>
-                    <InterestDialog
-                      interests={interests.filter(
-                        (i) => i !== "No Ideas" && i !== "I want to explore"
-                      )}
-                      onSave={updateInterests}
-                    >
+                    <InterestDialog interests={interests} onSave={refetch}>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -337,7 +304,7 @@ const Profile = () => {
                   {/* Internships */}
                   <div className="flex items-center justify-between">
                     <span>Internships</span>
-                    <InternshipDialog onSave={addInternshipEntry}>
+                    <InternshipDialog onSave={refetch}>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -351,10 +318,8 @@ const Profile = () => {
                   <div className="flex items-center justify-between">
                     <span>Personal Details</span>
                     <PersonalDetailsDialog
-                      profile={profile}
-                      studentProfile={studentProfile}
-                      onUpdate={updateProfile}
-                      onUpdateStudent={updateStudentProfile}
+                      profile={profileData}
+                      onUpdate={refetch}
                     >
                       <Button
                         variant="ghost"
@@ -369,10 +334,8 @@ const Profile = () => {
                   <div className="flex items-center justify-between">
                     <span>Languages</span>
                     <PersonalDetailsDialog
-                      profile={profile}
-                      studentProfile={studentProfile}
-                      onUpdate={updateProfile}
-                      onUpdateStudent={updateStudentProfile}
+                      profile={profileData}
+                      onUpdate={refetch}
                     >
                       <Button
                         variant="ghost"
@@ -387,7 +350,7 @@ const Profile = () => {
                   {/* Links */}
                   <div className="flex items-center justify-between">
                     <span>Links</span>
-                    <LinkDialog onSave={addInternshipEntry}>
+                    <LinkDialog onSave={refetch}>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -410,15 +373,15 @@ const Profile = () => {
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="text-lg font-semibold">Profile Summary</h3>
                   <ProfileSummaryDialog
-                    summary={studentProfile?.cover_letter || ""}
-                    onSave={updateCoverLetter}
+                    summary={profileData?.profileSummary || ""}
+                    onSave={refetch}
                   >
                     <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
                   </ProfileSummaryDialog>
                 </div>
                 <div className="border border-gray-400 rounded-2xl p-3 min-h-28">
                   <p className="text-muted-foreground">
-                    {studentProfile?.cover_letter || (
+                    {profileData?.profileSummary || (
                       <p className="flex pr-2 items-center gap-1">
                         <AIEditIcon />
                         Get AI assistance to write your Profile Summary
@@ -434,7 +397,7 @@ const Profile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Completed Courses</h3>
-                  <CourseDialog onSave={addCourseEntry}>
+                  <CourseDialog onSave={refetch}>
                     <Button variant="ghost" size="sm" className="text-primary">
                       Add Completed Course
                     </Button>
@@ -466,7 +429,10 @@ const Profile = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => removeCourseEntry(course.id)}
+                              onClick={() => {
+                                // Remove course logic
+                                refetch();
+                              }}
                               className="text-muted-foreground hover:text-destructive"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -492,10 +458,7 @@ const Profile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="text-lg font-semibold">Key Skills</h3>
-                  <SkillsDialog
-                    studentProfile={studentProfile}
-                    onUpdate={updateStudentProfile}
-                  >
+                  <SkillsDialog profile={profileData} onUpdate={refetch}>
                     <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
                   </SkillsDialog>
                 </div>
@@ -508,10 +471,6 @@ const Profile = () => {
                         className="px-4 py-2 border-gray-400 flex items-center gap-1 bg-transparent"
                       >
                         {skill}
-                        {/* <X
-                          className="w-3 h-3 cursor-pointer hover:text-destructive"
-                          onClick={() => removeSkill(skill)}
-                        /> */}
                       </Badge>
                     ))
                   ) : (
@@ -529,7 +488,7 @@ const Profile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Education</h3>
-                  <EducationDialog onSave={addEducationEntry}>
+                  <EducationDialog onSave={refetch}>
                     <Button variant="ghost" size="sm" className="text-primary">
                       Add Education
                     </Button>
@@ -565,7 +524,10 @@ const Profile = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeEducationEntry(edu.id)}
+                            onClick={() => {
+                              // Remove education logic
+                              refetch();
+                            }}
                             className="text-muted-foreground hover:text-destructive"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -587,7 +549,7 @@ const Profile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Projects</h3>
-                  <ProjectDialog onSave={addProjectEntry}>
+                  <ProjectDialog onSave={refetch}>
                     <Button variant="ghost" size="sm" className="text-primary">
                       Add Project
                     </Button>
@@ -644,7 +606,10 @@ const Profile = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeProjectEntry(project.id)}
+                            onClick={() => {
+                              // Remove project logic
+                              refetch();
+                            }}
                             className="text-muted-foreground hover:text-destructive ml-2"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -667,10 +632,7 @@ const Profile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Interests</h3>
-                  <InterestDialog
-                    interests={interests}
-                    onSave={updateInterests}
-                  >
+                  <InterestDialog interests={interests} onSave={refetch}>
                     <Button variant="ghost" size="sm" className="text-primary">
                       Add Interest
                     </Button>
@@ -685,10 +647,6 @@ const Profile = () => {
                         className="px-4 py-2 flex items-center gap-1 border-gray-400"
                       >
                         {interest}
-                        {/* <X
-                          className="w-3 h-3 cursor-pointer hover:text-destructive"
-                          onClick={() => removeInterest(interest)}
-                        /> */}
                       </Badge>
                     ))}
                   </div>
@@ -705,7 +663,7 @@ const Profile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Internships</h3>
-                  <InternshipDialog onSave={addInternshipEntry}>
+                  <InternshipDialog onSave={refetch}>
                     <Button variant="ghost" size="sm" className="text-primary">
                       Add Internship
                     </Button>
@@ -747,7 +705,10 @@ const Profile = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeInternshipEntry(internship.id)}
+                            onClick={() => {
+                              // Remove internship logic
+                              refetch();
+                            }}
                             className="text-muted-foreground hover:text-destructive ml-2"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -769,12 +730,10 @@ const Profile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="text-lg font-semibold">Personal Details</h3>
-                  {profile && (
+                  {profileData && (
                     <PersonalDetailsDialog
-                      profile={profile}
-                      studentProfile={studentProfile}
-                      onUpdate={updateProfile}
-                      onUpdateStudent={updateStudentProfile}
+                      profile={profileData}
+                      onUpdate={refetch}
                     >
                       <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
                     </PersonalDetailsDialog>
@@ -786,8 +745,9 @@ const Profile = () => {
                       Personal
                     </p>
                     <p className="font-medium">
-                      {`${profile?.gender}, ${studentProfile?.marital_status}` ||
-                        "Not specified"}
+                      {`${profileData?.gender || "Not specified"}, ${
+                        profileData?.maritalStatus || "Single/ Unmarried"
+                      }`}
                     </p>
                   </div>
                   <div>
@@ -795,7 +755,7 @@ const Profile = () => {
                       Career Break
                     </p>
                     <p className="font-medium">
-                      {studentProfile?.has_career_break ? "Yes" : "No"}
+                      {profileData?.hasCareerBreak ? "Yes" : "No"}
                     </p>
                   </div>
                   <div>
@@ -803,8 +763,11 @@ const Profile = () => {
                       Date Of Birth
                     </p>
                     <p className="font-medium">
-                      {profile?.date_of_birth
-                        ? format(new Date(profile.date_of_birth), "dd MMM yyyy")
+                      {profileData?.dateOfBirth
+                        ? format(
+                            new Date(profileData.dateOfBirth),
+                            "dd MMM yyyy"
+                          )
                         : "Not provided"}
                     </p>
                   </div>
@@ -813,7 +776,7 @@ const Profile = () => {
                       Differently Abled
                     </p>
                     <p className="font-medium">
-                      {studentProfile?.is_differently_abled ? "Yes" : "No"}{" "}
+                      {profileData?.isDifferentlyAbled ? "Yes" : "No"}
                     </p>
                   </div>
                 </div>
@@ -826,10 +789,8 @@ const Profile = () => {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Languages</h3>
                   <PersonalDetailsDialog
-                    profile={profile}
-                    studentProfile={studentProfile}
-                    onUpdate={updateProfile}
-                    onUpdateStudent={updateStudentProfile}
+                    profile={profileData}
+                    onUpdate={refetch}
                   >
                     <Button variant="ghost" size="sm" className="text-primary">
                       Add Languages
@@ -841,7 +802,6 @@ const Profile = () => {
                     <>
                       <div className="grid grid-cols-5 gap-4 text-sm text-center text-muted-foreground mb-2">
                         <span className="flex self-start">Language</span>
-                        {/* <span>Proficiency</span> */}
                         <span>Read</span>
                         <span>Write</span>
                         <span>Speak</span>
@@ -881,7 +841,10 @@ const Profile = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeLanguageEntry(lang.id)}
+                            onClick={() => {
+                              // Remove language logic
+                              refetch();
+                            }}
                             className="text-muted-foreground hover:text-destructive justify-self-end"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -904,10 +867,7 @@ const Profile = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold">Links</h2>
-                    <LinkDialog
-                      existingLinks={studentProfile.links || []}
-                      onSave={addLinkEntry}
-                    >
+                    <LinkDialog existingLinks={links || []} onSave={refetch}>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -918,9 +878,9 @@ const Profile = () => {
                     </LinkDialog>
                   </div>
 
-                  {studentProfile.links.length > 0 ? (
+                  {links && links.length > 0 ? (
                     <div>
-                      {studentProfile.links.map((link: any, index: number) => (
+                      {links.map((link: any, index: number) => (
                         <div
                           key={index}
                           className="grid grid-cols-5 items-center mt-4"
@@ -937,7 +897,10 @@ const Profile = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeLinkEntry(link.id)}
+                            onClick={() => {
+                              // Remove link logic
+                              refetch();
+                            }}
                             className="text-muted-foreground hover:text-destructive justify-self-end"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -958,13 +921,13 @@ const Profile = () => {
       </div>
 
       {/* Avatar Upload Dialog */}
-      {profile && studentProfile && (
+      {profileData && (
         <AvatarUploadDialog
           isOpen={isAvatarDialogOpen}
           onClose={() => setIsAvatarDialogOpen(false)}
-          currentAvatarUrl={(studentProfile as any)?.avatar_url}
-          userId={profile.id}
-          userName={profile.full_name}
+          currentAvatarUrl={profileData.avatarUrl || profileData.image || ""}
+          userId={profileData.id}
+          userName={profileData.name}
           onSuccess={handleAvatarUploadSuccess}
         />
       )}

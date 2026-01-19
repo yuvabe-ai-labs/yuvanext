@@ -16,20 +16,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CalendarIcon, Search, Clock, ChevronLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { useInfiniteCourses } from "@/hooks/useInfiniteCourses";
-import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { useCourses } from "@/hooks/useCourses";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  differenceInDays,
-  differenceInHours,
-  differenceInMinutes,
-  formatDistanceToNow,
-} from "date-fns";
+import { useSession } from "@/lib/auth-client";
+import { formatDistanceToNow } from "date-fns";
 
 const Courses = () => {
   const navigate = useNavigate();
-  const { courses: allCourses, loading: coursesLoading } = useCourses();
+  const { data: session } = useSession();
+  const { data: coursesData, isLoading: coursesLoading } = useCourses();
+
+  const allCourses = coursesData || [];
+
   const [providers, setProviders] = useState<
     Array<{ id: string; name: string }>
   >([]);
@@ -48,33 +45,28 @@ const Courses = () => {
   const [showAllTitles, setShowAllTitles] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-  // Fetch course providers
+  // Extract unique providers from courses
   useEffect(() => {
-    const fetchProviders = async () => {
-      const uniqueCreatorIds = [
-        ...new Set(allCourses.map((c) => c.created_by)),
-      ];
-
-      const { data } = await supabase
-        .from("units")
-        .select("id, unit_name")
-        .in("id", uniqueCreatorIds);
-
-      if (data) {
-        setProviders(data.map((p) => ({ id: p.id, name: p.unit_name })));
-      }
-    };
-
     if (allCourses.length > 0) {
-      fetchProviders();
+      const uniqueProviders = Array.from(
+        new Map(
+          allCourses
+            .filter((c) => c.creatorName)
+            .map((c) => [
+              c.createdBy,
+              { id: c.createdBy, name: c.creatorName! },
+            ])
+        ).values()
+      );
+      setProviders(uniqueProviders);
     }
   }, [allCourses]);
 
   useEffect(() => {
     if (showMobileFilters) {
-      document.body.style.overflow = "hidden"; // ✅ stop background scroll
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = "auto"; // ✅ restore scrolling
+      document.body.style.overflow = "auto";
     }
 
     return () => {
@@ -99,7 +91,7 @@ const Courses = () => {
     s = s
       .replace(" ", "T")
       .replace(/\.(\d{3})\d+/, ".$1")
-      .replace(/\+00:00?$|Z$/i, "Z");
+      .replace(/\+00:00?|Z$/i, "Z");
     if (!/[zZ]|[+\-]\d{2}:?\d{2}$/.test(s)) s = s + "Z";
     return new Date(s);
   };
@@ -152,7 +144,7 @@ const Courses = () => {
     // Filter by provider
     if (filters.providers.length) {
       const providerName = providers.find(
-        (p) => p.id === course.created_by
+        (p) => p.id === course.createdBy
       )?.name;
       if (!providerName || !filters.providers.includes(providerName))
         return false;
@@ -165,13 +157,13 @@ const Courses = () => {
     // Filter by difficulty
     if (
       filters.difficulty.length &&
-      !filters.difficulty.includes(course.difficulty_level || "")
+      !filters.difficulty.includes(course.difficultyLevel || "")
     )
       return false;
 
     // Filter by posting date
     if (filters.postingDate.from || filters.postingDate.to) {
-      const courseDate = parsePgTimestamp(course.created_at).getTime();
+      const courseDate = parsePgTimestamp(course.createdAt).getTime();
       const from = filters.postingDate.from
         ? new Date(filters.postingDate.from).getTime()
         : -Infinity;
@@ -204,7 +196,7 @@ const Courses = () => {
       <div className="container px-4 sm:px-6 lg:px-[7.5rem] py-4 lg:py-10">
         <div className="flex flex-col lg:flex-row gap-5">
           {/* Left Sidebar - Filters */}
-          <div className=" hidden w-full lg:w-80 bg-card pt-5 border border-gray-200 rounded-3xl lg:flex flex-col lg:h-[90vh] lg:sticky lg:top-6 mb-4 lg:mb-0">
+          <div className="hidden w-full lg:w-80 bg-card pt-5 border border-gray-200 rounded-3xl lg:flex flex-col lg:h-[90vh] lg:sticky lg:top-6 mb-4 lg:mb-0">
             <div className="flex items-center justify-between mb-4 px-6 py-3 border-b bg-card sticky top-0 z-10">
               <h2 className="text-lg font-bold">Filters</h2>
               <Button
@@ -247,9 +239,11 @@ const Courses = () => {
                   {["Beginner", "Intermediate", "Advanced"].map((level) => (
                     <div key={level} className="flex items-center space-x-2">
                       <Checkbox
-                        checked={filters.difficulty.includes(level)}
+                        checked={filters.difficulty.includes(
+                          level.toLowerCase()
+                        )}
                         onCheckedChange={() =>
-                          toggleFilter("difficulty", level)
+                          toggleFilter("difficulty", level.toLowerCase())
                         }
                       />
                       <span className="text-sm">{level}</span>
@@ -266,6 +260,7 @@ const Courses = () => {
               />
             </div>
           </div>
+
           {showMobileFilters && (
             <>
               {/* Overlay */}
@@ -275,10 +270,7 @@ const Courses = () => {
               />
 
               {/* Slide-in Panel */}
-              <div
-                className="md:hidden fixed top-0 left-0 h-full w-[75%] bg-white z-50
-        p-4 overflow-y-auto shadow-xl space-y-8"
-              >
+              <div className="md:hidden fixed top-0 left-0 h-full w-[75%] bg-white z-50 p-4 overflow-y-auto shadow-xl space-y-8">
                 {/* Header */}
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-bold">Filters</h2>
@@ -314,7 +306,7 @@ const Courses = () => {
                   setShowAll={setShowAllTitles}
                 />
 
-                {/* ✅ Course Level - moved into drawer */}
+                {/* Course Level */}
                 <div className="mt-6">
                   <Label className="text-sm font-medium text-gray-500 mb-3 block">
                     Course Level
@@ -323,9 +315,11 @@ const Courses = () => {
                     {["Beginner", "Intermediate", "Advanced"].map((level) => (
                       <div key={level} className="flex items-center space-x-2">
                         <Checkbox
-                          checked={filters.difficulty.includes(level)}
+                          checked={filters.difficulty.includes(
+                            level.toLowerCase()
+                          )}
                           onCheckedChange={() =>
-                            toggleFilter("difficulty", level)
+                            toggleFilter("difficulty", level.toLowerCase())
                           }
                         />
                         <span className="text-sm">{level}</span>
@@ -334,7 +328,7 @@ const Courses = () => {
                   </div>
                 </div>
 
-                {/* ✅ Posting Date Filter - moved into drawer */}
+                {/* Posting Date Filter */}
                 <PostingDateFilter
                   filters={filters}
                   activeDateRange={activeDateRange}
@@ -378,12 +372,6 @@ const Courses = () => {
                 {filteredCourses.length !== 1 ? "s" : ""}
               </h1>
             </div>
-            {/* <div className="mb-4 sm:mb-6">
-              <h1 className="text-xl sm:text-2xl text-gray-600 font-medium">
-                Explore {filteredCourses.length} Course
-                {filteredCourses.length !== 1 ? "s" : ""}
-              </h1>
-            </div> */}
 
             {/* Courses Grid */}
             <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -408,9 +396,9 @@ const Courses = () => {
                     <div
                       className={`h-40 ${gradient} relative flex items-center justify-center`}
                     >
-                      {course.image_url ? (
+                      {course.bannerUrl ? (
                         <img
-                          src={course.image_url}
+                          src={course.bannerUrl}
                           alt={course.title}
                           className="w-full h-full object-cover"
                         />
@@ -423,7 +411,7 @@ const Courses = () => {
                       )}
                       {/* Time ago badge */}
                       <Badge className="absolute top-3 right-3 bg-white/90 text-foreground hover:bg-white">
-                        {formatDistanceToNow(new Date(course.created_at), {
+                        {formatDistanceToNow(new Date(course.createdAt), {
                           addSuffix: true,
                         })}
                       </Badge>
@@ -436,13 +424,14 @@ const Courses = () => {
                           <Clock className="w-4 h-4" />
                           <span>{course.duration || "8 weeks"}</span>
                         </div>
-                        {course.difficulty_level && (
+                        {course.difficultyLevel && (
                           <Badge
                             className={`${getDifficultyColor(
-                              course.difficulty_level
+                              course.difficultyLevel
                             )} text-white`}
                           >
-                            {course.difficulty_level}
+                            {course.difficultyLevel.charAt(0).toUpperCase() +
+                              course.difficultyLevel.slice(1)}
                           </Badge>
                         )}
                       </div>
@@ -460,8 +449,9 @@ const Courses = () => {
 
                       {/* Know More Button */}
                       <a
-                        href={course.website_url}
+                        href={course.redirectUrl || "#"}
                         target="_blank"
+                        rel="noopener noreferrer"
                         className="w-full inline-block text-center rounded-full border py-1 border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-all"
                       >
                         Know more

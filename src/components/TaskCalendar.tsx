@@ -10,14 +10,14 @@ import {
   endOfWeek,
   startOfDay,
 } from "date-fns";
-import type { StudentTask } from "@/types/studentTasks.types";
+import type { Task } from "@/types/candidateTasks.types";
 
 interface TaskCalendarProps {
-  tasks: StudentTask[];
+  tasks: Task[];
   currentDate: Date;
   onDateChange: (date: Date) => void;
   viewMode: "month" | "week";
-  onTaskClick: (task: StudentTask) => void;
+  onTaskClick: (task: Task) => void;
   onAddTaskClick: () => void;
   hideAddButton?: boolean;
 }
@@ -67,10 +67,10 @@ export default function TaskCalendar({
     }
 
     return tasks.filter((task) => {
-      if (!task.start_date || !task.end_date) return false;
+      if (!task.taskStartDate || !task.taskEndDate) return false;
 
-      const taskStart = startOfDay(new Date(task.start_date));
-      const taskEnd = startOfDay(new Date(task.end_date));
+      const taskStart = startOfDay(new Date(task.taskStartDate));
+      const taskEnd = startOfDay(new Date(task.taskEndDate));
       const dayToCheck = startOfDay(day);
 
       return (
@@ -92,15 +92,11 @@ export default function TaskCalendar({
     }
   };
 
-  const renderTaskBar = (
-    task: StudentTask,
-    day: Date,
-    dayTasks: StudentTask[]
-  ) => {
-    if (!task.start_date || !task.end_date) return null;
+  const renderTaskBar = (task: Task, day: Date, dayTasks: Task[]) => {
+    if (!task.taskStartDate || !task.taskEndDate) return null;
 
-    const taskStart = startOfDay(new Date(task.start_date));
-    const taskEnd = startOfDay(new Date(task.end_date));
+    const taskStart = startOfDay(new Date(task.taskStartDate));
+    const taskEnd = startOfDay(new Date(task.taskEndDate));
     const currentDay = startOfDay(day);
 
     const isStartDay = currentDay.getTime() === taskStart.getTime();
@@ -111,34 +107,33 @@ export default function TaskCalendar({
 
     if (!isStartDay && !isMiddleDay && !isEndDay) return null;
 
-    const taskIndex = dayTasks.findIndex((t) => t.id === task.id);
+    const taskIndex = dayTasks.findIndex((t) => t.taskId === task.taskId);
 
-    // Calculate positioning based on time (kept for layout)
+    // Calculate positioning based on time
     let leftOffset = 0;
     let rightOffset = 0;
     let borderRadius = "";
 
     if (isStartDay && isEndDay) {
-      leftOffset = timeToPercentage(task.start_time);
-      rightOffset = 100 - timeToPercentage(task.end_time);
+      leftOffset = timeToPercentage(task.taskStartTime);
+      rightOffset = 100 - timeToPercentage(task.taskEndTime);
       borderRadius = "rounded-full";
     } else if (isStartDay) {
-      leftOffset = timeToPercentage(task.start_time);
+      leftOffset = timeToPercentage(task.taskStartTime);
       rightOffset = 0;
       borderRadius = "rounded-l-full";
     } else if (isEndDay) {
       leftOffset = 0;
-      rightOffset = 100 - timeToPercentage(task.end_time);
+      rightOffset = 100 - timeToPercentage(task.taskEndTime);
       borderRadius = "rounded-r-full";
     } else {
       leftOffset = 0;
       rightOffset = 0;
     }
 
-    // Tooltip only shows task title now
     return (
       <div
-        key={task.id}
+        key={task.taskId}
         className="relative w-full"
         style={{
           marginTop: taskIndex > 0 ? "4px" : "0",
@@ -151,16 +146,16 @@ export default function TaskCalendar({
           }}
           className={`text-xs text-white py-2 cursor-pointer hover:opacity-90 transition-opacity ${borderRadius} min-h-[28px] flex items-center -mx-px absolute`}
           style={{
-            backgroundColor: task.color || "#3B82F6",
+            backgroundColor: task.taskColor || "#3B82F6",
             left: `${leftOffset}%`,
             right: `${rightOffset}%`,
             paddingLeft: isStartDay ? "12px" : "4px",
             paddingRight: isEndDay ? "12px" : "4px",
           }}
-          title={task.title}
+          title={task.taskTitle}
         >
           {isStartDay ? (
-            <span className="truncate font-medium">{task.title}</span>
+            <span className="truncate font-medium">{task.taskTitle}</span>
           ) : (
             <span>&nbsp;</span>
           )}

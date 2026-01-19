@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,205 +8,76 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   MapPin,
   Clock,
-  DollarSign,
   Bookmark,
   Check,
   Share2,
   ChevronLeft,
   IndianRupee,
+  CircleCheckBig,
 } from "lucide-react";
-import Navbar from "@/components/Navbar";
-import { useApplicationStatus } from "@/hooks/useApplicationStatus";
-import { useInternshipRecommendations } from "@/hooks/useRecommendations";
+import {
+  useRemommendedInternships,
+  useSaveInternship,
+  useRemoveSavedInternship,
+  useInternshipShareLink,
+} from "@/hooks/useInternships";
+import { useInternshipStatus } from "@/hooks/useSavedInternships";
 import ProfileSummaryDialog from "@/components/ProfileSummaryDialog";
 import ApplicationSuccessDialog from "@/components/ApplicationSuccessDialog";
 import { ShareDialog } from "@/components/ShareDialog";
-import type { Tables } from "@/integrations/supabase/types";
-import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { PayIcon } from "@/components/ui/custom-icons";
-import { useUnits } from "@/hooks/useUnits";
-
-type Internship = Tables<"internships">;
-
-interface InternshipWithUnit extends Internship {
-  unit_avatar?: string | null;
-  unit_name?: string | null;
-  matchScore?: number;
-  matchPercentage?: number;
-}
-
-// Helper to safely parse JSON
-function safeParse<T>(data: any, fallback: T): T {
-  if (!data) return fallback;
-  try {
-    return typeof data === "string" ? JSON.parse(data) : data;
-  } catch {
-    return fallback;
-  }
-}
-
-// Helper to convert numbered object to array
-function parseNumberedObject(data: any): string[] {
-  if (!data) return [];
-  if (Array.isArray(data)) return data;
-  if (typeof data === "object") {
-    return Object.entries(data)
-      .sort(([a], [b]) => parseInt(a) - parseInt(b))
-      .map(([_, value]) => value as string)
-      .filter(
-        (value) =>
-          typeof value === "string" &&
-          value.length > 0 &&
-          !value.toLowerCase().includes("responsibilities") &&
-          !value.toLowerCase().includes("requirements") &&
-          !value.toLowerCase().includes("candidates")
-      );
-  }
-  return [];
-}
+import { useSession } from "@/lib/auth-client";
+import type { Internship } from "@/types/internships.types";
 
 const RecommendedInternships = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { units } = useUnits();
-  const [allInternships, setAllInternships] = useState<InternshipWithUnit[]>(
-    []
-  );
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const { data: session } = useSession();
+
   const [selectedInternship, setSelectedInternship] = useState<string>("");
   const [showApplicationDialog, setShowApplicationDialog] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
-  const [userSkills, setUserSkills] = useState<string[]>([]);
-  const [savedInternshipsSet, setSavedInternshipsSet] = useState<Set<string>>(
-    new Set()
-  );
-  const [isSaving, setIsSaving] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
 
+  // Fetch data using React Query hooks
   const {
-    hasApplied,
+    data: internshipsData,
+    isLoading: loading,
+    error: fetchError,
+  } = useRemommendedInternships();
+
+  // Get saved and applied status for the selected internship
+  const {
+    isSaved,
+    isApplied,
+    applicationData,
     isLoading: isCheckingStatus,
-    markAsApplied,
-  } = useApplicationStatus(selectedInternship);
+    refetchSaved,
+    refetchApplied,
+  } = useInternshipStatus(selectedInternship || "");
 
-  // Fetch internships with unit data and user skills
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const { mutate: saveInternshipMutation, isPending: isSaving } =
+    useSaveInternship();
+  const { mutate: removeSavedInternshipMutation, isPending: isRemoving } =
+    useRemoveSavedInternship();
+  const { mutate: generateShareLink } = useInternshipShareLink();
 
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+  // Process data
+  const internships: Internship[] = Array.isArray(internshipsData)
+    ? internshipsData
+    : [];
+  const error = fetchError ? "Failed to fetch internships" : null;
 
-        // Fetch internships with unit data
-        const { data: internshipsData, error: internshipsError } =
-          await supabase
-            .from("internships")
-            .select(
-              `
-            *,
-            profiles!internships_created_by_fkey (
-              id,
-              units (
-                avatar_url,
-                unit_name
-              )
-            )
-          `
-            )
-            .eq("status", "active")
-            .order("created_at", { ascending: false });
-
-        if (internshipsError) throw internshipsError;
-
-        // Transform data to include unit info
-        const transformedInternships: InternshipWithUnit[] = (
-          internshipsData || []
-        ).map((internship: any) => ({
-          ...internship,
-          unit_avatar: internship.profiles?.units?.[0]?.avatar_url || null,
-          unit_name: internship.profiles?.units?.[0]?.unit_name || null,
-        }));
-
-        setAllInternships(transformedInternships);
-
-        // Fetch user skills and saved internships if logged in
-        if (user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("id")
-            .eq("user_id", user.id)
-            .maybeSingle();
-
-          if (profile) {
-            // Fetch skills
-            const { data: studentProfile } = await supabase
-              .from("student_profiles")
-              .select("skills")
-              .eq("profile_id", profile.id)
-              .maybeSingle();
-
-            if (studentProfile?.skills) {
-              let skills: any[] = [];
-
-              if (typeof studentProfile.skills === "string") {
-                try {
-                  const parsed = JSON.parse(studentProfile.skills);
-                  skills = Array.isArray(parsed)
-                    ? parsed
-                    : studentProfile.skills.split(",").map((s) => s.trim());
-                } catch {
-                  skills = studentProfile.skills
-                    .split(",")
-                    .map((s) => s.trim());
-                }
-              } else if (Array.isArray(studentProfile.skills)) {
-                skills = studentProfile.skills;
-              }
-
-              setUserSkills(skills);
-            }
-
-            // Fetch saved internships
-            const { data: savedData } = await supabase
-              .from("saved_internships")
-              .select("internship_id")
-              .eq("student_id", profile.id);
-
-            if (savedData) {
-              setSavedInternshipsSet(
-                new Set(savedData.map((item) => item.internship_id))
-              );
-            }
-          }
-        }
-      } catch (error: any) {
-        console.error("Error fetching data:", error);
-        setError(error.message || "Failed to fetch internships");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  // Use the recommendation hook (same as Dashboard)
-  const internships = useInternshipRecommendations(allInternships, userSkills);
+  const savingInternship = isSaving || isRemoving;
 
   // Set default selected internship when data loads or from URL params
   useEffect(() => {
     const idFromUrl = searchParams.get("id");
 
     if (idFromUrl && internships.length > 0) {
-      // Check if the internship from URL exists in the list
       const exists = internships.some((int) => int.id === idFromUrl);
       if (exists) {
         setSelectedInternship(idFromUrl);
@@ -214,11 +85,10 @@ const RecommendedInternships = () => {
       }
     }
 
-    // Default to first internship if no URL param or invalid ID
     if (internships.length > 0 && !selectedInternship) {
       setSelectedInternship(internships[0].id);
     }
-  }, [internships, searchParams]);
+  }, [internships, searchParams, selectedInternship]);
 
   // Scroll to top when internship selection changes
   useEffect(() => {
@@ -230,153 +100,99 @@ const RecommendedInternships = () => {
   const selectedInternshipData =
     internships.find((int) => int.id === selectedInternship) || internships[0];
 
-  const selectedMatchingUnit = selectedInternshipData
-    ? units.find(
-        (unit) => unit.profile_id === selectedInternshipData.created_by
-      )
-    : undefined;
-
   const handleSaveInternship = async () => {
-    if (!selectedInternship || isSaving) return;
+    if (!selectedInternship) return;
 
-    const isSaved = savedInternshipsSet.has(selectedInternship);
-
-    // Immediate optimistic UI update
-    const newSavedSet = new Set(savedInternshipsSet);
-    if (isSaved) {
-      newSavedSet.delete(selectedInternship);
-    } else {
-      newSavedSet.add(selectedInternship);
+    if (!session) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to save internships.",
+        variant: "destructive",
+      });
+      return;
     }
-    setSavedInternshipsSet(newSavedSet);
 
-    setIsSaving(true);
-
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        // Revert optimistic update
-        setSavedInternshipsSet(savedInternshipsSet);
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in to save internships.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!profile) {
-        // Revert optimistic update
-        setSavedInternshipsSet(savedInternshipsSet);
-        toast({
-          title: "Error",
-          description: "Profile not found.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Perform API call in background
-      if (isSaved) {
-        const { error } = await supabase
-          .from("saved_internships")
-          .delete()
-          .eq("student_id", profile.id)
-          .eq("internship_id", selectedInternship);
-
-        if (error) {
-          // Revert on error
-          setSavedInternshipsSet(savedInternshipsSet);
+    if (isSaved) {
+      removeSavedInternshipMutation(selectedInternship, {
+        onSuccess: () => {
+          toast({
+            title: "Removed",
+            description: "Internship removed from saved list.",
+          });
+          refetchSaved();
+        },
+        onError: (error: any) => {
+          console.error("Error removing internship:", error);
           toast({
             title: "Error",
-            description: "Failed to remove internship.",
+            description: error.message || "Failed to remove internship.",
             variant: "destructive",
           });
-          throw error;
-        }
-      } else {
-        const { error } = await supabase.from("saved_internships").insert({
-          student_id: profile.id,
-          internship_id: selectedInternship,
-        });
-
-        if (error) {
-          // Revert on error
-          setSavedInternshipsSet(savedInternshipsSet);
+        },
+      });
+    } else {
+      saveInternshipMutation(selectedInternship, {
+        onSuccess: () => {
+          toast({
+            title: "Saved",
+            description: "Internship saved successfully!",
+          });
+          refetchSaved();
+        },
+        onError: (error: any) => {
+          console.error("Error saving internship:", error);
           toast({
             title: "Error",
-            description: "Failed to save internship.",
+            description: error.message || "Failed to save internship.",
             variant: "destructive",
           });
-          throw error;
-        }
-      }
-    } catch (error: any) {
-      console.error("Error saving internship:", error);
-    } finally {
-      setIsSaving(false);
+        },
+      });
     }
   };
 
-  // Parse all data fields from database with error handling
-  let responsibilities = [];
-  let requirements = [];
-  let skills = [];
-  let benefits = [];
+  const handleShare = () => {
+    if (!selectedInternship) return;
 
-  try {
-    responsibilities = parseNumberedObject(
-      safeParse(selectedInternshipData?.responsibilities, {})
-    );
-  } catch (e) {
-    console.error("Error parsing responsibilities:", e);
-    responsibilities = [];
-  }
+    generateShareLink(selectedInternship, {
+      onSuccess: (shareUrl) => {
+        setShowShareDialog(true);
+      },
+      onError: () => {
+        toast({
+          title: "Error",
+          description: "Failed to generate share link.",
+          variant: "destructive",
+        });
+      },
+    });
+  };
 
-  try {
-    requirements = parseNumberedObject(
-      safeParse(selectedInternshipData?.requirements, {})
-    );
-  } catch (e) {
-    console.error("Error parsing requirements:", e);
-    requirements = [];
-  }
+  const handleApplicationSuccess = () => {
+    refetchApplied();
+    setShowSuccessDialog(true);
+  };
 
-  try {
-    skills = parseNumberedObject(
-      safeParse(selectedInternshipData?.skills_required, {})
-    );
-  } catch (e) {
-    console.error("Error parsing skills:", e);
-    skills = [];
-  }
+  // Parse array fields safely
+  const parseArray = (data: any): string[] => {
+    if (!data) return [];
+    if (Array.isArray(data))
+      return data.filter((item) => item && typeof item === "string");
+    return [];
+  };
 
-  try {
-    benefits = parseNumberedObject(
-      safeParse(selectedInternshipData?.benefits, {})
-    );
-  } catch (e) {
-    console.error("Error parsing benefits:", e);
-    benefits = [];
-  }
+  const responsibilities = parseArray(selectedInternshipData?.responsibilities);
+  const benefits = parseArray(selectedInternshipData?.benefits);
+  const skillsRequired = parseArray(selectedInternshipData?.skillsRequired);
 
   return (
-    <div className="min-h-screen  bg-gray-50">
-      <Navbar />
+    <div className="min-h-screen bg-gray-50">
       <div className="container px-4 sm:px-6 lg:px-[5.5rem]">
         <div className="flex flex-col h-[calc(100vh-4rem)] lg:flex-row">
           {/* Left Sidebar - Fixed Header + Scrollable List */}
           <div className="w-full lg:w-80 border-gray-200 h-full flex flex-col overflow-y-auto lg:overflow-y-visible">
             {/* Fixed Top Picks Header */}
-            <div className="bg-gradient-to-br hidden md:block  from-orange-400  via-orange-500 to-orange-600 text-white p-4 sm:p-5 shadow-sm flex-shrink-0 sticky top-0 z-10">
+            <div className="bg-gradient-to-br hidden md:block from-orange-400 via-orange-500 to-orange-600 text-white p-4 sm:p-5 shadow-sm flex-shrink-0 sticky top-0 z-10">
               <h2 className="text-base sm:text-2xl font-bold">
                 Top picks for you
               </h2>
@@ -395,12 +211,9 @@ const RecommendedInternships = () => {
               style={{ scrollbarWidth: "thin", minHeight: 0 }}
             >
               <div className="flex items-center md:hidden">
-                {/* Only for mobile screens */}
-                {/* Back Button */}
                 <button onClick={() => window.history.back()} className="p-2">
                   <ChevronLeft size={28} className="text-gray-700" />
                 </button>
-
                 <h2 className="text-xl font-semibold">Recommended for you</h2>
               </div>
 
@@ -436,14 +249,11 @@ const RecommendedInternships = () => {
                 </div>
               ) : (
                 internships.map((internship) => {
-                  const matchingUnit = units.find(
-                    (unit) => unit.profile_id === internship.created_by
-                  );
+                  const createdBy = internship.createdBy;
                   return (
-                    <>
-                      {/* Only for mobile screen md */}
+                    <React.Fragment key={internship.id}>
+                      {/* Mobile View */}
                       <Card
-                        key={internship.id}
                         className="block mb-2.5 lg:hidden cursor-pointer transition-all duration-150 shadow-sm border border-orange-600 hover:shadow-md"
                         onClick={() =>
                           navigate(`/internships/${internship.id}`)
@@ -453,21 +263,17 @@ const RecommendedInternships = () => {
                           <div className="flex justify-between items-start mb-3">
                             <Avatar className="w-8 h-8">
                               <AvatarImage
-                                src={matchingUnit.avatar_url || undefined}
-                                alt={internship.unit_name || "Unit"}
+                                src={createdBy?.avatarUrl || undefined}
+                                alt={createdBy?.name || "Company"}
                               />
                               <AvatarFallback className="bg-black text-white text-xs font-bold">
-                                {(
-                                  internship.unit_name ||
-                                  internship.company_name
-                                )?.charAt(0) || "C"}
+                                {createdBy?.name?.charAt(0) || "C"}
                               </AvatarFallback>
                             </Avatar>
                             <Badge className="bg-blue-500 hover:bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-medium">
-                              Saved{" "}
-                              {internship.posted_date
+                              {internship.createdAt
                                 ? formatDistanceToNow(
-                                    new Date(internship.posted_date),
+                                    new Date(internship.createdAt),
                                     {
                                       addSuffix: true,
                                     }
@@ -483,13 +289,13 @@ const RecommendedInternships = () => {
                           </p>
                           <div className="flex items-center text-xs text-gray-500">
                             <Clock className="w-3 h-3 mr-1" />
-                            {internship.duration}
+                            {internship.duration || "Not specified"}
                           </div>
                         </CardContent>
                       </Card>
 
+                      {/* Desktop View */}
                       <Card
-                        key={internship.id}
                         className={`hidden lg:block cursor-pointer transition-all duration-150 shadow-sm border lg:border-gray-100 rounded-none hover:shadow-md ${
                           selectedInternship === internship.id
                             ? "ring-1 ring-blue-500 shadow-md border-blue-200"
@@ -501,21 +307,17 @@ const RecommendedInternships = () => {
                           <div className="flex justify-between items-start mb-3">
                             <Avatar className="w-8 h-8">
                               <AvatarImage
-                                src={matchingUnit.avatar_url || undefined}
-                                alt={internship.unit_name || "Unit"}
+                                src={createdBy?.avatarUrl || undefined}
+                                alt={createdBy?.name || "Company"}
                               />
                               <AvatarFallback className="bg-black text-white text-xs font-bold">
-                                {(
-                                  internship.unit_name ||
-                                  internship.company_name
-                                )?.charAt(0) || "C"}
+                                {createdBy?.name?.charAt(0) || "C"}
                               </AvatarFallback>
                             </Avatar>
                             <Badge className="bg-blue-500 hover:bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-medium">
-                              Saved{" "}
-                              {internship.posted_date
+                              {internship.createdAt
                                 ? formatDistanceToNow(
-                                    new Date(internship.posted_date),
+                                    new Date(internship.createdAt),
                                     {
                                       addSuffix: true,
                                     }
@@ -531,11 +333,11 @@ const RecommendedInternships = () => {
                           </p>
                           <div className="flex items-center text-xs text-gray-500">
                             <Clock className="w-3 h-3 mr-1" />
-                            {internship.duration}
+                            {internship.duration || "Not specified"}
                           </div>
                         </CardContent>
                       </Card>
-                    </>
+                    </React.Fragment>
                   );
                 })
               )}
@@ -585,14 +387,17 @@ const RecommendedInternships = () => {
                   <div className="flex flex-col sm:flex-row flex-1 items-start space-y-4 sm:space-y-0 sm:space-x-5 w-full lg:w-auto">
                     <Avatar className="w-12 h-12 sm:w-16 sm:h-16 shadow-sm flex-shrink-0">
                       <AvatarImage
-                        src={selectedMatchingUnit?.avatar_url || undefined}
-                        alt={selectedMatchingUnit?.unit_name || "Unit"}
+                        src={
+                          selectedInternshipData.createdBy?.avatarUrl ||
+                          undefined
+                        }
+                        alt={
+                          selectedInternshipData.createdBy?.name || "Company"
+                        }
                       />
                       <AvatarFallback className="bg-teal-600 text-white text-lg sm:text-2xl font-bold">
-                        {(
-                          selectedInternshipData.unit_name ||
-                          selectedInternshipData.company_name
-                        )?.charAt(0) || "C"}
+                        {selectedInternshipData.createdBy?.name?.charAt(0) ||
+                          "C"}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
@@ -602,97 +407,112 @@ const RecommendedInternships = () => {
                             {selectedInternshipData.title}
                           </h1>
                           <p className="text-base sm:text-lg text-gray-700 mb-3 font-medium">
-                            {selectedInternshipData.company_name?.replace(
-                              /\n/g,
-                              ""
-                            )}
+                            {selectedInternshipData.createdBy?.name}
                           </p>
                         </div>
 
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-2">
                           <Button
                             size="sm"
-                            disabled={isSaving}
-                            className={`flex items-center p-0 ${
-                              savedInternshipsSet.has(selectedInternship)
-                                ? "text-gray-400 bg-white"
+                            disabled={savingInternship || isCheckingStatus}
+                            className={`flex items-center px-3 py-2 ${
+                              isSaved
+                                ? "text-blue-600 bg-blue-50"
                                 : "text-gray-600 bg-white"
                             }`}
                             onClick={handleSaveInternship}
                           >
                             <Bookmark
-                              className={`w-4 h-4 ${
-                                savedInternshipsSet.has(selectedInternship)
-                                  ? "fill-current"
-                                  : ""
+                              className={`w-4 h-4 mr-1 ${
+                                isSaved ? "fill-current" : ""
                               }`}
                             />
-                            <span>
-                              {savedInternshipsSet.has(selectedInternship)
-                                ? "Saved"
-                                : "Save"}
-                            </span>
+                            <span>{isSaved ? "Saved" : "Save"}</span>
                           </Button>
                           <Button
                             size="sm"
-                            className="flex items-center p-0 ml-4 text-gray-700 bg-white"
-                            onClick={() => setShowShareDialog(true)}
+                            className="flex items-center px-3 py-2 text-gray-700 bg-white"
+                            onClick={handleShare}
                           >
-                            <Share2 className="w-4 h-4" />
+                            <Share2 className="w-4 h-4 mr-1" />
                             <span>Share</span>
                           </Button>
                           <Button
-                            className="bg-orange-500 hover:bg-orange-600 rounded-full text-white px-6 ml-4"
-                            disabled={hasApplied || isCheckingStatus}
+                            className="bg-orange-500 hover:bg-orange-600 rounded-full text-white px-6"
+                            disabled={isApplied || isCheckingStatus}
                             onClick={() => setShowApplicationDialog(true)}
                           >
-                            {hasApplied ? "Applied" : "Apply Now"}
+                            {isApplied ? "Applied" : "Apply Now"}
                           </Button>
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-xs sm:text-sm text-gray-500">
                         <div className="flex items-center">
                           <MapPin className="w-4 h-4 mr-1.5 text-gray-500" />
-                          {selectedInternshipData.location}
+                          {selectedInternshipData.createdBy?.location ||
+                            "Not specified"}
                         </div>
                         <div className="flex items-center">
                           <Clock className="w-4 h-4 mr-1.5 text-gray-500" />
-                          {selectedInternshipData.duration}
+                          {selectedInternshipData.duration || "Not specified"}
                         </div>
                         <div className="flex items-center">
                           <IndianRupee className="w-4 h-4 mr-1.5 text-gray-500" />
-                          {selectedInternshipData.is_paid ? (
+                          {selectedInternshipData.isPaid ? (
                             <span>
                               Paid{" "}
-                              {selectedInternshipData?.payment &&
-                                `- ${selectedInternshipData?.payment}`}
+                              {selectedInternshipData.payment &&
+                                `- ${selectedInternshipData.payment}`}
                             </span>
                           ) : (
                             <span>Unpaid</span>
                           )}
                         </div>
 
-                        <div className="flex items-cente">
-                          {selectedInternshipData.job_type === "full_time"
+                        <div className="flex items-center">
+                          {selectedInternshipData.jobType === "full_time"
                             ? "Full Time"
-                            : selectedInternshipData.job_type === "part_time"
+                            : selectedInternshipData.jobType === "part_time"
                             ? "Part Time"
-                            : selectedInternshipData.job_type === "both"
+                            : selectedInternshipData.jobType === "both"
                             ? "Full Time & Part Time"
                             : "Not specified"}
                         </div>
 
-                        {/* Minimum Age */}
-                        {selectedInternshipData.min_age_required && (
+                        {selectedInternshipData.minAgeRequired && (
                           <div className="flex items-center">
-                            Minimum Age:{" "}
-                            {selectedInternshipData.min_age_required}
+                            Minimum Age: {selectedInternshipData.minAgeRequired}
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
                 </div>
+
+                {/* Status Banner - Shows if saved or applied */}
+                {(isSaved || isApplied) && (
+                  <div className="flex gap-2 mb-6">
+                    {isSaved && (
+                      <div className="px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg flex items-center gap-2">
+                        <Bookmark className="w-4 h-4 text-teal-600 fill-teal-600" />
+                        <span className="text-sm font-medium text-teal-700">
+                          Saved
+                        </span>
+                      </div>
+                    )}
+                    {isApplied && applicationData && (
+                      <div className="px-4 py-2 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                        <CircleCheckBig className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-700">
+                          Applied on{" "}
+                          {new Date(
+                            applicationData.createdAt
+                          ).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* About the Internship */}
                 <div className="mb-6 sm:mb-8">
@@ -725,27 +545,6 @@ const RecommendedInternships = () => {
                   </div>
                 )}
 
-                {/* Requirements */}
-                {requirements.length > 0 && (
-                  <div className="mb-6 sm:mb-8">
-                    <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">
-                      Requirements from the Candidates
-                    </h2>
-                    <div className="space-y-3">
-                      {requirements.map((requirement, index) => (
-                        <div key={index} className="flex items-start space-x-3">
-                          <div className="w-5 h-5 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <Check className="w-3 h-3" />
-                          </div>
-                          <p className="text-gray-700 leading-relaxed">
-                            {requirement}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* Benefits */}
                 {benefits.length > 0 && (
                   <div className="mb-6 sm:mb-8">
@@ -768,15 +567,15 @@ const RecommendedInternships = () => {
                 )}
 
                 {/* Skills Required */}
-                {skills.length > 0 && (
+                {skillsRequired.length > 0 && (
                   <div className="mb-6 sm:mb-8">
                     <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">
                       Skills Required
                     </h2>
                     <div className="space-y-3">
-                      {skills.map((skill, index) => (
+                      {skillsRequired.map((skill, index) => (
                         <div key={index} className="flex items-start space-x-3">
-                          <div className="w-5 h-5 bg-green-100 text-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <div className="w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                             <Check className="w-3 h-3" />
                           </div>
                           <p className="text-gray-700 leading-relaxed">
@@ -786,46 +585,30 @@ const RecommendedInternships = () => {
                       ))}
                     </div>
                   </div>
-                  // <div className="mb-6 sm:mb-8">
-                  //   <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">
-                  //     Skills Required
-                  //   </h2>
-                  //   {/* <div className="flex flex-wrap gap-2">
-                  //     {skills.map((skill, index) => (
-                  //       <Badge
-                  //         key={index}
-                  //         variant="secondary"
-                  //         className="bg-gray-100 text-gray-700 px-3 py-1"
-                  //       >
-                  //         {skill}
-                  //       </Badge>
-                  //     ))}
-                  //   </div> */}
-                  // </div>
                 )}
 
                 {/* Additional Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {selectedInternshipData.application_deadline && (
+                  {selectedInternshipData.closingDate && (
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-2">
                         Application Deadline
                       </h3>
                       <p className="text-gray-700 mb-10">
                         {new Date(
-                          selectedInternshipData.application_deadline
+                          selectedInternshipData.closingDate
                         ).toLocaleDateString()}
                       </p>
                     </div>
                   )}
 
-                  {selectedInternshipData.company_email && (
+                  {selectedInternshipData.createdBy?.phone && (
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-2">
                         Contact
                       </h3>
                       <p className="text-gray-700">
-                        {selectedInternshipData.company_email}
+                        {selectedInternshipData.createdBy.phone}
                       </p>
                     </div>
                   )}
@@ -842,10 +625,7 @@ const RecommendedInternships = () => {
           isOpen={showApplicationDialog}
           onClose={() => setShowApplicationDialog(false)}
           internship={selectedInternshipData}
-          onSuccess={() => {
-            markAsApplied();
-            setShowSuccessDialog(true);
-          }}
+          onSuccess={handleApplicationSuccess}
         />
       )}
 

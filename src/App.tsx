@@ -10,14 +10,15 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useSession } from "@/lib/auth-client";
+import { useEffect } from "react";
+import { NuqsAdapter } from "nuqs/adapters/react-router";
 import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
 import UnitDashboard from "./pages/UnitDashboard";
+// import Chatbot from "./pages/Chatbot";
 import Chatbot from "./pages/Chatbot";
 import Internships from "./pages/Internships";
 import Courses from "./pages/Courses";
@@ -30,99 +31,65 @@ import InternshipApplicants from "./pages/InternshipApplicants";
 import NotFound from "./pages/NotFound";
 import UnitProfile from "@/pages/UnitProfile";
 import InternshipDetail from "./pages/InternshipDetail";
-import AuthCallback from "@/hooks/AuthCallback";
 import RecommendedInternships from "./pages/RecommendedInternships";
 import ForgotPassword from "./pages/ForgotPassword";
-import CheckEmail from "./pages/CheckEmail";
 import ResetPassword from "./pages/ResetPassword";
 import CandidateTasks from "./pages/CandidateTasks";
 import MyTasks from "./pages/MyTasks";
 import UnitCandidateTasks from "./pages/UnitCandidateTasks";
 import Settings from "./pages/Settings";
-import ScrollToTop from "@/components/ScrollToTop"; // Adjust path if needed
+import AuthCallback from "@/hooks/AuthCallback";
+import ScrollToTop from "@/components/ScrollToTop";
+import { useProfile } from "@/hooks/useProfile";
+import EnvironmentIndicator from "@/components/EnvironmentIndicator";
 
 const queryClient = new QueryClient();
 
-// Protected Route component with onboarding check and role-based routing
+// Protected Route component with onboarding check
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
-  const [profileLoading, setProfileLoading] = useState(true);
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const { data: session, isPending: isAuthPending } = useSession();
+  const { data: profile, isLoading: isProfileLoading } = useProfile();
+
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    const checkProfileAndRedirect = async () => {
-      if (user) {
-        try {
-          // Fetch profile with role and onboarding status
-          const { data: profile, error } = await supabase
-            .from("profiles")
-            .select("onboarding_completed, role, deactivated_at")
-            .eq("user_id", user.id)
-            .maybeSingle();
+    // Wait for auth and profile to load
+    if (isAuthPending || isProfileLoading || !session || !profile) return;
 
-          if (error) {
-            console.error("Error fetching profile:", error);
-            setProfileLoading(false);
-            return;
-          }
+    const currentPath = location.pathname;
+    const isOnChatbot = currentPath === "/chatbot";
 
-          // Direct Update if needed
-          if (profile?.deactivated_at) {
-            const { error: updateError } = await supabase
-              .from("profiles")
-              .update({ deactivated_at: null })
-              .eq("user_id", user.id);
-
-            if (updateError)
-              console.error("Failed to reactivate:", updateError);
-          }
-
-          const isOnboardingCompleted = profile?.onboarding_completed || false;
-          const role = profile?.role || "student";
-
-          setHasCompletedOnboarding(isOnboardingCompleted);
-          setUserRole(role);
-
-          // If onboarding not completed, redirect to chatbot
-          if (!isOnboardingCompleted && location.pathname !== "/chatbot") {
-            navigate("/chatbot", { replace: true });
-            setProfileLoading(false);
-            return;
-          }
-
-          // Role-based routing after onboarding is complete
-          if (isOnboardingCompleted) {
-            // For students accessing unit dashboard or vice versa
-            if (role === "student" && location.pathname === "/unit-dashboard") {
-              navigate("/dashboard", { replace: true });
-            } else if (role === "unit" && location.pathname === "/dashboard") {
-              navigate("/unit-dashboard", { replace: true });
-            }
-            // Redirect from chatbot to appropriate dashboard after onboarding
-            else if (location.pathname === "/chatbot") {
-              const targetDashboard =
-                role === "unit" ? "/unit-dashboard" : "/dashboard";
-              navigate(targetDashboard, { replace: true });
-            }
-          }
-        } catch (error) {
-          console.error("Error checking profile:", error);
+    // Check onboarding status
+    if (profile.onboardingCompleted === true) {
+      // Onboarding completed - redirect away from chatbot to dashboard
+      if (isOnChatbot) {
+        // Redirect based on role
+        if (profile.role === "candidate") {
+          navigate("/dashboard", { replace: true });
+        } else if (profile.role === "unit") {
+          navigate("/unit-dashboard", { replace: true });
+        } else {
+          navigate("/dashboard", { replace: true });
         }
       }
-      setProfileLoading(false);
-    };
-
-    if (!loading && user) {
-      checkProfileAndRedirect();
     } else {
-      setProfileLoading(false);
+      // Onboarding NOT completed - redirect to chatbot
+      if (!isOnChatbot) {
+        navigate("/chatbot", { replace: true });
+      }
     }
-  }, [user, loading, location.pathname, navigate]);
+  }, [
+    session,
+    isAuthPending,
+    profile,
+    isProfileLoading,
+    location.pathname,
+    navigate,
+  ]);
 
-  if (loading || profileLoading) {
+  // Show loading spinner while checking auth and profile
+  if (isAuthPending || (session && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-muted flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -130,7 +97,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  return user ? <>{children}</> : <Navigate to="/" replace />;
+  // If validated session exists, render children. Otherwise, redirect to Landing.
+  return session ? <>{children}</> : <Navigate to="/" replace />;
 };
 
 const App = () => (
@@ -138,12 +106,14 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <EnvironmentIndicator />
       <BrowserRouter>
         <ScrollToTop />
-        <AuthProvider>
+        <NuqsAdapter>
           <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Landing />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            {/* Chatbot Route */}
             <Route
               path="/chatbot"
               element={
@@ -156,8 +126,9 @@ const App = () => (
             <Route path="/auth/:role/signin" element={<SignIn />} />
             <Route path="/auth/:role/signup" element={<SignUp />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/check-email" element={<CheckEmail />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+
+            {/* Protected Routes */}
             <Route
               path="/internships/:id"
               element={
@@ -174,6 +145,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            {/* Dashboards */}
             <Route
               path="/dashboard"
               element={
@@ -190,14 +162,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/chatbot"
-              element={
-                <ProtectedRoute>
-                  <Chatbot />
-                </ProtectedRoute>
-              }
-            />
+            {/* Common Resources */}
             <Route
               path="/internships"
               element={
@@ -230,22 +195,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/candidate/:id"
-              element={
-                <ProtectedRoute>
-                  <CandidateProfile />
-                </ProtectedRoute>
-              }
-            />
-            {/* <Route
-              path="/candidate"
-              element={
-                <ProtectedRoute>
-                  <CandidateProfile />
-                </ProtectedRoute>
-              }
-            /> */}
+            {/* Profiles */}
             <Route
               path="/profile"
               element={
@@ -262,11 +212,12 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            {/* Candidate Views */}
             <Route
-              path="/all-applications"
+              path="/candidate/:id"
               element={
                 <ProtectedRoute>
-                  <AllApplications />
+                  <CandidateProfile />
                 </ProtectedRoute>
               }
             />
@@ -279,14 +230,6 @@ const App = () => (
               }
             />
             <Route
-              path="/internship-applicants/:internshipId"
-              element={
-                <ProtectedRoute>
-                  <InternshipApplicants />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/my-tasks/:applicationId"
               element={
                 <ProtectedRoute>
@@ -295,6 +238,23 @@ const App = () => (
               }
             />
 
+            {/* Unit Management Views */}
+            <Route
+              path="/all-applications"
+              element={
+                <ProtectedRoute>
+                  <AllApplications />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/internship-applicants/:internshipId"
+              element={
+                <ProtectedRoute>
+                  <InternshipApplicants />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/unit/candidate-tasks/:applicationId"
               element={
@@ -303,7 +263,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-
+            {/* Settings & Misc */}
             <Route
               path="/settings"
               element={
@@ -312,10 +272,18 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            {/* <Route
+              path="/chatbot"
+              element={
+                <ProtectedRoute>
+                  <Chatbot />
+                </ProtectedRoute>
+              }
+            /> 
+            */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </AuthProvider>
+        </NuqsAdapter>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

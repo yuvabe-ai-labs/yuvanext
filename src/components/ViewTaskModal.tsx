@@ -28,14 +28,12 @@ interface ViewTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   task: Task;
-  applicationId: string;
 }
 
 export default function ViewTaskModal({
   isOpen,
   onClose,
   task,
-  applicationId,
 }: ViewTaskModalProps) {
   const reviewTaskMutation = useReviewTask();
 

@@ -188,6 +188,7 @@ export default function UnitCandidateTasks() {
           isOpen={isViewModalOpen}
           onClose={handleCloseModal}
           task={selectedTask}
+          applicationId={applicationId}
         />
       )}
     </div>

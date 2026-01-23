@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import {
   ArrowRight,
@@ -68,7 +68,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Hooks
-import { useInternship, useUpdateInternship } from "@/hooks/useInternships";
+import {
+  useInternship,
+  useUpdateInternship,
+  useDeleteInternship,
+} from "@/hooks/useInternships";
 import { useUnitStats, useUnitApplications } from "@/hooks/useUnitApplications";
 import { useUnitReports } from "@/hooks/useUnitReports";
 import { useHiredApplicants } from "@/hooks/useHiredApplicants";
@@ -162,7 +166,15 @@ const CandidateTaskProgress = ({
 // --- Main Dashboard Component ---
 const UnitDashboard = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("applications");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "applications";
+
+  // Update URL when tab changes
+  const handleTabChange = (value: string) => {
+    // replace: true updates the current history entry so the back button logic feels smoother
+    // remove { replace: true } if you want every tab click to be a history entry
+    setSearchParams({ tab: value }, { replace: true });
+  };
 
   // --- 1. DATA FETCHING (REACT QUERY) ---
   const { data: rawApplications, isLoading: dashboardLoading } =
@@ -175,6 +187,8 @@ const UnitDashboard = () => {
   const { data: internships, isLoading: internshipsLoading } = useInternship();
 
   const updateInternshipMutation = useUpdateInternship();
+
+  const deleteInternshipMutation = useDeleteInternship();
 
   const { data: rawHiredCandidates = [], isLoading: hiredLoading } =
     useHiredApplicants();
@@ -283,21 +297,22 @@ const UnitDashboard = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = () => {
     if (!deletingInternship) return;
 
-    try {
-      setUpdating(deletingInternship.id);
-      await axiosInstance.delete(`/internships/${deletingInternship.id}`);
-      window.location.reload();
-      setShowDeleteDialog(false);
-      setDeletingInternship(null);
-    } catch (err: unknown) {
-      console.error("Error deleting job:", err);
-      alert("Failed to delete job description");
-    } finally {
-      setUpdating(null);
-    }
+    setUpdating(deletingInternship.id);
+
+    deleteInternshipMutation.mutate(deletingInternship.id, {
+      // 1. Success: Close dialog and clear selection
+      onSuccess: () => {
+        setShowDeleteDialog(false);
+        setDeletingInternship(null);
+      },
+      // This ensures your UI never gets stuck in "Deleting..." mode
+      onSettled: () => {
+        setUpdating(null);
+      },
+    });
   };
 
   const handleToggleStatus = async (internship: Internship) => {
@@ -536,7 +551,7 @@ const UnitDashboard = () => {
         {/* TABS */}
         <Tabs
           value={activeTab}
-          onValueChange={setActiveTab}
+          onValueChange={handleTabChange}
           className="space-y-4 sm:space-y-6"
         >
           <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">

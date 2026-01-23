@@ -1,10 +1,15 @@
 import { useState, useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Camera, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useUploadAvatar, useDeleteAvatar } from "@/hooks/useProfile";
 
 interface AvatarUploadDialogProps {
   isOpen: boolean;
@@ -12,7 +17,7 @@ interface AvatarUploadDialogProps {
   currentAvatarUrl?: string | null;
   userId: string;
   userName: string;
-  onSuccess: (avatarUrl: string) => void;
+  onSuccess?: () => void;
 }
 
 export const AvatarUploadDialog = ({
@@ -23,10 +28,14 @@ export const AvatarUploadDialog = ({
   userName,
   onSuccess,
 }: AvatarUploadDialogProps) => {
-  const [uploading, setUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(currentAvatarUrl || null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(
+    currentAvatarUrl || null,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const uploadAvatar = useUploadAvatar();
+  const deleteAvatar = useDeleteAvatar();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -43,7 +52,9 @@ export const AvatarUploadDialog = ({
     }
 
     // Check file type
-    if (!["image/png", "image/jpg", "image/jpeg", "image/gif"].includes(file.type)) {
+    if (
+      !["image/png", "image/jpg", "image/jpeg", "image/gif"].includes(file.type)
+    ) {
       toast({
         title: "Invalid file type",
         description: "Please select a PNG, JPG, JPEG, or GIF image",
@@ -65,48 +76,14 @@ export const AvatarUploadDialog = ({
     if (!file) return;
 
     try {
-      setUploading(true);
-
-      // Get current auth user ID
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      // Delete old avatar if exists
-      if (currentAvatarUrl) {
-        const oldPath = currentAvatarUrl.split("/").pop();
-        if (oldPath) {
-          await supabase.storage.from("avatars").remove([`${user.id}/${oldPath}`]);
-        }
-      }
-
-      // Upload new avatar using auth user ID for folder structure
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("avatars").getPublicUrl(filePath);
-
-      // Update student profile
-      const { error: updateError } = await supabase
-        .from("student_profiles")
-        .update({ avatar_url: publicUrl })
-        .eq("profile_id", userId);
-
-      if (updateError) throw updateError;
+      await uploadAvatar.mutateAsync(file);
 
       toast({
         title: "Success",
         description: "Profile photo updated successfully",
       });
 
-      onSuccess(publicUrl);
+      onSuccess?.();
       onClose();
     } catch (error: any) {
       console.error("Error uploading avatar:", error);
@@ -115,8 +92,6 @@ export const AvatarUploadDialog = ({
         description: error.message || "Failed to upload profile photo",
         variant: "destructive",
       });
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -124,58 +99,47 @@ export const AvatarUploadDialog = ({
     if (!currentAvatarUrl) return;
 
     try {
-      setUploading(true);
-
-      // Get current auth user ID
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      // Delete from storage using auth user ID
-      const oldPath = currentAvatarUrl.split("/").pop();
-      if (oldPath) {
-        await supabase.storage.from("avatars").remove([`${user.id}/${oldPath}`]);
-      }
-
-      // Update student profile
-      const { error } = await supabase.from("student_profiles").update({ avatar_url: null }).eq("profile_id", userId);
-
-      if (error) throw error;
+      await deleteAvatar.mutateAsync();
 
       toast({
         title: "Success",
         description: "Profile photo deleted successfully",
       });
 
-      onSuccess("");
+      setPreviewUrl(null);
+      onSuccess?.();
       onClose();
     } catch (error: any) {
-      console.error("Error deleting avatar:", error);
       toast({
         title: "Delete failed",
         description: error.message || "Failed to delete profile photo",
         variant: "destructive",
       });
-    } finally {
-      setUploading(false);
     }
   };
+
+  const isLoading = uploadAvatar.isPending || deleteAvatar.isPending;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-center text-xl">Profile photo upload</DialogTitle>
+          <DialogTitle className="text-center text-xl">
+            Profile photo upload
+          </DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col items-center space-y-6 py-6">
           <div className="relative group">
             <Avatar className="h-40 w-40">
               <AvatarImage src={previewUrl || ""} />
-              <AvatarFallback className="text-4xl">{userName.charAt(0).toUpperCase()}</AvatarFallback>
+              <AvatarFallback className="text-4xl">
+                {userName.charAt(0).toUpperCase()}
+              </AvatarFallback>
             </Avatar>
             <div
               className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => !isLoading && fileInputRef.current?.click()}
             >
               <Camera className="w-8 h-8 text-white" />
               <span className="text-white text-sm ml-2">Replace photo</span>
@@ -188,6 +152,7 @@ export const AvatarUploadDialog = ({
             accept="image/png,image/jpg,image/jpeg,image/gif"
             onChange={handleFileSelect}
             className="hidden"
+            disabled={isLoading}
           />
 
           <div className="text-center">
@@ -195,7 +160,7 @@ export const AvatarUploadDialog = ({
               or{" "}
               <button
                 onClick={handleDelete}
-                disabled={!currentAvatarUrl || uploading}
+                disabled={!currentAvatarUrl || isLoading}
                 className="text-destructive hover:underline disabled:opacity-50"
               >
                 Delete
@@ -208,18 +173,23 @@ export const AvatarUploadDialog = ({
           </p>
 
           <div className="flex gap-4 w-full">
-            <Button variant="outline" onClick={onClose} disabled={uploading} className="flex-1">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={isLoading}
+              className="flex-1"
+            >
               Cancel
             </Button>
             <Button
               onClick={handleUpload}
-              disabled={uploading || !fileInputRef.current?.files?.[0]}
+              disabled={isLoading || !fileInputRef.current?.files?.[0]}
               className="flex-1 bg-primary"
             >
-              {uploading ? (
+              {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading...
+                  {uploadAvatar.isPending ? "Uploading..." : "Deleting..."}
                 </>
               ) : (
                 "Save"

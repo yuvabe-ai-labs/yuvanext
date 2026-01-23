@@ -263,3 +263,16 @@ export interface UploadImagePayload {
   type: ImageType;
   userId: string;
 }
+
+export interface UploadAvatarResponse {
+  avatarUrl: string;
+}
+
+export interface DeleteAvatarResponse {
+  success: boolean;
+  message?: string;
+}
+
+export interface UploadAvatarPayload {
+  file: File;
+}

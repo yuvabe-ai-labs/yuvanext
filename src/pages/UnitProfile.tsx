@@ -28,6 +28,8 @@ import {
   useBannerOperations,
 } from "@/hooks/useUnitProfile";
 import { useSession } from "@/lib/auth-client";
+// ADDED: Import useQueryClient for manual cache updates
+import { useQueryClient } from "@tanstack/react-query";
 
 // 2. IMPORT TYPES
 import type { Profile, Project, SocialLink } from "@/types/profiles.types";
@@ -42,22 +44,19 @@ import { GlimpseDialog } from "@/components/GlimpseDialog";
 import { CircularProgress } from "@/components/CircularProgress";
 import { ImageUploadDialog } from "@/components/ImageUploadDialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import {
-  type ProjectFormValues, // Import the type here
-} from "@/lib/unitDialogSchemas";
+import { type ProjectFormValues } from "@/lib/unitDialogSchemas";
 
 const UnitProfile = () => {
   const { data: session } = useSession();
   const user = session?.user;
+  const queryClient = useQueryClient(); // Initialize Query Client
 
   // 3. USE REACT QUERY HOOKS WITH TYPE
   const { data: profileData, isLoading, refetch } = useUnitProfile();
   const { uploadAvatar, deleteAvatar } = useAvatarOperations();
   const { uploadBanner, deleteBanner } = useBannerOperations();
 
-  // Cast strictly if the hook returns a generic type, otherwise rely on hook inference
   const profile = profileData as Profile | undefined;
-
   const updateMutation = useUpdateUnitProfile();
 
   // Dialog States
@@ -69,43 +68,82 @@ const UnitProfile = () => {
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // 4. ACTION HANDLERS
+  // --- 4. OPTIMISTIC UPDATE HELPER ---
+  // This function updates the UI immediately before the server responds
+  const performOptimisticUpdate = (updates: Partial<Profile>) => {
+    // 1. Snapshot previous value
+    const previousProfile = queryClient.getQueryData<Profile>(["unitProfile"]);
 
-  // Update Profile fields (Mission, Values, Description, etc.)
+    // 2. Optimistically update to the new value
+    queryClient.setQueryData<Profile>(["unitProfile"], (old) => {
+      if (!old) return old;
+      return { ...old, ...updates };
+    });
+
+    // 3. Send to Server
+    updateMutation.mutate(updates, {
+      onError: (err) => {
+        // 4. Rollback on error
+        console.error("Update failed, rolling back", err);
+        if (previousProfile) {
+          queryClient.setQueryData(["unitProfile"], previousProfile);
+        }
+      },
+      // onSuccess is handled by the hook (invalidating queries), which is fine
+    });
+  };
+
+  // --- HANDLERS ---
+
+  // Update Profile fields (Name, Mission, Values, Description, etc.)
   const handleUpdateProfile = (updates: Partial<Profile>) => {
-    updateMutation.mutate(updates);
+    performOptimisticUpdate(updates);
   };
 
   // Add Project
   const handleAddProject = (projectData: ProjectFormValues) => {
     const currentProjects = profile?.projects || [];
-    // Optimistic update logic handled by React Query cache or refetch
-    // For now, assume backend adds it and we refetch or we send full array
-    const updatedProjects = [...currentProjects, projectData] as Project[];
-    updateMutation.mutate({ projects: updatedProjects });
+
+    // Create a temp project object with a temp ID to display immediately
+    const tempProject: Project = {
+      ...projectData,
+      id: `temp-${Date.now()}`, // Temp ID so React can key it list
+    } as Project;
+
+    const updatedProjects = [...currentProjects, tempProject];
+
+    performOptimisticUpdate({ projects: updatedProjects });
   };
 
   // Remove Project
   const handleRemoveProject = (projectId: string) => {
     if (!projectId) return;
     const currentProjects = profile?.projects || [];
+
+    // Filter out the project
     const updatedProjects = currentProjects.filter((p) => p.id !== projectId);
-    updateMutation.mutate({ projects: updatedProjects });
+
+    // Update immediately
+    performOptimisticUpdate({ projects: updatedProjects });
   };
 
   // Update Social Links
   const handleUpdateSocialLinks = (links: SocialLink[]) => {
-    updateMutation.mutate({ socialLinks: [...links] });
+    console.log("links");
+    console.log(links);
+
+    performOptimisticUpdate({ socialLinks: links });
   };
 
   // Remove Social Link
   const handleRemoveSocialLink = (linkId: string) => {
     const currentLinks = profile?.socialLinks || [];
     const updatedLinks = currentLinks.filter((l) => l.id !== linkId);
-    updateMutation.mutate({ socialLinks: updatedLinks });
+
+    performOptimisticUpdate({ socialLinks: updatedLinks });
   };
 
-  // Refetch after image uploads
+  // Refetch after image uploads (Images are harder to do optimistically without base64, so refetch is okay here)
   const handleImageSuccess = () => {
     refetch();
   };

@@ -23,7 +23,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { X } from "lucide-react";
-import { Profile } from "@/types/profiles.types";
+import { Profile, Language } from "@/types/profiles.types";
+import { useUpdateProfile } from "@/hooks/useProfile";
+import { useToast } from "@/hooks/use-toast";
 
 const personalDetailsSchema = z.object({
   first_name: z.string().min(1, "First name is required"),
@@ -38,17 +40,6 @@ const personalDetailsSchema = z.object({
   birth_year: z.string().optional(),
   is_differently_abled: z.boolean().optional(),
   has_career_break: z.boolean().optional(),
-  languages: z
-    .array(
-      z.object({
-        id: z.string(),
-        name: z.string(),
-        read: z.boolean(),
-        write: z.boolean(),
-        speak: z.boolean(),
-      })
-    )
-    .optional(),
 });
 
 type PersonalDetailsForm = z.infer<typeof personalDetailsSchema>;
@@ -68,23 +59,30 @@ const MARITAL_STATUS_OPTIONS = [
   "Prefer not to say",
 ];
 
+const AVAILABLE_LANGUAGES = [
+  "English",
+  "Hindi",
+  "Tamil",
+  "French",
+  "Spanish",
+  "German",
+  "Mandarin",
+  "Arabic",
+  "Portuguese",
+  "Russian",
+];
+
 export const PersonalDetailsDialog = ({
   profile,
   onUpdate,
   children,
 }: PersonalDetailsDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [languages, setLanguages] = useState<
-    Array<{
-      id: string;
-      name: string;
-      read: boolean;
-      write: boolean;
-      speak: boolean;
-    }>
-  >([]);
+  const [languages, setLanguages] = useState<Language[]>([]);
   const [languageError, setLanguageError] = useState<string | null>(null);
+
+  const { mutateAsync: updateProfileMutation, isPending } = useUpdateProfile();
+  const { toast } = useToast();
 
   // Split name into first and last name
   const nameParts = profile?.name?.split(" ") || [""];
@@ -100,22 +98,50 @@ export const PersonalDetailsDialog = ({
   const birthYear = dateOfBirth ? String(dateOfBirth.getFullYear()) : "";
 
   // Parse languages from profile
-  const parseLanguages = (langs: any) => {
+  const parseLanguages = (langs: any): Language[] => {
     if (!langs) return [];
+
+    // If it's already an array of Language objects, return it
+    if (Array.isArray(langs)) {
+      // Check if items are already objects
+      if (langs.length > 0 && typeof langs[0] === "object" && langs[0].id) {
+        return langs;
+      }
+
+      // If items are JSON strings, parse them
+      return langs
+        .map((lang) => {
+          if (typeof lang === "string") {
+            try {
+              return JSON.parse(lang);
+            } catch {
+              return null;
+            }
+          }
+          return lang;
+        })
+        .filter(Boolean);
+    }
+
+    // If it's a string, try to parse it
     if (typeof langs === "string") {
       try {
-        return JSON.parse(langs);
+        const parsed = JSON.parse(langs);
+        return Array.isArray(parsed) ? parsed : [];
       } catch {
         return [];
       }
     }
-    return Array.isArray(langs) ? langs : [];
+
+    return [];
   };
 
   useEffect(() => {
-    const parsedLanguages = parseLanguages(profile?.language);
-    setLanguages(parsedLanguages.length > 0 ? parsedLanguages : []);
-  }, [profile?.language]);
+    if (open) {
+      const parsedLanguages = parseLanguages(profile?.language);
+      setLanguages(parsedLanguages.length > 0 ? parsedLanguages : []);
+    }
+  }, [open, profile?.language]);
 
   const form = useForm<PersonalDetailsForm>({
     resolver: zodResolver(personalDetailsSchema),
@@ -132,7 +158,6 @@ export const PersonalDetailsDialog = ({
       birth_year: birthYear,
       is_differently_abled: profile?.isDifferentlyAbled || false,
       has_career_break: profile?.hasCareerBreak || false,
-      languages: languages,
     },
   });
 
@@ -149,23 +174,23 @@ export const PersonalDetailsDialog = ({
     ]);
   };
 
-  const removeLanguage = (id: string) => {
-    setLanguages(languages.filter((lang) => lang.id !== id));
-  };
-
-  const updateLanguage = (id: string, field: string, value: any) => {
+  const updateLanguage = (id: string, field: keyof Language, value: any) => {
     setLanguages(
       languages.map((lang) =>
-        lang.id === id ? { ...lang, [field]: value } : lang
-      )
+        lang.id === id ? { ...lang, [field]: value } : lang,
+      ),
     );
   };
 
+  const removeLanguage = (id: string) => {
+    setLanguages(languages.filter((lang) => lang.id !== id));
+    setLanguageError(null);
+  };
+
   const onSubmit = async (data: PersonalDetailsForm) => {
-    setLoading(true);
     try {
       // Combine first and last name
-      const fullName = `${data.first_name} ${data.last_name}`.trim();
+      const fullName = `${data.first_name} ${data.last_name || ""}`.trim();
 
       // Construct date of birth from separate fields
       let dateOfBirth: string | null = null;
@@ -173,58 +198,76 @@ export const PersonalDetailsDialog = ({
         const date = new Date(
           parseInt(data.birth_year),
           parseInt(data.birth_month) - 1,
-          parseInt(data.birth_date)
+          parseInt(data.birth_date),
         );
         dateOfBirth = date.toISOString();
       }
 
-      // Check for duplicate languages
-      const languageNames = languages.map((l) => l.name).filter(Boolean);
-      const duplicates = languageNames.filter(
-        (name, index) => languageNames.indexOf(name) !== index
-      );
-
-      // Validate empty selections
-      const emptyLanguages = languages.filter(
-        (lang) => !lang.name || lang.name.trim() === ""
-      );
-
-      if (duplicates.length > 0) {
-        setLanguageError(
-          `${duplicates[0]} language added more than once. Please remove or update it.`
+      if (languages.length > 0) {
+        const languageNames = languages.map((l) => l.name).filter(Boolean);
+        const duplicates = languageNames.filter(
+          (name, index) => languageNames.indexOf(name) !== index,
         );
-        setLoading(false);
-        return;
-      } else if (emptyLanguages.length > 0) {
-        setLanguageError("Please select a language before saving.");
-        setLoading(false);
-        return;
+
+        const emptyLanguages = languages.filter(
+          (lang) => !lang.name || lang.name.trim() === "",
+        );
+
+        if (duplicates.length > 0) {
+          setLanguageError(
+            `${duplicates[0]} language added more than once. Please remove or update it.`,
+          );
+          return;
+        } else if (emptyLanguages.length > 0) {
+          setLanguageError("Please select a language before saving.");
+          return;
+        }
+
+        // Validate that at least one proficiency is selected
+        const invalidLanguages = languages.filter(
+          (lang) => lang.name && !lang.read && !lang.write && !lang.speak,
+        );
+
+        if (invalidLanguages.length > 0) {
+          setLanguageError(
+            "Please select at least one proficiency (Read, Write, or Speak) for each language.",
+          );
+          return;
+        }
       }
-      setLanguageError("");
 
-      // Call your API to update profile
-      // You'll need to implement this based on your API service
-      // const updateData = {
-      //   name: fullName,
-      //   email: data.email || null,
-      //   phone: data.phone || null,
-      //   location: data.location || null,
-      //   gender: data.gender || null,
-      //   maritalStatus: data.marital_status || null,
-      //   dateOfBirth: dateOfBirth,
-      //   isDifferentlyAbled: data.is_differently_abled || false,
-      //   hasCareerBreak: data.has_career_break || false,
-      //   language: languages.length > 0 ? languages : [],
-      // };
+      setLanguageError(null);
 
-      // await updateProfile(updateData);
+      await updateProfileMutation({
+        name: fullName,
+        phone: data.phone || null,
+        location: data.location || null,
+        gender: data.gender || null,
+        maritalStatus: data.marital_status || null,
+        dateOfBirth: dateOfBirth,
+        isDifferentlyAbled: data.is_differently_abled || false,
+        hasCareerBreak: data.has_career_break || false,
+        // Send languages as array of JSON strings (API expects string[])
+        language:
+          languages.length > 0
+            ? languages.map((lang) => JSON.stringify(lang))
+            : [],
+      });
+
+      toast({
+        title: "Success",
+        description: "Personal details updated successfully",
+      });
 
       onUpdate();
       setOpen(false);
     } catch (error) {
       console.error("Error updating personal details:", error);
-    } finally {
-      setLoading(false);
+      toast({
+        title: "Error",
+        description: "Failed to update personal details",
+        variant: "destructive",
+      });
     }
   };
 
@@ -489,7 +532,7 @@ export const PersonalDetailsDialog = ({
                   <SelectContent>
                     {Array.from(
                       { length: 100 },
-                      (_, i) => new Date().getFullYear() - i
+                      (_, i) => new Date().getFullYear() - i,
                     ).map((year) => (
                       <SelectItem key={year} value={String(year)}>
                         {year}
@@ -556,9 +599,9 @@ export const PersonalDetailsDialog = ({
               {languages.map((language) => (
                 <div
                   key={language.id}
-                  className="flex items-center gap-12 justify-between mb-4 rounded-lg relative"
+                  className="flex items-center gap-4 justify-between mb-4 rounded-lg"
                 >
-                  <div className="w-full">
+                  <div className="flex-1">
                     <Select
                       value={language.name}
                       onValueChange={(value) => {
@@ -569,55 +612,73 @@ export const PersonalDetailsDialog = ({
                         <SelectValue placeholder="Select Language" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="English">English</SelectItem>
-                        <SelectItem value="Hindi">Hindi</SelectItem>
-                        <SelectItem value="Tamil">Tamil</SelectItem>
-                        <SelectItem value="French">French</SelectItem>
-                        <SelectItem value="Spanish">Spanish</SelectItem>
-                        <SelectItem value="German">German</SelectItem>
+                        {AVAILABLE_LANGUAGES.map((lang) => (
+                          <SelectItem key={lang} value={lang}>
+                            {lang}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <div className="flex gap-6">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          disabled={!language.name}
-                          id={`read-${language.id}`}
-                          checked={language.read}
-                          onCheckedChange={(checked) =>
-                            updateLanguage(language.id, "read", checked)
-                          }
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 data-[state=checked]:text-white"
-                        />
-                        <Label htmlFor={`read-${language.id}`}>Read</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          disabled={!language.name}
-                          id={`write-${language.id}`}
-                          checked={language.write}
-                          onCheckedChange={(checked) =>
-                            updateLanguage(language.id, "write", checked)
-                          }
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 data-[state=checked]:text-white"
-                        />
-                        <Label htmlFor={`write-${language.id}`}>Write</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          disabled={!language.name}
-                          id={`speak-${language.id}`}
-                          checked={language.speak}
-                          onCheckedChange={(checked) =>
-                            updateLanguage(language.id, "speak", checked)
-                          }
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 data-[state=checked]:text-white"
-                        />
-                        <Label htmlFor={`speak-${language.id}`}>Speak</Label>
-                      </div>
+                  <div className="flex gap-6">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        disabled={!language.name}
+                        id={`read-${language.id}`}
+                        checked={language.read}
+                        onCheckedChange={(checked) =>
+                          updateLanguage(
+                            language.id,
+                            "read",
+                            checked as boolean,
+                          )
+                        }
+                        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 data-[state=checked]:text-white"
+                      />
+                      <Label htmlFor={`read-${language.id}`}>Read</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        disabled={!language.name}
+                        id={`write-${language.id}`}
+                        checked={language.write}
+                        onCheckedChange={(checked) =>
+                          updateLanguage(
+                            language.id,
+                            "write",
+                            checked as boolean,
+                          )
+                        }
+                        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 data-[state=checked]:text-white"
+                      />
+                      <Label htmlFor={`write-${language.id}`}>Write</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        disabled={!language.name}
+                        id={`speak-${language.id}`}
+                        checked={language.speak}
+                        onCheckedChange={(checked) =>
+                          updateLanguage(
+                            language.id,
+                            "speak",
+                            checked as boolean,
+                          )
+                        }
+                        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 data-[state=checked]:text-white"
+                      />
+                      <Label htmlFor={`speak-${language.id}`}>Speak</Label>
                     </div>
                   </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeLanguage(language.id)}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
                 </div>
               ))}
               <Button
@@ -643,8 +704,12 @@ export const PersonalDetailsDialog = ({
                 Cancel
               </Button>
 
-              <Button type="submit" disabled={loading} className="rounded-full">
-                {loading ? "Saving..." : "Save"}
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="rounded-full"
+              >
+                {isPending ? "Saving..." : "Save"}
               </Button>
             </div>
           </form>

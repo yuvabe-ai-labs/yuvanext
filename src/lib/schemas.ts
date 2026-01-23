@@ -22,7 +22,7 @@ export const updateEmailSchema = z
     {
       message: "New email must be different from current email",
       path: ["newEmail"],
-    }
+    },
   );
 
 export const phoneSchema = z.object({
@@ -54,16 +54,11 @@ export const taskSchema = z
   .object({
     title: z.string().min(1, "Task name is required").trim(),
     startDate: z.string().min(1, "Start date is required"),
-    startTime: z.string().optional(),
+    startTime: z.string().min(1, "Start time is required"),
     endDate: z.string().min(1, "Due date is required"),
-    endTime: z.string().optional(),
-    color: z.string(),
-    note: z.string().optional(),
-    submissionLink: z
-      .string()
-      .url("Please enter a valid URL")
-      .optional()
-      .or(z.literal("")),
+    endTime: z.string().min(1, "End time is required"),
+    color: z.string().min(1, "Please select a color"),
+    note: z.string().min(1, "Note is required").trim(),
   })
   .refine(
     (data) => {
@@ -76,28 +71,29 @@ export const taskSchema = z
     {
       message: "Due date cannot be before start date",
       path: ["endDate"],
-    }
+    },
   );
 
 export const updateTaskSchema = z
   .object({
     startDate: z.string().min(1, "Start date is required"),
+    startTime: z.string().min(1, "Start time is required"),
     endDate: z.string().min(1, "Due date is required"),
-    color: z.string(),
-    note: z.string().optional(),
+    endTime: z.string().min(1, "End time is required"),
+    color: z.string().min(1, "Please select a color"),
+    note: z.string().min(1, "Note is required").trim(),
     submissionLink: z
       .string()
       .transform((val) => val.trim())
       .refine(
         (val) => val === "" || /^https?:\/\/.+/.test(val),
-        "Please enter a valid URL"
+        "Please enter a valid URL starting with http:// or https://",
       )
       .optional()
       .or(z.literal("")),
   })
   .refine(
     (data) => {
-      // Validate that end date is not before start date
       if (data.startDate && data.endDate) {
         return new Date(data.endDate) >= new Date(data.startDate);
       }
@@ -106,5 +102,5 @@ export const updateTaskSchema = z
     {
       message: "Due date cannot be before start date",
       path: ["endDate"],
-    }
+    },
   );

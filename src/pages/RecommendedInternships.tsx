@@ -276,7 +276,7 @@ const RecommendedInternships = () => {
                                     new Date(internship.createdAt),
                                     {
                                       addSuffix: true,
-                                    }
+                                    },
                                   )
                                 : "recently"}
                             </Badge>
@@ -320,7 +320,7 @@ const RecommendedInternships = () => {
                                     new Date(internship.createdAt),
                                     {
                                       addSuffix: true,
-                                    }
+                                    },
                                   )
                                 : "recently"}
                             </Badge>
@@ -473,10 +473,10 @@ const RecommendedInternships = () => {
                           {selectedInternshipData.jobType === "full_time"
                             ? "Full Time"
                             : selectedInternshipData.jobType === "part_time"
-                            ? "Part Time"
-                            : selectedInternshipData.jobType === "both"
-                            ? "Full Time & Part Time"
-                            : "Not specified"}
+                              ? "Part Time"
+                              : selectedInternshipData.jobType === "both"
+                                ? "Full Time & Part Time"
+                                : "Not specified"}
                         </div>
 
                         {selectedInternshipData.minAgeRequired && (
@@ -492,21 +492,13 @@ const RecommendedInternships = () => {
                 {/* Status Banner - Shows if saved or applied */}
                 {(isSaved || isApplied) && (
                   <div className="flex gap-2 mb-6">
-                    {isSaved && (
-                      <div className="px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg flex items-center gap-2">
-                        <Bookmark className="w-4 h-4 text-teal-600 fill-teal-600" />
-                        <span className="text-sm font-medium text-teal-700">
-                          Saved
-                        </span>
-                      </div>
-                    )}
                     {isApplied && applicationData && (
                       <div className="px-4 py-2 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
                         <CircleCheckBig className="w-4 h-4 text-green-600" />
                         <span className="text-sm font-medium text-green-700">
                           Applied on{" "}
                           {new Date(
-                            applicationData.createdAt
+                            applicationData.createdAt,
                           ).toLocaleDateString()}
                         </span>
                       </div>
@@ -596,7 +588,7 @@ const RecommendedInternships = () => {
                       </h3>
                       <p className="text-gray-700 mb-10">
                         {new Date(
-                          selectedInternshipData.closingDate
+                          selectedInternshipData.closingDate,
                         ).toLocaleDateString()}
                       </p>
                     </div>

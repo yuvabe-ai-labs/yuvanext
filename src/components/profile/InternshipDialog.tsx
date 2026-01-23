@@ -15,7 +15,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { InternshipEntry } from "@/types/profile";
+import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
+import { CandidateInternship } from "@/types/profiles.types";
 
 const internshipSchema = z
   .object({
@@ -28,44 +29,38 @@ const internshipSchema = z
   })
   .refine(
     (data) => {
-      // If currently working, or if dates are missing, skip this validation
-      if (data.is_current || !data.end_date || !data.start_date) {
-        return true;
-      }
-      // Convert strings to Date objects for comparison
-      const start = new Date(data.start_date);
-      const end = new Date(data.end_date);
-      return end >= start;
+      if (data.is_current || !data.end_date || !data.start_date) return true;
+      return new Date(data.end_date) >= new Date(data.start_date);
     },
-    {
-      message: "End date cannot be before start date",
-      path: ["end_date"], // Attach error to end_date field
-    }
+    { message: "End date cannot be before start date", path: ["end_date"] },
   );
 
 type InternshipFormData = z.infer<typeof internshipSchema>;
 
 interface InternshipDialogProps {
   children: React.ReactNode;
-  internship?: InternshipEntry;
-  onSave: (internship: Omit<InternshipEntry, "id">) => Promise<void>;
+  internship?: CandidateInternship;
+  onUpdate?: () => void;
 }
 
 export const InternshipDialog: React.FC<InternshipDialogProps> = ({
   children,
   internship,
-  onSave,
+  onUpdate,
 }) => {
   const [open, setOpen] = React.useState(false);
   const { toast } = useToast();
+  const { data: profileData } = useProfile();
+  const { mutateAsync: updateProfile, isPending } = useUpdateProfile();
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
     watch,
     setValue,
-    clearErrors, // Added clearErrors
+    clearErrors,
+    reset,
   } = useForm<InternshipFormData>({
     resolver: zodResolver(internshipSchema),
     defaultValues: {
@@ -79,28 +74,34 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
   });
 
   const isCurrent = watch("is_current");
+  const parseJsonField = (field: any) => (Array.isArray(field) ? field : []);
 
   const onSubmit = async (data: InternshipFormData) => {
     try {
-      await onSave({
-        title: data.title!,
-        company: data.company!,
-        start_date: data.start_date!,
-        end_date: data.is_current ? null : data.end_date || null,
-        description: data.description || null,
-        is_current: data.is_current!,
-      } as Omit<InternshipEntry, "id">);
-      toast({
-        title: "Success",
-        description: `Internship ${
-          internship ? "updated" : "added"
-        } successfully`,
-      });
+      const existingInternships = parseJsonField(profileData?.internship);
+      let updatedInternships;
+
+      if (internship?.id) {
+        updatedInternships = existingInternships.map(
+          (i: CandidateInternship) =>
+            i.id === internship.id ? { ...i, ...data } : i,
+        );
+      } else {
+        updatedInternships = [
+          ...existingInternships,
+          { ...data, id: crypto.randomUUID() },
+        ];
+      }
+
+      await updateProfile({ internship: updatedInternships });
+      toast({ title: "Success", description: "Internship saved successfully" });
       setOpen(false);
+      reset();
+      onUpdate?.();
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save internship",
+        description: "Failed to save",
         variant: "destructive",
       });
     }
@@ -109,7 +110,7 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
   React.useEffect(() => {
     if (isCurrent) {
       setValue("end_date", "");
-      clearErrors("end_date"); // Clear error when switching to "current"
+      clearErrors("end_date");
     }
   }, [isCurrent, setValue, clearErrors]);
 
@@ -124,91 +125,48 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <Label htmlFor="title">Position Title *</Label>
-            <Input
-              id="title"
-              {...register("title")}
-              placeholder="e.g. Software Development Intern"
-              className="rounded-full"
-            />
-            {errors.title && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.title.message}
-              </p>
-            )}
+            <Label>Position Title *</Label>
+            <Input {...register("title")} className="rounded-full" />
           </div>
-
           <div>
-            <Label htmlFor="company">Company *</Label>
-            <Input
-              id="company"
-              {...register("company")}
-              placeholder="e.g. Tech Corp"
-              className="rounded-full"
-            />
-            {errors.company && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.company.message}
-              </p>
-            )}
+            <Label>Company *</Label>
+            <Input {...register("company")} className="rounded-full" />
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="start_date">Start Date *</Label>
+              <Label>Start Date *</Label>
               <Input
-                className="rounded-full"
-                id="start_date"
                 type="date"
                 {...register("start_date")}
-              />
-              {errors.start_date && (
-                <p className="text-sm text-destructive mt-1">
-                  {errors.start_date.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="end_date">End Date</Label>
-              <Input
                 className="rounded-full"
-                id="end_date"
+              />
+            </div>
+            <div>
+              <Label>End Date</Label>
+              <Input
                 type="date"
                 disabled={isCurrent}
                 {...register("end_date")}
+                className="rounded-full"
               />
-              {/* Added Error Message Display Below */}
               {errors.end_date && (
-                <p className="text-sm text-destructive mt-1">
+                <p className="text-sm text-destructive">
                   {errors.end_date.message}
                 </p>
               )}
             </div>
           </div>
-
           <div className="flex items-center space-x-2">
             <Checkbox
-              id="is_current"
               checked={isCurrent}
-              onCheckedChange={(checked) =>
-                setValue("is_current", checked as boolean)
-              }
+              onCheckedChange={(c) => setValue("is_current", c as boolean)}
             />
-            <Label htmlFor="is_current">Currently working here</Label>
+            <Label>Currently working here</Label>
           </div>
-
           <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              {...register("description")}
-              placeholder="Describe your responsibilities and achievements"
-              rows={3}
-              className="rounded-xl"
-            />
+            <Label>Description</Label>
+            <Textarea {...register("description")} className="rounded-xl" />
           </div>
-
           <div className="flex justify-end space-x-2 pt-4">
             <Button
               type="button"
@@ -218,12 +176,8 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-full"
-            >
-              {isSubmitting ? "Saving..." : internship ? "Update" : "Add"}
+            <Button type="submit" disabled={isPending} className="rounded-full">
+              {isPending ? "Saving..." : "Save"}
             </Button>
           </div>
         </form>

@@ -4,6 +4,7 @@ import {
   deleteTask,
   getCandidateTasks,
   updateTask,
+  getAllTaskProgress,
 } from "@/services/candidateTasks.service";
 import {
   CreateTaskPayload,
@@ -31,7 +32,7 @@ export const useCreateTask = () => {
   });
 };
 
-export const useUpdateTask = (applicationId: string) => {
+export const useUpdateTask = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -44,21 +45,28 @@ export const useUpdateTask = (applicationId: string) => {
     }) => updateTask(taskId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["candidateTasks", applicationId],
+        queryKey: ["candidateTasks"],
       });
     },
   });
 };
 
-export const useDeleteTask = (applicationId: string) => {
+export const useDeleteTask = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (taskId: string) => deleteTask(taskId),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["candidateTasks", applicationId],
+        queryKey: ["candidateTasks"],
       });
     },
+  });
+};
+
+export const useAllTaskProgress = () => {
+  return useQuery({
+    queryKey: ["allTaskProgress"],
+    queryFn: getAllTaskProgress,
   });
 };

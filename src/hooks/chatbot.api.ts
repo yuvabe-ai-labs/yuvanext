@@ -1,11 +1,12 @@
-const API_BASE_URL = `${import.meta.env.VITE_BETTER_AUTH_URL}/api`;
+import { env } from "@/env";
+const API_BASE_URL = `${env.VITE_API_URL}/api`;
 
 export async function streamChatbotMessage(
   message: string,
   onEvent: (event: {
     type: "start" | "chunk" | "complete" | "error";
     data: any;
-  }) => void
+  }) => void,
 ) {
   const response = await fetch(`${API_BASE_URL}/chatbot`, {
     method: "POST",

@@ -24,7 +24,7 @@ export default function MyTasks() {
 
   // Fetch application data which includes metadata and tasks
   const { data: applicationData, isLoading } = useCandidateTasks(
-    applicationId || ""
+    applicationId || "",
   );
 
   // Extract the inner tasks array for the calendar and sidebar
@@ -140,7 +140,7 @@ export default function MyTasks() {
                           <Badge
                             variant="secondary"
                             className={`${getStatusColor(
-                              task.taskStatus
+                              task.taskStatus,
                             )} text-white text-[10px] px-2 py-0.5`}
                           >
                             {getStatusLabel(task.taskStatus)}
@@ -182,6 +182,7 @@ export default function MyTasks() {
           isOpen={isUpdateModalOpen}
           onClose={handleCloseModal}
           task={selectedTask}
+          applicationId={""}
         />
       )}
     </div>

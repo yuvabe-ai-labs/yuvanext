@@ -60,13 +60,13 @@ export const LinkDialog: React.FC<LinkDialogProps> = ({
     const platformExists = existingLinks.some(
       (l) =>
         l.platform?.toLowerCase() === data.platform.toLowerCase() &&
-        l.platform?.toLowerCase() !== link?.platform?.toLowerCase()
+        l.platform?.toLowerCase() !== link?.platform?.toLowerCase(),
     );
 
     const urlExists = existingLinks.some(
       (l) =>
         l.url?.toLowerCase() === data.url.toLowerCase() &&
-        l.url?.toLowerCase() !== link?.url?.toLowerCase()
+        l.url?.toLowerCase() !== link?.url?.toLowerCase(),
     );
 
     if (platformExists) {

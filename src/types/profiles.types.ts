@@ -24,9 +24,18 @@ export interface Project {
   description?: string;
   technologies?: string[];
   projectUrl?: string;
+  start_date?: string;
+  end_date?: string;
+  is_current?: boolean;
 }
 
-// --- Candidate Specific Sub-Types ---
+export interface Language {
+  id: string;
+  name: string;
+  read: boolean;
+  write: boolean;
+  speak: boolean;
+}
 
 export interface CandidateInternship {
   id: string;
@@ -41,7 +50,7 @@ export interface CandidateInternship {
 export interface CandidateProject {
   id: string;
   title?: string;
-  name?: string; // Fallback for API inconsistency
+  name?: string;
   client_name?: string;
   description?: string;
   start_date?: string;
@@ -62,10 +71,10 @@ export interface CandidateCourse {
 export interface CandidateEducation {
   id: string;
   degree?: string;
-  name?: string; // Fallback
+  name?: string;
   institution?: string;
-  school?: string; // Fallback
-  college?: string; // Fallback
+  school?: string;
+  college?: string;
   field_of_study?: string;
   description?: string;
   start_year?: string;
@@ -77,16 +86,12 @@ export interface CandidateEducation {
   gpa?: string;
 }
 
-// --- Main Profile Interface (Unified) ---
-
 export interface Profile {
   id: string;
   userId: string;
   name: string;
   email: string;
-  role: string; // Keeping as string for compatibility, ideally use UserRole
-
-  // Common Fields
+  role: string;
   image: string | null;
   avatarUrl: string | null;
   phone: string | null;
@@ -94,8 +99,6 @@ export interface Profile {
   address: string | null;
   websiteUrl: string | null;
   description: string | null;
-
-  // Unit Specific Fields
   mission: string | null;
   values: string | null;
   industry: string | null;
@@ -117,31 +120,19 @@ export interface Profile {
   gender: string | null;
   dateOfBirth: string | null;
   onboardingCompleted: boolean | null;
-
-  // Arrays (Typed where possible)
   skills: string[];
   interests: string[];
   lookingFor: string[];
-  language: string[];
-
-  // Complex Arrays
+  language: Language[];
   education: CandidateEducation[];
   course: CandidateCourse[];
   internship: CandidateInternship[];
-  projects: Project[]; // Unit projects (usually)
-
-  // Social
+  projects: Project[];
   socialLinks: SocialLink[];
-
-  // Stats
   profileScore: number;
-
-  // Timestamps
   createdAt: string;
   updatedAt: string;
 }
-
-// --- API Payload Interfaces ---
 
 export interface UpdateProfilePayload {
   name?: string;
@@ -160,15 +151,11 @@ export interface UpdateProfilePayload {
   isDifferentlyAbled?: boolean | null;
   hasCareerBreak?: boolean | null;
   onboardingCompleted?: boolean | null;
-
-  // Unit fields
   mission?: string | null;
   values?: string | null;
   industry?: string | null;
   isAurovillian?: boolean | null;
   bannerUrl?: string | null;
-
-  // Arrays
   skills?: string[];
   interests?: string[];
   lookingFor?: string[];
@@ -180,8 +167,6 @@ export interface UpdateProfilePayload {
   socialLinks?: SocialLink[];
   galleryImages?: string[];
 }
-
-// --- Application / Candidate View Interfaces ---
 
 export interface CandidateProfileData {
   application: {
@@ -221,6 +206,7 @@ export interface CandidateProfileData {
     socialLinks: SocialLink[] | null;
     internship: CandidateInternship[];
     projects: CandidateProject[];
+    language?: Language[]; // Added for consistency
   };
 }
 
@@ -265,8 +251,6 @@ export interface UpdateApplicationStatusPayload {
     | "hired";
   interviewDetails?: InterviewDetails;
 }
-
-// --- Image Upload Interfaces ---
 
 export type ImageType = "avatar" | "banner" | "gallery";
 

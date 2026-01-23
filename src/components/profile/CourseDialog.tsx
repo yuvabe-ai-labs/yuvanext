@@ -13,7 +13,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
+import { useUpdateProfile, useProfile } from "@/hooks/useProfile"; //
+import { CandidateCourse } from "@/types/profiles.types"; //
 
 const courseSchema = z.object({
   title: z.string().min(1, "Course title is required"),
@@ -24,31 +25,26 @@ const courseSchema = z.object({
 
 type CourseFormData = z.infer<typeof courseSchema>;
 
-interface CourseEntry {
-  title: string;
-  provider: string;
-  completion_date: string;
-  certificate_url?: string | null;
-}
-
 interface CourseDialogProps {
   children: React.ReactNode;
-  course?: CourseEntry;
+  course?: CandidateCourse;
+  onUpdate?: () => void;
 }
 
 export const CourseDialog: React.FC<CourseDialogProps> = ({
   children,
   course,
+  onUpdate,
 }) => {
   const [open, setOpen] = React.useState(false);
   const { toast } = useToast();
-  const { data: profileData } = useProfile();
-  const { mutateAsync: updateProfile } = useUpdateProfile();
+  const { data: profileData } = useProfile(); //
+  const { mutateAsync: updateProfile, isPending } = useUpdateProfile(); //
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
     reset,
   } = useForm<CourseFormData>({
     resolver: zodResolver(courseSchema),
@@ -60,6 +56,7 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({
     },
   });
 
+  // Helper to safely parse array fields from profile
   const parseJsonField = (field: any, defaultValue: any = []) => {
     if (!field) return defaultValue;
     if (typeof field === "string") {
@@ -77,18 +74,22 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({
       const existingCourses = parseJsonField(profileData?.course, []);
 
       let updatedCourses;
-      if (course) {
-        // Update existing course
-        updatedCourses = existingCourses.map((c: CourseEntry) =>
-          c.title === course.title && c.provider === course.provider ? data : c
+      if (course?.id) {
+        // Update: match by ID for accuracy
+        updatedCourses = existingCourses.map((c: CandidateCourse) =>
+          c.id === course.id ? { ...c, ...data } : c,
         );
       } else {
-        // Add new course
-        updatedCourses = [...existingCourses, data];
+        // Add: generate a temporary ID if backend doesn't handle it, or let backend assign
+        const newCourse = {
+          ...data,
+          id: crypto.randomUUID(), // Ensure new entries have a unique identifier
+        };
+        updatedCourses = [...existingCourses, newCourse];
       }
 
       await updateProfile({
-        course: updatedCourses,
+        course: updatedCourses, //
       });
 
       toast({
@@ -98,6 +99,10 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({
 
       setOpen(false);
       reset();
+
+      if (onUpdate) {
+        onUpdate();
+      }
     } catch (error) {
       console.error("Error saving course:", error);
       toast({
@@ -188,12 +193,8 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-full"
-            >
-              {isSubmitting ? "Saving..." : course ? "Update" : "Add"}
+            <Button type="submit" disabled={isPending} className="rounded-full">
+              {isPending ? "Saving..." : course ? "Update" : "Add"}
             </Button>
           </div>
         </form>

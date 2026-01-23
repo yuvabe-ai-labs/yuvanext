@@ -15,80 +15,114 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { ProjectEntry } from "@/types/profile";
+import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
+import { Project } from "@/types/profiles.types";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 
 const projectSchema = z
   .object({
-    title: z.string().min(1, "Title is required"),
+    projectName: z.string().min(1, "Title is required"),
     description: z.string().min(1, "Description is required"),
     technologies: z
       .array(z.string())
       .min(1, "At least one technology is required"),
-    start_date: z.string().min(1, "Start date is required"),
-    end_date: z.string().optional(),
-    project_url: z.string().url().optional().or(z.literal("")),
+    completionDate: z.string().optional(),
+    projectUrl: z.string().url().optional().or(z.literal("")),
     is_current: z.boolean().default(false),
+    start_date: z.string().min(1, "Start date is required"),
   })
   .refine(
     (data) => {
-      // If currently working, or if dates are missing, skip this validation
-      if (data.is_current || !data.end_date || !data.start_date) {
+      if (data.is_current || !data.completionDate || !data.start_date) {
         return true;
       }
-      // Convert strings to Date objects for comparison
       const start = new Date(data.start_date);
-      const end = new Date(data.end_date);
+      const end = new Date(data.completionDate);
       return end >= start;
     },
     {
       message: "End date cannot be before start date",
-      path: ["end_date"], // Attach error to end_date field
-    }
+      path: ["completionDate"],
+    },
   );
 
 type ProjectFormData = z.infer<typeof projectSchema>;
 
 interface ProjectDialogProps {
   children: React.ReactNode;
-  project?: ProjectEntry;
-  onSave: (project: Omit<ProjectEntry, "id">) => Promise<void>;
+  project?: any; // Using any to handle both Project type and potential extra fields
+  onUpdate?: () => void;
 }
 
 export const ProjectDialog: React.FC<ProjectDialogProps> = ({
   children,
   project,
-  onSave,
+  onUpdate,
 }) => {
   const [open, setOpen] = React.useState(false);
   const [newTech, setNewTech] = React.useState("");
   const [technologies, setTechnologies] = React.useState<string[]>(
-    project?.technologies || []
+    project?.technologies || [],
   );
   const { toast } = useToast();
+  const { data: profileData } = useProfile();
+  const { mutateAsync: updateProfile, isPending } = useUpdateProfile();
+
+  // Extract start_date from either field name
+  const getStartDate = () => {
+    if (project?.start_date) return project.start_date;
+    if (project?.startDate) return project.startDate;
+    return "";
+  };
+
+  // Extract end_date/completion date
+  const getEndDate = () => {
+    if (project?.completionDate && project.completionDate !== "Present") {
+      return project.completionDate;
+    }
+    if (project?.end_date && project.end_date !== "Present") {
+      return project.end_date;
+    }
+    return "";
+  };
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
     watch,
     setValue,
-    clearErrors, // Added clearErrors
+    clearErrors,
+    reset,
   } = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
-      title: project?.title || "",
+      projectName: project?.projectName || project?.title || "",
       description: project?.description || "",
       technologies: project?.technologies || [],
-      start_date: project?.start_date || "",
-      end_date: project?.end_date || "",
-      project_url: project?.project_url || "",
-      is_current: project?.is_current || false,
+      completionDate: getEndDate(),
+      projectUrl: project?.projectUrl || "",
+      is_current:
+        project?.completionDate === "Present" ||
+        project?.end_date === "Present",
+      start_date: getStartDate(),
     },
   });
 
   const isCurrent = watch("is_current");
+
+  const parseJsonField = (field: any, defaultValue: any = []) => {
+    if (!field) return defaultValue;
+    if (typeof field === "string") {
+      try {
+        return JSON.parse(field);
+      } catch {
+        return defaultValue;
+      }
+    }
+    return Array.isArray(field) ? field : defaultValue;
+  };
 
   const addTechnology = () => {
     if (newTech.trim() && !technologies.includes(newTech.trim())) {
@@ -107,21 +141,44 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
 
   const onSubmit = async (data: ProjectFormData) => {
     try {
-      await onSave({
-        title: data.title!,
-        description: data.description!,
-        technologies,
-        start_date: data.start_date!,
-        end_date: data.is_current ? null : data.end_date || null,
-        project_url: data.project_url || null,
-        is_current: data.is_current!,
-      } as Omit<ProjectEntry, "id">);
+      const existingProjects = parseJsonField(profileData?.projects, []);
+
+      // Include start_date in the payload
+      const projectPayload = {
+        id: project?.id || crypto.randomUUID(),
+        projectName: data.projectName,
+        description: data.description,
+        technologies: data.technologies,
+        start_date: data.start_date, // ✅ NOW SAVING START DATE
+        completionDate: data.is_current ? "Present" : data.completionDate || "",
+        projectUrl: data.projectUrl || "",
+      };
+
+      let updatedProjects;
+      if (project?.id) {
+        // Update existing project
+        updatedProjects = existingProjects.map((p: any) =>
+          p.id === project.id ? projectPayload : p,
+        );
+      } else {
+        // Add new project
+        updatedProjects = [...existingProjects, projectPayload];
+      }
+
+      await updateProfile({
+        projects: updatedProjects,
+      });
+
       toast({
         title: "Success",
         description: `Project ${project ? "updated" : "added"} successfully`,
       });
       setOpen(false);
+      reset();
+      setTechnologies([]);
+      if (onUpdate) onUpdate();
     } catch (error) {
+      console.error("Error saving project:", error);
       toast({
         title: "Error",
         description: "Failed to save project",
@@ -132,10 +189,31 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
 
   React.useEffect(() => {
     if (isCurrent) {
-      setValue("end_date", "");
-      clearErrors("end_date"); // Clear error when switching to current
+      setValue("completionDate", "");
+      clearErrors("completionDate");
     }
   }, [isCurrent, setValue, clearErrors]);
+
+  // Reset form when dialog opens with project data
+  React.useEffect(() => {
+    if (open && project) {
+      setTechnologies(project.technologies || []);
+      setValue("projectName", project.projectName || project.title || "");
+      setValue("description", project.description || "");
+      setValue("technologies", project.technologies || []);
+      setValue("start_date", getStartDate());
+      setValue("completionDate", getEndDate());
+      setValue("projectUrl", project.projectUrl || "");
+      setValue(
+        "is_current",
+        project.completionDate === "Present" || project.end_date === "Present",
+      );
+    } else if (!open) {
+      reset();
+      setTechnologies([]);
+      setNewTech("");
+    }
+  }, [open, project]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -146,16 +224,16 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <Label htmlFor="title">Project Title *</Label>
+            <Label htmlFor="projectName">Project Title *</Label>
             <Input
-              id="title"
-              {...register("title")}
+              id="projectName"
+              {...register("projectName")}
               placeholder="e.g. E-commerce Website"
               className="rounded-full"
             />
-            {errors.title && (
+            {errors.projectName && (
               <p className="text-sm text-destructive mt-1">
-                {errors.title.message}
+                {errors.projectName.message}
               </p>
             )}
           </div>
@@ -236,18 +314,17 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
             </div>
 
             <div>
-              <Label htmlFor="end_date">End Date</Label>
+              <Label htmlFor="completionDate">End Date</Label>
               <Input
-                id="end_date"
+                id="completionDate"
                 type="date"
                 disabled={isCurrent}
-                {...register("end_date")}
+                {...register("completionDate")}
                 className="rounded-full"
               />
-              {/* Added Error Message Display Below */}
-              {errors.end_date && (
+              {errors.completionDate && (
                 <p className="text-sm text-destructive mt-1">
-                  {errors.end_date.message}
+                  {errors.completionDate.message}
                 </p>
               )}
             </div>
@@ -267,17 +344,17 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
           </div>
 
           <div>
-            <Label htmlFor="project_url">Project URL</Label>
+            <Label htmlFor="projectUrl">Project URL</Label>
             <Input
               className="rounded-full"
-              id="project_url"
+              id="projectUrl"
               type="url"
-              {...register("project_url")}
+              {...register("projectUrl")}
               placeholder="https://github.com/username/project"
             />
-            {errors.project_url && (
+            {errors.projectUrl && (
               <p className="text-sm text-destructive mt-1">
-                {errors.project_url.message}
+                {errors.projectUrl.message}
               </p>
             )}
           </div>
@@ -291,12 +368,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-full"
-            >
-              {isSubmitting ? "Saving..." : project ? "Update" : "Add"}
+            <Button type="submit" disabled={isPending} className="rounded-full">
+              {isPending ? "Saving..." : project ? "Update" : "Add"}
             </Button>
           </div>
         </form>

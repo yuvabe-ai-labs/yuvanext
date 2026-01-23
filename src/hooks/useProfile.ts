@@ -15,7 +15,6 @@ export const useUpdateProfile = () => {
   return useMutation({
     mutationFn: (payload: UpdateProfilePayload) => updateProfile(payload),
     onSuccess: () => {
-      // Refetch updated profile
       queryClient.invalidateQueries({ queryKey: ["profile"] });
     },
   });

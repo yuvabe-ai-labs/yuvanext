@@ -10,9 +10,7 @@ export enum UserRole {
 // --- Shared Sub-Types ---
 
 export interface SocialLink {
-  id: string;
-  platform: string;
-  url: string;
+  [platform: string]: string;
 }
 
 export interface Project {

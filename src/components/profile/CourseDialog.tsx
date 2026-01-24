@@ -13,8 +13,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { useUpdateProfile, useProfile } from "@/hooks/useProfile"; //
-import { CandidateCourse } from "@/types/profiles.types"; //
+import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
+import { CandidateCourse } from "@/types/profiles.types";
 
 const courseSchema = z.object({
   title: z.string().min(1, "Course title is required"),
@@ -25,9 +25,13 @@ const courseSchema = z.object({
 
 type CourseFormData = z.infer<typeof courseSchema>;
 
+interface CourseWithIndex extends CandidateCourse {
+  index?: number;
+}
+
 interface CourseDialogProps {
   children: React.ReactNode;
-  course?: CandidateCourse;
+  course?: CourseWithIndex;
   onUpdate?: () => void;
 }
 
@@ -38,8 +42,8 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({
 }) => {
   const [open, setOpen] = React.useState(false);
   const { toast } = useToast();
-  const { data: profileData } = useProfile(); //
-  const { mutateAsync: updateProfile, isPending } = useUpdateProfile(); //
+  const { data: profileData } = useProfile();
+  const { mutateAsync: updateProfile, isPending } = useUpdateProfile();
 
   const {
     register,
@@ -56,7 +60,6 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({
     },
   });
 
-  // Helper to safely parse array fields from profile
   const parseJsonField = (field: any, defaultValue: any = []) => {
     if (!field) return defaultValue;
     if (typeof field === "string") {
@@ -74,22 +77,17 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({
       const existingCourses = parseJsonField(profileData?.course, []);
 
       let updatedCourses;
-      if (course?.id) {
-        // Update: match by ID for accuracy
-        updatedCourses = existingCourses.map((c: CandidateCourse) =>
-          c.id === course.id ? { ...c, ...data } : c,
+      if (course?.index !== undefined) {
+        updatedCourses = existingCourses.map(
+          (c: CandidateCourse, idx: number) =>
+            idx === course.index ? { ...data } : c,
         );
       } else {
-        // Add: generate a temporary ID if backend doesn't handle it, or let backend assign
-        const newCourse = {
-          ...data,
-          id: crypto.randomUUID(), // Ensure new entries have a unique identifier
-        };
-        updatedCourses = [...existingCourses, newCourse];
+        updatedCourses = [...existingCourses, { ...data }];
       }
 
       await updateProfile({
-        course: updatedCourses, //
+        course: updatedCourses,
       });
 
       toast({

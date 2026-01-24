@@ -33,20 +33,28 @@ const educationSchema = z
   })
   .refine(
     (data) => {
-      if (data.is_current || !data.end_year || !data.start_year) return true;
+      if (data.is_current) return true;
+
+      if (!data.end_year || isNaN(data.end_year)) return false;
+
       return data.end_year >= data.start_year;
     },
     {
-      message: "End year cannot be before start year",
+      message:
+        "End year is required for completed education and must be after start year",
       path: ["end_year"],
     },
   );
 
 type EducationFormData = z.infer<typeof educationSchema>;
 
+interface EducationWithId extends CandidateEducation {
+  index?: number;
+}
+
 interface EducationDialogProps {
   children: React.ReactNode;
-  education?: CandidateEducation;
+  education?: EducationWithId;
   onUpdate?: () => void;
 }
 
@@ -78,7 +86,7 @@ export const EducationDialog: React.FC<EducationDialogProps> = ({
         : undefined,
       end_year: education?.end_year ? Number(education.end_year) : undefined,
       score: education?.score || "",
-      is_current: false,
+      is_current: education?.is_current || false,
     },
   });
 
@@ -89,19 +97,23 @@ export const EducationDialog: React.FC<EducationDialogProps> = ({
   const onSubmit = async (data: EducationFormData) => {
     try {
       const existingEdu = parseJsonField(profileData?.education);
+
       const payload = {
-        ...data,
+        degree: data.degree,
+        institution: data.institution,
         start_year: data.start_year.toString(),
-        end_year: data.is_current ? null : data.end_year?.toString() || null,
+        end_year: data.is_current ? undefined : data.end_year?.toString(),
+        score: data.score,
+        is_current: data.is_current,
       };
 
       let updatedEdu;
-      if (education?.id) {
-        updatedEdu = existingEdu.map((e: CandidateEducation) =>
-          e.id === education.id ? { ...e, ...payload } : e,
+      if (education?.index !== undefined) {
+        updatedEdu = existingEdu.map((e: EducationWithId, idx: number) =>
+          idx === education.index ? payload : e,
         );
       } else {
-        updatedEdu = [...existingEdu, { ...payload, id: crypto.randomUUID() }];
+        updatedEdu = [...existingEdu, payload];
       }
 
       await updateProfile({ education: updatedEdu });
@@ -139,7 +151,7 @@ export const EducationDialog: React.FC<EducationDialogProps> = ({
             <Label>Degree *</Label>
             <Input {...register("degree")} className="rounded-full" />
             {errors.degree && (
-              <p className="text-sm text-destructive">
+              <p className="text-xs text-destructive mt-1">
                 {errors.degree.message}
               </p>
             )}
@@ -147,6 +159,11 @@ export const EducationDialog: React.FC<EducationDialogProps> = ({
           <div>
             <Label>Institution *</Label>
             <Input {...register("institution")} className="rounded-full" />
+            {errors.institution && (
+              <p className="text-xs text-destructive mt-1">
+                {errors.institution.message}
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -156,6 +173,11 @@ export const EducationDialog: React.FC<EducationDialogProps> = ({
                 {...register("start_year")}
                 className="rounded-full"
               />
+              {errors.start_year && (
+                <p className="text-xs text-destructive mt-1">
+                  {errors.start_year.message}
+                </p>
+              )}
             </div>
             <div>
               <Label>End Year</Label>
@@ -166,7 +188,7 @@ export const EducationDialog: React.FC<EducationDialogProps> = ({
                 className="rounded-full"
               />
               {errors.end_year && (
-                <p className="text-sm text-destructive">
+                <p className="text-xs text-destructive mt-1">
                   {errors.end_year.message}
                 </p>
               )}
@@ -178,7 +200,9 @@ export const EducationDialog: React.FC<EducationDialogProps> = ({
               checked={isCurrent}
               onCheckedChange={(c) => setValue("is_current", c as boolean)}
             />
-            <Label htmlFor="is_current">Currently studying here</Label>
+            <Label htmlFor="is_current" className="text-sm font-normal">
+              Currently studying here
+            </Label>
           </div>
           <div>
             <Label>Score/Grade</Label>

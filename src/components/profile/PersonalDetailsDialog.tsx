@@ -247,7 +247,6 @@ export const PersonalDetailsDialog = ({
         dateOfBirth: dateOfBirth,
         isDifferentlyAbled: data.is_differently_abled || false,
         hasCareerBreak: data.has_career_break || false,
-        // Send languages as array of JSON strings (API expects string[])
         language:
           languages.length > 0
             ? languages.map((lang) => JSON.stringify(lang))

@@ -50,7 +50,6 @@ const Chatbot = () => {
   const [isMultiSelect, setIsMultiSelect] = useState(false);
   const [initialGreetingSent, setInitialGreetingSent] = useState(false);
 
-  // Derive role dynamically from useProfile hook
   const userRole = profile?.role || "";
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -99,7 +98,6 @@ const Chatbot = () => {
     }
   }, [onboardingCompleted]);
 
-  // Sync backend messages with local state
   useEffect(() => {
     if (chatMessages.length === 0 && messages.length <= 1) return;
 
@@ -126,7 +124,6 @@ const Chatbot = () => {
     setInitialGreetingSent(false);
 
     setTimeout(() => {
-      // Use profile name if available, fallback to session, then fallback to "there"
       const name = profile?.name || session?.user?.name || "there";
       const initialMessage: Message = {
         id: "initial",
@@ -460,7 +457,6 @@ const Chatbot = () => {
                       )}
                     </Card>
 
-                    {/* Logic Fix: Buttons only show when history is finished and no current stream is active */}
                     {message.role === "assistant" &&
                       message.options &&
                       message.options.length > 0 &&

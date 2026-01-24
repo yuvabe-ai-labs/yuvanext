@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { streamChatbotMessage } from "./chatbot.api";
 
 interface ChatMessage {
@@ -14,23 +14,6 @@ export function useChatbotStream() {
   const [streamingMessage, setStreamingMessage] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
-
-  // Use a ref to track typing state so the complete event can wait
-  const isTypingRef = useRef(false);
-
-  const simulateTyping = async (fullText: string) => {
-    isTypingRef.current = true;
-    let currentText = "";
-    const speed = 15; // Slightly faster for better UX
-
-    for (let i = 0; i < fullText.length; i++) {
-      currentText += fullText[i];
-      setStreamingMessage(currentText);
-      await new Promise((resolve) => setTimeout(resolve, speed));
-    }
-    isTypingRef.current = false;
-    return currentText;
-  };
 
   const sendMessage = async (message: string) => {
     setLoading(true);
@@ -49,18 +32,13 @@ export function useChatbotStream() {
         if (type === "structured") {
           lastStructuredData = data;
           if (data.message) {
-            const textToAnimate =
+            const fullText =
               data.message + (data.question ? "\n\n" + data.question : "");
-            await simulateTyping(textToAnimate);
+            setStreamingMessage(fullText);
           }
         }
 
         if (type === "complete") {
-          // LOOP: Wait until typing simulation is finished
-          while (isTypingRef.current) {
-            await new Promise((resolve) => setTimeout(resolve, 50));
-          }
-
           if (lastStructuredData) {
             setMessages((prev) => [
               ...prev,
@@ -75,7 +53,6 @@ export function useChatbotStream() {
             setOnboardingCompleted(data.onboardingCompleted || false);
           }
 
-          // Clear streaming message ONLY after it has been added to the permanent list
           setStreamingMessage("");
           setLoading(false);
         }

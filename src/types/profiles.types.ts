@@ -10,13 +10,11 @@ export enum UserRole {
 // --- Shared Sub-Types ---
 
 export interface SocialLink {
-  id: string;
   platform: string;
   url: string;
 }
 
 export interface Project {
-  id?: string;
   projectName: string;
   clientName?: string;
   status?: string;
@@ -38,7 +36,6 @@ export interface Language {
 }
 
 export interface CandidateInternship {
-  id: string;
   title: string;
   company?: string;
   description?: string;
@@ -61,7 +58,6 @@ export interface CandidateProject {
 }
 
 export interface CandidateCourse {
-  id: string;
   title: string;
   provider?: string;
   completion_date?: string;
@@ -69,7 +65,7 @@ export interface CandidateCourse {
 }
 
 export interface CandidateEducation {
-  id: string;
+  is_current: boolean;
   degree?: string;
   name?: string;
   institution?: string;
@@ -109,8 +105,6 @@ export interface Profile {
   focusAreas: string[];
   skillsOffered: string[];
   opportunitiesOffered: string[];
-
-  // Candidate Specific Fields
   type: string | null;
   experienceLevel: string | null;
   profileSummary: string | null;

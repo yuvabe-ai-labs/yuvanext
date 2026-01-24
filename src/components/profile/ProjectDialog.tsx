@@ -16,7 +16,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
-import { Project } from "@/types/profiles.types";
+import { CandidateProject } from "@/types/profiles.types";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 
@@ -51,7 +51,7 @@ type ProjectFormData = z.infer<typeof projectSchema>;
 
 interface ProjectDialogProps {
   children: React.ReactNode;
-  project?: any; // Using any to handle both Project type and potential extra fields
+  project?: CandidateProject;
   onUpdate?: () => void;
 }
 
@@ -69,18 +69,12 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
   const { data: profileData } = useProfile();
   const { mutateAsync: updateProfile, isPending } = useUpdateProfile();
 
-  // Extract start_date from either field name
   const getStartDate = () => {
     if (project?.start_date) return project.start_date;
-    if (project?.startDate) return project.startDate;
     return "";
   };
 
-  // Extract end_date/completion date
   const getEndDate = () => {
-    if (project?.completionDate && project.completionDate !== "Present") {
-      return project.completionDate;
-    }
     if (project?.end_date && project.end_date !== "Present") {
       return project.end_date;
     }
@@ -98,14 +92,12 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
   } = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
-      projectName: project?.projectName || project?.title || "",
+      projectName: project?.title || project?.name || "",
       description: project?.description || "",
       technologies: project?.technologies || [],
       completionDate: getEndDate(),
-      projectUrl: project?.projectUrl || "",
-      is_current:
-        project?.completionDate === "Present" ||
-        project?.end_date === "Present",
+      projectUrl: project?.project_url || "",
+      is_current: project?.is_current || project?.end_date === "Present",
       start_date: getStartDate(),
     },
   });
@@ -143,25 +135,25 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
     try {
       const existingProjects = parseJsonField(profileData?.projects, []);
 
-      // Include start_date in the payload
-      const projectPayload = {
-        id: project?.id || crypto.randomUUID(),
-        projectName: data.projectName,
+      const projectPayload: CandidateProject = {
+        id:
+          project?.id ||
+          `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        title: data.projectName,
         description: data.description,
         technologies: data.technologies,
-        start_date: data.start_date, // ✅ NOW SAVING START DATE
-        completionDate: data.is_current ? "Present" : data.completionDate || "",
-        projectUrl: data.projectUrl || "",
+        start_date: data.start_date,
+        end_date: data.is_current ? "Present" : data.completionDate || "",
+        is_current: data.is_current,
+        project_url: data.projectUrl || "",
       };
 
       let updatedProjects;
       if (project?.id) {
-        // Update existing project
-        updatedProjects = existingProjects.map((p: any) =>
+        updatedProjects = existingProjects.map((p: CandidateProject) =>
           p.id === project.id ? projectPayload : p,
         );
       } else {
-        // Add new project
         updatedProjects = [...existingProjects, projectPayload];
       }
 
@@ -194,19 +186,18 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
     }
   }, [isCurrent, setValue, clearErrors]);
 
-  // Reset form when dialog opens with project data
   React.useEffect(() => {
     if (open && project) {
       setTechnologies(project.technologies || []);
-      setValue("projectName", project.projectName || project.title || "");
+      setValue("projectName", project.title || project.name || "");
       setValue("description", project.description || "");
       setValue("technologies", project.technologies || []);
       setValue("start_date", getStartDate());
       setValue("completionDate", getEndDate());
-      setValue("projectUrl", project.projectUrl || "");
+      setValue("projectUrl", project.project_url || "");
       setValue(
         "is_current",
-        project.completionDate === "Present" || project.end_date === "Present",
+        project.is_current || project.end_date === "Present",
       );
     } else if (!open) {
       reset();

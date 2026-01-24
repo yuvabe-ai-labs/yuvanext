@@ -142,7 +142,13 @@ const Profile = () => {
       } else {
         const existingArray = parseJsonField(rawData, []);
         updatedPayload = existingArray.filter((item: any) => {
-          const id = item.id || item.title || item.name;
+          // Add more fields to check based on the type
+          const id =
+            item.id ||
+            item.title ||
+            item.name ||
+            item.degree ||
+            item.projectName;
           return id !== itemId;
         });
       }
@@ -455,7 +461,10 @@ const Profile = () => {
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <CourseDialog course={course} onUpdate={refetch}>
+                            <CourseDialog
+                              course={{ ...course, index }}
+                              onUpdate={refetch}
+                            >
                               <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary mr-2" />
                             </CourseDialog>
                             <Button
@@ -551,8 +560,10 @@ const Profile = () => {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          {/* Added Education Edit Option */}
-                          <EducationDialog education={edu} onUpdate={refetch}>
+                          <EducationDialog
+                            education={{ ...edu, index }}
+                            onUpdate={refetch}
+                          >
                             <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary mr-2" />
                           </EducationDialog>
                           <Button
@@ -709,7 +720,7 @@ const Profile = () => {
                                 : "Start Date"}{" "}
                               -{" "}
                               {internship.is_current
-                                ? "End date"
+                                ? "Present"
                                 : internship.end_date
                                   ? format(
                                       new Date(internship.end_date),
@@ -721,7 +732,7 @@ const Profile = () => {
 
                           <div className="flex items-center gap-6">
                             <InternshipDialog
-                              internship={internship}
+                              internship={{ ...internship, index }}
                               onUpdate={refetch}
                             >
                               <Button

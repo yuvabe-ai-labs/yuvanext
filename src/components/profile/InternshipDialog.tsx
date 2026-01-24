@@ -29,17 +29,28 @@ const internshipSchema = z
   })
   .refine(
     (data) => {
-      if (data.is_current || !data.end_date || !data.start_date) return true;
+      if (data.is_current) return true;
+
+      if (!data.end_date) return false;
+
       return new Date(data.end_date) >= new Date(data.start_date);
     },
-    { message: "End date cannot be before start date", path: ["end_date"] },
+    {
+      message:
+        "End date is required for past internships and must be after the start date",
+      path: ["end_date"],
+    },
   );
 
 type InternshipFormData = z.infer<typeof internshipSchema>;
 
+interface InternshipWithId extends CandidateInternship {
+  index?: number;
+}
+
 interface InternshipDialogProps {
   children: React.ReactNode;
-  internship?: CandidateInternship;
+  internship?: InternshipWithId;
   onUpdate?: () => void;
 }
 
@@ -79,18 +90,20 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
   const onSubmit = async (data: InternshipFormData) => {
     try {
       const existingInternships = parseJsonField(profileData?.internship);
+
+      const internshipPayload = {
+        ...data,
+      };
+
       let updatedInternships;
 
-      if (internship?.id) {
+      if (internship?.index !== undefined) {
         updatedInternships = existingInternships.map(
-          (i: CandidateInternship) =>
-            i.id === internship.id ? { ...i, ...data } : i,
+          (i: InternshipWithId, idx: number) =>
+            idx === internship.index ? internshipPayload : i,
         );
       } else {
-        updatedInternships = [
-          ...existingInternships,
-          { ...data, id: crypto.randomUUID() },
-        ];
+        updatedInternships = [...existingInternships, internshipPayload];
       }
 
       await updateProfile({ internship: updatedInternships });
@@ -127,10 +140,20 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
           <div>
             <Label>Position Title *</Label>
             <Input {...register("title")} className="rounded-full" />
+            {errors.title && (
+              <p className="text-sm text-destructive mt-1">
+                {errors.title.message}
+              </p>
+            )}
           </div>
           <div>
             <Label>Company *</Label>
             <Input {...register("company")} className="rounded-full" />
+            {errors.company && (
+              <p className="text-sm text-destructive mt-1">
+                {errors.company.message}
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -140,6 +163,11 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
                 {...register("start_date")}
                 className="rounded-full"
               />
+              {errors.start_date && (
+                <p className="text-sm text-destructive mt-1">
+                  {errors.start_date.message}
+                </p>
+              )}
             </div>
             <div>
               <Label>End Date</Label>
@@ -150,7 +178,7 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
                 className="rounded-full"
               />
               {errors.end_date && (
-                <p className="text-sm text-destructive">
+                <p className="text-sm text-destructive mt-1">
                   {errors.end_date.message}
                 </p>
               )}

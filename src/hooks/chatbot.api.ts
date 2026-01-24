@@ -4,7 +4,7 @@ const API_BASE_URL = `${env.VITE_API_URL}/api`;
 export async function streamChatbotMessage(
   message: string,
   onEvent: (event: {
-    type: "start" | "chunk" | "complete" | "error";
+    type: "start" | "chunk" | "structured" | "complete" | "error";
     data: any;
   }) => void,
 ) {
@@ -13,7 +13,7 @@ export async function streamChatbotMessage(
     headers: {
       "Content-Type": "application/json",
     },
-    credentials: "include", // 🔑 SAME AS axios withCredentials
+    credentials: "include", // 🔒 SAME AS axios withCredentials
     body: JSON.stringify({ message }),
   });
 

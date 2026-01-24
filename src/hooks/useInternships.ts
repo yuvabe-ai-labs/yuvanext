@@ -14,6 +14,7 @@ import {
   applyToInternship,
   updateInternship,
   createInternship,
+  deleteInternship,
 } from "@/services/internships.service";
 import {
   ApplyInternshipRequest,
@@ -201,6 +202,35 @@ export const useUpdateInternship = () => {
     onError: (error) => {
       console.error("Update internship failed", error);
       // Toast handled by error callback in component or global handler
+    },
+  });
+};
+
+export const useDeleteInternship = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteInternship(id),
+
+    onSuccess: () => {
+      toast({
+        title: "Deleted",
+        description: "Job description removed successfully",
+      });
+      // Forces the "internships" query to refetch, updating the UI list automatically
+      queryClient.invalidateQueries({ queryKey: ["internships"] });
+      // Also update stats if they track total jobs
+      queryClient.invalidateQueries({ queryKey: ["unitStats"] });
+    },
+
+    onError: (error: any) => {
+      console.error("Delete internship failed", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete internship",
+        variant: "destructive",
+      });
     },
   });
 };

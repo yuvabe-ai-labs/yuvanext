@@ -69,91 +69,110 @@ const UnitProfile = () => {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   // --- 4. OPTIMISTIC UPDATE HELPER ---
-  // This function updates the UI immediately before the server responds
   const performOptimisticUpdate = (updates: Partial<Profile>) => {
-    // 1. Snapshot previous value
     const previousProfile = queryClient.getQueryData<Profile>(["unitProfile"]);
 
-    // 2. Optimistically update to the new value
     queryClient.setQueryData<Profile>(["unitProfile"], (old) => {
       if (!old) return old;
       return { ...old, ...updates };
     });
 
-    // 3. Send to Server
     updateMutation.mutate(updates, {
       onError: (err) => {
-        // 4. Rollback on error
         console.error("Update failed, rolling back", err);
         if (previousProfile) {
           queryClient.setQueryData(["unitProfile"], previousProfile);
         }
       },
-      // onSuccess is handled by the hook (invalidating queries), which is fine
     });
   };
 
   // --- HANDLERS ---
 
-  // Update Profile fields (Name, Mission, Values, Description, etc.)
   const handleUpdateProfile = (updates: Partial<Profile>) => {
     performOptimisticUpdate(updates);
   };
 
-  // Add Project
   const handleAddProject = (projectData: ProjectFormValues) => {
     const currentProjects = profile?.projects || [];
-
-    // Create a temp project object with a temp ID to display immediately
     const tempProject: Project = {
       ...projectData,
-      id: `temp-${Date.now()}`, // Temp ID so React can key it list
+      id: `temp-${Date.now()}`,
     } as Project;
-
     const updatedProjects = [...currentProjects, tempProject];
-
     performOptimisticUpdate({ projects: updatedProjects });
   };
 
-  // Remove Project
   const handleRemoveProject = (projectId: string) => {
     if (!projectId) return;
     const currentProjects = profile?.projects || [];
-
-    // Filter out the project
     const updatedProjects = currentProjects.filter((p) => p.id !== projectId);
-
-    // Update immediately
     performOptimisticUpdate({ projects: updatedProjects });
   };
 
-  // Update Social Links
+  // --- FIX: Social Link Handlers to match Reference Code Logic ---
+
+  // 1. Update Social Links (Convert Array -> Object for Backend)
   const handleUpdateSocialLinks = (links: SocialLink[]) => {
-    console.log("links");
-    console.log(links);
+    // Convert the array back to the Object format the backend expects
+    // e.g. [{platform: 'linkedin', url: '...'}] -> { linkedin: '...' }
+    const socialLinksRecord = links.reduce((acc, curr) => {
+      if (curr.platform && curr.url) {
+        acc[curr.platform] = curr.url;
+      }
+      return acc;
+    }, {} as Record<string, string>);
 
-    performOptimisticUpdate({ socialLinks: links });
+    // Cast to any because Profile type says SocialLink[] but we are sending an Object
+    performOptimisticUpdate({ socialLinks: socialLinksRecord as any });
   };
 
-  // Remove Social Link
-  const handleRemoveSocialLink = (linkId: string) => {
-    const currentLinks = profile?.socialLinks || [];
-    const updatedLinks = currentLinks.filter((l) => l.id !== linkId);
+  // 2. Remove Social Link (Handle Object Key Deletion)
+  const handleRemoveSocialLink = (platformId: string) => {
+    // Get current raw data (Object)
+    const currentLinksRecord = (profile?.socialLinks ||
+      {}) as unknown as Record<string, string>;
 
-    performOptimisticUpdate({ socialLinks: updatedLinks });
+    // Create new object without the deleted key
+    const updatedPayload = Object.keys(currentLinksRecord)
+      .filter((key) => key !== platformId)
+      .reduce((acc: any, key) => {
+        acc[key] = currentLinksRecord[key];
+        return acc;
+      }, {});
+
+    performOptimisticUpdate({ socialLinks: updatedPayload });
   };
 
-  // Refetch after image uploads (Images are harder to do optimistically without base64, so refetch is okay here)
   const handleImageSuccess = () => {
     refetch();
   };
 
-  // 5. DATA MAPPING (Safe Defaults)
+  // 5. DATA MAPPING
   const projects = profile?.projects || [];
   const galleryImages = profile?.galleryImages || [];
-  const socialLinks = profile?.socialLinks || [];
   const glimpseUrl = profile?.galleryVideos || null;
   const profileScore = profile?.profileScore || 0;
+
+  // --- FIX: Parse Social Links (Object -> Array for UI) ---
+  const rawSocialLinks = profile?.socialLinks;
+  let socialLinks: SocialLink[] = [];
+
+  if (rawSocialLinks) {
+    // If backend returns Object: { linkedin: "url", facebook: "url" }
+    if (typeof rawSocialLinks === "object" && !Array.isArray(rawSocialLinks)) {
+      socialLinks = Object.entries(rawSocialLinks).map(([key, value]) => ({
+        id: key, // Use platform name as ID for deletion
+        platform: key,
+        url: String(value),
+      }));
+    }
+    // If backend happens to return Array (fallback)
+    else if (Array.isArray(rawSocialLinks)) {
+      socialLinks = rawSocialLinks;
+    }
+  }
+  // -------------------------------------------------------
 
   if (isLoading) {
     return (
@@ -610,6 +629,7 @@ const UnitProfile = () => {
                         <Button
                           variant="ghost"
                           size="sm"
+                          // Use link.id which is mapped to platform name in our parsing logic
                           onClick={() => handleRemoveSocialLink(link.id)}
                           className="text-muted-foreground hover:text-destructive sm:justify-self-end self-end"
                         >

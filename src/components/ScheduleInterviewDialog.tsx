@@ -15,9 +15,9 @@ import { useToast } from "@/hooks/use-toast";
 // 1. Imports for RHF + Zod
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 
-import { useInterviewMutations } from "@/hooks/useInterviews";
+// 2. CHANGE: Import the Status Update Hook instead of Interview Mutation
+import { useUpdateApplicationStatus } from "@/hooks/useCandidateProfile"; // Ensure this path matches where you keep this hook
 import {
   ScheduleFormValues,
   scheduleInterviewSchema,
@@ -40,14 +40,14 @@ export default function ScheduleInterviewDialog({
   onOpenChange,
   candidateName,
   applicationId,
-  unitId = "",
-  studentId = "",
   onSuccess,
 }: ScheduleInterviewDialogProps) {
   const { toast } = useToast();
-  const { createInterview } = useInterviewMutations();
 
-  // 3. Initialize Form
+  // 3. USE THE STATUS UPDATE MUTATION
+  const updateStatusMutation = useUpdateApplicationStatus();
+
+  // Initialize Form
   const {
     register,
     handleSubmit,
@@ -63,7 +63,7 @@ export default function ScheduleInterviewDialog({
     },
   });
 
-  // Guest emails state (Keeping as local state for the "Chip" UI interaction)
+  // Guest emails state
   const [guestEmails, setGuestEmails] = useState<string[]>([]);
 
   const addEmail = (email: string) => {
@@ -91,32 +91,50 @@ export default function ScheduleInterviewDialog({
 
   // 4. Submit Handler
   const onSubmit = (data: ScheduleFormValues) => {
+    // Combine Date & Time
     const scheduledDate = new Date(
       `${data.date}T${data.time}:00`
     ).toISOString();
 
+    // Combine Description & Guests
     const fullDescription = `${
       data.description || ""
-    }\n\nGuests: ${guestEmails.join(", ")}`;
+    }\n\nGuests: ${guestEmails.join(", ")}`.trim();
 
-    createInterview.mutate(
+    // 5. CALL UPDATE STATUS MUTATION
+    // We pass 'interviewed' status + the details object
+    updateStatusMutation.mutate(
       {
-        application_id: applicationId,
-        scheduled_date: scheduledDate,
-        title: data.title,
-        description: fullDescription.trim(),
-        meeting_link: "zoom",
-        duration_minutes: 60,
-        unit_id: unitId,
-        student_id: studentId,
-        status: "scheduled",
-      },
+        applicationId: applicationId,
+        status: "interviewed",
+        // This matches the endpoint structure
+        interviewDetails: {
+          title: data.title,
+          description: fullDescription,
+          scheduledDate: scheduledDate,
+          durationMinutes: 60, // Default duration
+          provider: "zoom", // Default provider
+          // No need to pass meetingLink, backend generates it
+        },
+      } as any, // Cast to any if your type definition isn't fully updated yet
       {
         onSuccess: () => {
+          toast({
+            title: "Interview Scheduled",
+            description: `Invitation sent to ${candidateName}`,
+          });
           onOpenChange(false);
           onSuccess?.();
           reset();
           setGuestEmails([]);
+        },
+        onError: (error: any) => {
+          toast({
+            title: "Scheduling Failed",
+            description:
+              error?.response?.data?.message || "Could not schedule interview.",
+            variant: "destructive",
+          });
         },
       }
     );
@@ -249,10 +267,10 @@ export default function ScheduleInterviewDialog({
           <div className="flex justify-end pt-2">
             <Button
               type="submit"
-              disabled={createInterview.isPending || isSubmitting}
+              disabled={updateStatusMutation.isPending || isSubmitting}
               className="bg-[#2196F3] rounded-full text-white px-8 h-11 hover:bg-[#1976D2]"
             >
-              {createInterview.isPending
+              {updateStatusMutation.isPending
                 ? "Scheduling..."
                 : "Schedule Interview"}
             </Button>

@@ -11,6 +11,7 @@ import {
   deleteBanner,
   uploadTestimonial,
   deleteTestimonial,
+  uploadGalleryImage,
 } from "@/services/profile.service";
 
 // --- Main Query Hook ---
@@ -137,16 +138,14 @@ export const useGalleryOperations = (
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("type", "gallery");
-        formData.append("userId", userId);
+        // formData.append("type", "gallery");
+        // formData.append("userId", userId);
 
-        const response = await axiosInstance.put("/profile", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        const response = await uploadGalleryImage(file);
 
-        if (response.data.url) {
-          uploadedUrls.push(response.data.url);
-        }
+        // if (response.data.url) {
+        //   uploadedUrls.push(response.data.url);
+        // }
       }
 
       // Combine old + new images
@@ -167,7 +166,7 @@ export const useGalleryOperations = (
       console.error("Gallery upload failed", error);
       toast({
         title: "Upload failed",
-        description: error.response?.data?.message || "Failed to upload images",
+        description: error.message || "Failed to upload images",
         variant: "destructive",
       });
     },

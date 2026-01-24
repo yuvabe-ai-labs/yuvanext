@@ -53,7 +53,7 @@ export interface StudentTasksResponse {
   error: any;
 }
 
-export interface StudentTaskDTO {
+export interface Tasks {
   taskId: string;
   taskStatus: "pending" | "accepted" | "submitted" | "redo";
   taskTitle: string;
@@ -66,6 +66,10 @@ export interface StudentTaskDTO {
   taskSubmittedAt: string | null;
   taskReviewRemarks: string | null;
   taskReviewedAt: string | null;
+}
+
+export interface StudentTaskDTO {
+  tasks: Tasks[];
   applicationId: string;
   applicantId: string;
   applicantName: string | null;

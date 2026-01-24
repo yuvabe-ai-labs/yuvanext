@@ -47,14 +47,12 @@ import { useRef, useState } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
-// 1. IMPORT HOOKS & TYPES
 import {
   useCandidateProfile,
   useUpdateApplicationStatus,
 } from "@/hooks/useCandidateProfile";
 import ScheduleInterviewDialog from "@/components/ScheduleInterviewDialog";
 
-// Ensure these types are exported from your types file
 import type {
   CandidateInternship,
   CandidateProject,
@@ -63,7 +61,6 @@ import type {
   SocialLink,
 } from "@/types/profiles.types";
 
-// Generic Safe Parse Helper
 const safeParse = <T,>(data: any, fallback: T): T => {
   if (!data) return fallback;
   try {
@@ -74,12 +71,11 @@ const safeParse = <T,>(data: any, fallback: T): T => {
 };
 
 const CandidateProfile = () => {
-  const { id } = useParams<{ id: string }>(); // This is applicationId
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { toast } = useToast();
 
-  // 2. DATA FETCHING
   const { data, isLoading, error, refetch } = useCandidateProfile(id || "");
   const updateStatusMutation = useUpdateApplicationStatus();
 
@@ -224,11 +220,8 @@ const CandidateProfile = () => {
   // --- DATA MAPPING ---
   const { candidate, internship, application } = data;
 
-  // Assuming Skill can be string or object
   const skills = safeParse<(string | { name: string })[]>(candidate.skills, []);
   const interests = safeParse<string[]>(candidate.interests, []);
-
-  // Explicit mapping for nested objects (History)
   const candidateProjects = safeParse<CandidateProject[]>(
     candidate.projects,
     []
@@ -242,7 +235,21 @@ const CandidateProfile = () => {
     candidate.education,
     []
   );
-  const links = safeParse<SocialLink[]>(candidate.socialLinks, []);
+
+  // --- Handle Object vs Array for Social Links ---
+  let links: SocialLink[] = [];
+  const rawLinks = safeParse(candidate.socialLinks, null);
+
+  if (Array.isArray(rawLinks)) {
+    // If backend sends an Array: [{ platform: 'fb', url: '...' }]
+    links = rawLinks;
+  } else if (typeof rawLinks === "object" && rawLinks !== null) {
+    // If backend sends an Object: { facebook: '...', linkedin: '...' }
+    links = Object.entries(rawLinks).map(([key, value]) => ({
+      platform: key,
+      url: String(value),
+    }));
+  }
 
   const matchScore = application.profileScore || 0;
   const dialogContent = pendingStatus ? getDialogContent(pendingStatus) : null;
@@ -304,6 +311,24 @@ const CandidateProfile = () => {
     }
   };
 
+  // Helper for icon resolution
+  const getSocialIcon = (platformStr: string, urlStr: string) => {
+    const p = (platformStr || "").toLowerCase();
+    const u = (urlStr || "").toLowerCase();
+
+    if (p.includes("linkedin") || u.includes("linkedin.com")) return Linkedin;
+    if (p.includes("instagram") || u.includes("instagram.com"))
+      return Instagram;
+    if (p.includes("facebook") || u.includes("facebook.com")) return Facebook;
+    if (p.includes("twitter") || p.includes("x") || u.includes("twitter.com"))
+      return Twitter;
+    if (p.includes("youtube") || u.includes("youtube.com")) return Youtube;
+    if (p.includes("dribbble")) return Dribbble;
+    if (p.includes("behance")) return Palette;
+
+    return Globe;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -323,7 +348,7 @@ const CandidateProfile = () => {
             Applied for "{internship.title || "Internship"}"
           </h1>
 
-          <div className="flex items-center gap-2">
+          {/* <div className="flex items-center gap-2">
             <span className="text-l font-medium">Profile Match</span>
             <div className="relative w-10 h-10">
               <svg className="transform -rotate-90 w-10 h-10">
@@ -352,7 +377,7 @@ const CandidateProfile = () => {
                 {matchScore}%
               </span>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Profile Header Card */}
@@ -791,110 +816,44 @@ const CandidateProfile = () => {
                 <CardContent className="p-6">
                   <h3 className="text-2xl font-bold mb-4">Links</h3>
                   <div className="flex flex-wrap gap-3 items-center">
-                    {(() => {
-                      const getSocialIcon = (link: SocialLink) => {
-                        const url = (link.url || "").toLowerCase();
-                        const platform = (link.platform || "").toLowerCase();
-                        if (
-                          platform.includes("linkedin") ||
-                          url.includes("linkedin.com")
-                        )
-                          return Linkedin;
-                        if (
-                          platform.includes("instagram") ||
-                          url.includes("instagram.com")
-                        )
-                          return Instagram;
-                        if (
-                          platform.includes("facebook") ||
-                          url.includes("facebook.com")
-                        )
-                          return Facebook;
-                        if (
-                          platform.includes("twitter") ||
-                          platform.includes("x") ||
-                          url.includes("twitter.com")
-                        )
-                          return Twitter;
-                        if (
-                          platform.includes("youtube") ||
-                          url.includes("youtube.com")
-                        )
-                          return Youtube;
-                        if (platform.includes("dribbble")) return Dribbble;
-                        if (platform.includes("behance")) return Palette;
-                        return Globe;
-                      };
+                    {links.length > 0 ? (
+                      links.map((link, idx) => {
+                        const platform = link.platform || "";
+                        const url = link.url || "";
+                        const Icon = getSocialIcon(platform, url);
 
-                      if (!links || links.length === 0)
                         return (
-                          <p className="text-sm text-muted-foreground">
-                            No links provided
-                          </p>
+                          <Button
+                            key={idx}
+                            variant="outline"
+                            size="icon"
+                            className="rounded-full"
+                            asChild
+                          >
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Icon className="w-4 h-4" />
+                            </a>
+                          </Button>
                         );
-
-                      return (
-                        <div className="flex flex-wrap gap-3">
-                          {links.map((link, idx) => {
-                            const Icon = getSocialIcon(link);
-                            return (
-                              <Button
-                                key={idx}
-                                variant="outline"
-                                size="icon"
-                                className="rounded-full"
-                                asChild
-                              >
-                                <a
-                                  href={link.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <Icon className="w-4 h-4" />
-                                </a>
-                              </Button>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
+                      })
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No links provided
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
-              {/* Projects - Commented out as requested */}
-              {/* <Card className="rounded-3xl">
-                <CardContent className="p-6">
-                  <h3 className="text-2xl font-bold mb-4">Projects</h3>
-                  {projects.length > 0 ? (
-                    <ul className="space-y-4">
-                      {projects.map((project: any, idx: number) => (
-                        <li key={idx} className="text-base">
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-lg">
-                              {project.title || project.name}
-                            </span>
-                          </div>
-                          {project.description && (
-                            <p className="text-muted-foreground text-[15px] leading-relaxed mt-1">
-                              {project.description}
-                            </p>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-base text-muted-foreground">
-                      No projects listed
-                    </p>
-                  )}
-                </CardContent>
-              </Card> */}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Status Confirmation Dialog */}
+      {/* Confirmation Dialog */}
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent className="rounded-3xl">
           <AlertDialogHeader>

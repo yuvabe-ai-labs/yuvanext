@@ -621,8 +621,11 @@ const Profile = () => {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {/* Added Project Edit Option */}
-                        <ProjectDialog project={project} onUpdate={refetch}>
+                        {/* Pass project WITH index */}
+                        <ProjectDialog 
+                          project={{ ...project, index }} 
+                          onUpdate={refetch}
+                        >
                           <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary mr-2" />
                         </ProjectDialog>
                         <Button

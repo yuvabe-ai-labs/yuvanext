@@ -7,6 +7,12 @@ export enum UserRole {
   ADMIN = "admin",
 }
 
+export enum UserRole {
+  MALE = "male",
+  FEMALE = "female",
+  PREFER_NOT_SAY = "prefer_not_to_say",
+}
+
 // --- Shared Sub-Types ---
 
 export interface SocialLink {
@@ -153,7 +159,7 @@ export interface UpdateProfilePayload {
   skills?: string[];
   interests?: string[];
   lookingFor?: string[];
-  language?: string[];
+  language?: Language[];
   education?: CandidateEducation[];
   course?: CandidateCourse[];
   internship?: CandidateInternship[];

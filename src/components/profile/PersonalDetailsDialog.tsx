@@ -52,11 +52,11 @@ interface PersonalDetailsDialogProps {
 
 const LOCATIONS = ["Auroville", "Pondicherry", "Tamil Nadu", "Other"];
 const MARITAL_STATUS_OPTIONS = [
-  "Single/Unmarried",
-  "Married",
-  "Divorced",
-  "Widowed",
-  "Prefer not to say",
+  "single",
+  "married",
+  "divorced",
+  "widowed",
+  "prefer_not_to_say",
 ];
 
 const AVAILABLE_LANGUAGES = [
@@ -187,88 +187,86 @@ export const PersonalDetailsDialog = ({
     setLanguageError(null);
   };
 
-  const onSubmit = async (data: PersonalDetailsForm) => {
-    try {
-      // Combine first and last name
-      const fullName = `${data.first_name} ${data.last_name || ""}`.trim();
+const onSubmit = async (data: PersonalDetailsForm) => {
+  try {
+    // Combine first and last name
+    const fullName = `${data.first_name} ${data.last_name || ""}`.trim();
 
-      // Construct date of birth from separate fields
-      let dateOfBirth: string | null = null;
-      if (data.birth_date && data.birth_month && data.birth_year) {
-        const date = new Date(
-          parseInt(data.birth_year),
-          parseInt(data.birth_month) - 1,
-          parseInt(data.birth_date),
-        );
-        dateOfBirth = date.toISOString();
-      }
-
-      if (languages.length > 0) {
-        const languageNames = languages.map((l) => l.name).filter(Boolean);
-        const duplicates = languageNames.filter(
-          (name, index) => languageNames.indexOf(name) !== index,
-        );
-
-        const emptyLanguages = languages.filter(
-          (lang) => !lang.name || lang.name.trim() === "",
-        );
-
-        if (duplicates.length > 0) {
-          setLanguageError(
-            `${duplicates[0]} language added more than once. Please remove or update it.`,
-          );
-          return;
-        } else if (emptyLanguages.length > 0) {
-          setLanguageError("Please select a language before saving.");
-          return;
-        }
-
-        // Validate that at least one proficiency is selected
-        const invalidLanguages = languages.filter(
-          (lang) => lang.name && !lang.read && !lang.write && !lang.speak,
-        );
-
-        if (invalidLanguages.length > 0) {
-          setLanguageError(
-            "Please select at least one proficiency (Read, Write, or Speak) for each language.",
-          );
-          return;
-        }
-      }
-
-      setLanguageError(null);
-
-      await updateProfileMutation({
-        name: fullName,
-        phone: data.phone || null,
-        location: data.location || null,
-        gender: data.gender || null,
-        maritalStatus: data.marital_status || null,
-        dateOfBirth: dateOfBirth,
-        isDifferentlyAbled: data.is_differently_abled || false,
-        hasCareerBreak: data.has_career_break || false,
-        language:
-          languages.length > 0
-            ? languages.map((lang) => JSON.stringify(lang))
-            : [],
-      });
-
-      toast({
-        title: "Success",
-        description: "Personal details updated successfully",
-      });
-
-      onUpdate();
-      setOpen(false);
-    } catch (error) {
-      console.error("Error updating personal details:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update personal details",
-        variant: "destructive",
-      });
+    // Construct date of birth from separate fields
+    let dateOfBirth: string | null = null;
+    if (data.birth_date && data.birth_month && data.birth_year) {
+      const date = new Date(
+        parseInt(data.birth_year),
+        parseInt(data.birth_month) - 1,
+        parseInt(data.birth_date),
+      );
+      dateOfBirth = date.toISOString();
     }
-  };
+
+    if (languages.length > 0) {
+      const languageNames = languages.map((l) => l.name).filter(Boolean);
+      const duplicates = languageNames.filter(
+        (name, index) => languageNames.indexOf(name) !== index,
+      );
+
+      const emptyLanguages = languages.filter(
+        (lang) => !lang.name || lang.name.trim() === "",
+      );
+
+      if (duplicates.length > 0) {
+        setLanguageError(
+          `${duplicates[0]} language added more than once. Please remove or update it.`,
+        );
+        return;
+      } else if (emptyLanguages.length > 0) {
+        setLanguageError("Please select a language before saving.");
+        return;
+      }
+
+      // Validate that at least one proficiency is selected
+      const invalidLanguages = languages.filter(
+        (lang) => lang.name && !lang.read && !lang.write && !lang.speak,
+      );
+
+      if (invalidLanguages.length > 0) {
+        setLanguageError(
+          "Please select at least one proficiency (Read, Write, or Speak) for each language.",
+        );
+        return;
+      }
+    }
+
+    setLanguageError(null);
+
+    await updateProfileMutation({
+      name: fullName,
+      phone: data.phone || null,
+      location: data.location || null,
+      gender: data.gender || null,
+      maritalStatus: data.marital_status || null,
+      dateOfBirth: dateOfBirth,
+      isDifferentlyAbled: data.is_differently_abled || false,
+      hasCareerBreak: data.has_career_break || false,
+      // ✅ FIXED: Send as array of objects, not JSON strings
+      language: languages.length > 0 ? languages : [],
+    });
+
+    toast({
+      title: "Success",
+      description: "Personal details updated successfully",
+    });
+
+    onUpdate();
+    setOpen(false);
+  } catch (error) {
+    console.error("Error updating personal details:", error);
+    toast({
+      title: "Error",
+      description: "Failed to update personal details",
+      variant: "destructive",
+    });
+  }
+};
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -391,7 +389,7 @@ export const PersonalDetailsDialog = ({
                   >
                     <div className="flex items-center">
                       <RadioGroupItem
-                        value="Male"
+                        value="male"
                         id="male"
                         className="peer sr-only"
                       />
@@ -404,7 +402,7 @@ export const PersonalDetailsDialog = ({
                     </div>
                     <div className="flex items-center">
                       <RadioGroupItem
-                        value="Female"
+                        value="female"
                         id="female"
                         className="peer sr-only"
                       />
@@ -417,7 +415,7 @@ export const PersonalDetailsDialog = ({
                     </div>
                     <div className="flex items-center">
                       <RadioGroupItem
-                        value="Other"
+                        value="others"
                         id="other"
                         className="peer sr-only"
                       />

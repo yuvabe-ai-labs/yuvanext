@@ -49,9 +49,13 @@ const projectSchema = z
 
 type ProjectFormData = z.infer<typeof projectSchema>;
 
+interface ProjectWithIndex extends CandidateProject {
+  index?: number;
+}
+
 interface ProjectDialogProps {
   children: React.ReactNode;
-  project?: CandidateProject;
+  project?: ProjectWithIndex;
   onUpdate?: () => void;
 }
 
@@ -62,23 +66,31 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
 }) => {
   const [open, setOpen] = React.useState(false);
   const [newTech, setNewTech] = React.useState("");
-  const [technologies, setTechnologies] = React.useState<string[]>(
-    project?.technologies || [],
-  );
   const { toast } = useToast();
   const { data: profileData } = useProfile();
   const { mutateAsync: updateProfile, isPending } = useUpdateProfile();
 
-  const getStartDate = () => {
-    if (project?.start_date) return project.start_date;
-    return "";
-  };
-
-  const getEndDate = () => {
-    if (project?.end_date && project.end_date !== "Present") {
-      return project.end_date;
+  const getDefaultValues = (): ProjectFormData => {
+    if (project) {
+      return {
+        projectName: project.title || project.name || "",
+        description: project.description || "",
+        technologies: project.technologies || [],
+        completionDate: project.end_date && project.end_date !== "Present" ? project.end_date : "",
+        projectUrl: project.project_url || "",
+        is_current: project.is_current || project.end_date === "Present",
+        start_date: project.start_date || "",
+      };
     }
-    return "";
+    return {
+      projectName: "",
+      description: "",
+      technologies: [],
+      completionDate: "",
+      projectUrl: "",
+      is_current: false,
+      start_date: "",
+    };
   };
 
   const {
@@ -91,18 +103,11 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
     reset,
   } = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
-    defaultValues: {
-      projectName: project?.title || project?.name || "",
-      description: project?.description || "",
-      technologies: project?.technologies || [],
-      completionDate: getEndDate(),
-      projectUrl: project?.project_url || "",
-      is_current: project?.is_current || project?.end_date === "Present",
-      start_date: getStartDate(),
-    },
+    defaultValues: getDefaultValues(),
   });
 
   const isCurrent = watch("is_current");
+  const technologies = watch("technologies");
 
   const parseJsonField = (field: any, defaultValue: any = []) => {
     if (!field) return defaultValue;
@@ -119,7 +124,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
   const addTechnology = () => {
     if (newTech.trim() && !technologies.includes(newTech.trim())) {
       const updatedTech = [...technologies, newTech.trim()];
-      setTechnologies(updatedTech);
       setValue("technologies", updatedTech);
       setNewTech("");
     }
@@ -127,7 +131,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
 
   const removeTechnology = (tech: string) => {
     const updatedTech = technologies.filter((t) => t !== tech);
-    setTechnologies(updatedTech);
     setValue("technologies", updatedTech);
   };
 
@@ -135,10 +138,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
     try {
       const existingProjects = parseJsonField(profileData?.projects, []);
 
-      const projectPayload: CandidateProject = {
-        id:
-          project?.id ||
-          `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      const projectPayload = {
         title: data.projectName,
         description: data.description,
         technologies: data.technologies,
@@ -149,11 +149,13 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
       };
 
       let updatedProjects;
-      if (project?.id) {
-        updatedProjects = existingProjects.map((p: CandidateProject) =>
-          p.id === project.id ? projectPayload : p,
+      if (project?.index !== undefined) {
+        // Editing existing project at index
+        updatedProjects = existingProjects.map((p: CandidateProject, idx: number) =>
+          idx === project.index ? projectPayload : p
         );
       } else {
+        // Adding new project
         updatedProjects = [...existingProjects, projectPayload];
       }
 
@@ -167,7 +169,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
       });
       setOpen(false);
       reset();
-      setTechnologies([]);
+      setNewTech("");
       if (onUpdate) onUpdate();
     } catch (error) {
       console.error("Error saving project:", error);
@@ -185,26 +187,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
       clearErrors("completionDate");
     }
   }, [isCurrent, setValue, clearErrors]);
-
-  React.useEffect(() => {
-    if (open && project) {
-      setTechnologies(project.technologies || []);
-      setValue("projectName", project.title || project.name || "");
-      setValue("description", project.description || "");
-      setValue("technologies", project.technologies || []);
-      setValue("start_date", getStartDate());
-      setValue("completionDate", getEndDate());
-      setValue("projectUrl", project.project_url || "");
-      setValue(
-        "is_current",
-        project.is_current || project.end_date === "Present",
-      );
-    } else if (!open) {
-      reset();
-      setTechnologies([]);
-      setNewTech("");
-    }
-  }, [open, project]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

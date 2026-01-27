@@ -223,11 +223,12 @@ export interface CandidateProfileData {
 }
 
 export interface InterviewDetails {
-  scheduledAt: string;
-  meetingLink: string;
-  notes?: string;
+  title: string;
+  description: string;
+  scheduledDate: string;
   durationMinutes: number;
-  provider: "zoom" | "google_meet" | "teams" | "other";
+  provider: string;
+  link?: string;
 }
 
 export interface UpdateApplicationStatusResponse {

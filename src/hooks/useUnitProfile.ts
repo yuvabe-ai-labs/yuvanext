@@ -134,24 +134,16 @@ export const useGalleryOperations = (
     mutationFn: async (files: File[]) => {
       const uploadedUrls: string[] = [];
 
-      // Upload files sequentially
       for (const file of files) {
-        const formData = new FormData();
-        formData.append("file", file);
-        // formData.append("type", "gallery");
-        // formData.append("userId", userId);
-
         const response = await uploadGalleryImage(file);
-
-        // if (response.data.url) {
-        //   uploadedUrls.push(response.data.url);
-        // }
+        if (response?.galleryImages && response.galleryImages.length > 0) {
+          uploadedUrls.push(response.galleryImages[0]);
+        }
       }
 
-      // Combine old + new images
       const newGalleryImages = [...currentImages, ...uploadedUrls];
 
-      // Update Profile Record
+      // Update Profile Record with the new list
       await updateProfileMutation.mutateAsync({
         galleryImages: newGalleryImages,
       });

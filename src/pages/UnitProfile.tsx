@@ -110,8 +110,6 @@ const UnitProfile = () => {
     performOptimisticUpdate({ projects: updatedProjects });
   };
 
-  // --- FIX: Social Link Handlers to match Reference Code Logic ---
-
   // 1. Update Social Links (Convert Array -> Object for Backend)
   const handleUpdateSocialLinks = (links: SocialLink[]) => {
     // Convert the array back to the Object format the backend expects
@@ -123,8 +121,7 @@ const UnitProfile = () => {
       return acc;
     }, {} as Record<string, string>);
 
-    // Cast to any because Profile type says SocialLink[] but we are sending an Object
-    performOptimisticUpdate({ socialLinks: socialLinksRecord as any });
+    performOptimisticUpdate({ socialLinks: socialLinksRecord });
   };
 
   // 2. Remove Social Link (Handle Object Key Deletion)
@@ -136,7 +133,7 @@ const UnitProfile = () => {
     // Create new object without the deleted key
     const updatedPayload = Object.keys(currentLinksRecord)
       .filter((key) => key !== platformId)
-      .reduce((acc: any, key) => {
+      .reduce((acc, key) => {
         acc[key] = currentLinksRecord[key];
         return acc;
       }, {});

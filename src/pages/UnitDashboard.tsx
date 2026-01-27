@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryState, parseAsString } from "nuqs";
 import { format } from "date-fns";
 import {
   ArrowRight,
@@ -83,7 +84,10 @@ import { calculateOverallTaskProgress } from "@/utils/taskProgress";
 import axiosInstance from "@/config/platform-api";
 
 // Types
-import type { Internship } from "@/types/internships.types";
+import type {
+  Internship,
+  UpdateInternshipPayload,
+} from "@/types/internships.types";
 import type {
   CandidateTasksData,
   StudentTask,
@@ -166,15 +170,10 @@ const CandidateTaskProgress = ({
 // --- Main Dashboard Component ---
 const UnitDashboard = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get("tab") || "applications";
-
-  // Update URL when tab changes
-  const handleTabChange = (value: string) => {
-    // replace: true updates the current history entry so the back button logic feels smoother
-    // remove { replace: true } if you want every tab click to be a history entry
-    setSearchParams({ tab: value }, { replace: true });
-  };
+  const [activeTab, setActiveTab] = useQueryState(
+    "tab",
+    parseAsString.withDefault("applications")
+  );
 
   // --- 1. DATA FETCHING (REACT QUERY) ---
   const { data: rawApplications, isLoading: dashboardLoading } =
@@ -324,7 +323,7 @@ const UnitDashboard = () => {
         setUpdating(internship.id);
         // Explicit cast for mutation payload as it might require full object but API supports partial
         updateInternshipMutation.mutate(
-          { id: internship.id, status: "closed" } as any,
+          { id: internship.id, status: "closed" } as UpdateInternshipPayload,
           {
             onSuccess: () => {
               setUpdating(null);
@@ -343,7 +342,10 @@ const UnitDashboard = () => {
     if (activatingInternship) {
       try {
         updateInternshipMutation.mutate(
-          { id: activatingInternship.id, status: "active" } as any,
+          {
+            id: activatingInternship.id,
+            status: "active",
+          } as UpdateInternshipPayload,
           {
             onSuccess: () => {
               setActivatingInternship(null);
@@ -551,7 +553,7 @@ const UnitDashboard = () => {
         {/* TABS */}
         <Tabs
           value={activeTab}
-          onValueChange={handleTabChange}
+          onValueChange={setActiveTab}
           className="space-y-4 sm:space-y-6"
         >
           <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -1233,7 +1235,6 @@ const UnitDashboard = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Note: EditInternshipDialog might expect strict types, casting to any if interface mismatch occurs until that component is refactored */}
       <EditInternshipDialog
         isOpen={!!editingInternship}
         onClose={handleEditClose}

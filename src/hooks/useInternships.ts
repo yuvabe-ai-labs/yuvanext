@@ -177,7 +177,6 @@ export const useCreateInternship = () => {
     },
     onError: (error) => {
       console.error("Create internship failed", error);
-      // Toast is handled in service or here, but service returns rejected promise so this fires
     },
   });
 };
@@ -194,14 +193,10 @@ export const useUpdateInternship = () => {
         description: "Internship updated successfully!",
       });
 
-      // Invalidate list to show updated data
       queryClient.invalidateQueries({ queryKey: ["internships"] });
-      // If you have a detail view query, invalidate that too:
-      // queryClient.invalidateQueries({ queryKey: ["internship", id] });
     },
     onError: (error) => {
       console.error("Update internship failed", error);
-      // Toast handled by error callback in component or global handler
     },
   });
 };
@@ -224,7 +219,7 @@ export const useDeleteInternship = () => {
       queryClient.invalidateQueries({ queryKey: ["unitStats"] });
     },
 
-    onError: (error: any) => {
+    onError: (error) => {
       console.error("Delete internship failed", error);
       toast({
         title: "Error",

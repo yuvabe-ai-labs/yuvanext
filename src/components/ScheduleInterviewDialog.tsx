@@ -107,16 +107,14 @@ export default function ScheduleInterviewDialog({
       {
         applicationId: applicationId,
         status: "interviewed",
-        // This matches the endpoint structure
         interviewDetails: {
           title: data.title,
           description: fullDescription,
           scheduledDate: scheduledDate,
-          durationMinutes: 60, // Default duration
-          provider: "zoom", // Default provider
-          // No need to pass meetingLink, backend generates it
+          durationMinutes: 60,
+          provider: "zoom",
         },
-      } as any, // Cast to any if your type definition isn't fully updated yet
+      },
       {
         onSuccess: () => {
           toast({
@@ -128,11 +126,10 @@ export default function ScheduleInterviewDialog({
           reset();
           setGuestEmails([]);
         },
-        onError: (error: any) => {
+        onError: (error) => {
           toast({
             title: "Scheduling Failed",
-            description:
-              error?.response?.data?.message || "Could not schedule interview.",
+            description: error?.message || "Could not schedule interview.",
             variant: "destructive",
           });
         },

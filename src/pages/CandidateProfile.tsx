@@ -236,21 +236,7 @@ const CandidateProfile = () => {
     []
   );
 
-  // --- Handle Object vs Array for Social Links ---
-  let links: SocialLink[] = [];
-  const rawLinks = safeParse(candidate.socialLinks, null);
-
-  if (Array.isArray(rawLinks)) {
-    // If backend sends an Array: [{ platform: 'fb', url: '...' }]
-    links = rawLinks;
-  } else if (typeof rawLinks === "object" && rawLinks !== null) {
-    // If backend sends an Object: { facebook: '...', linkedin: '...' }
-    links = Object.entries(rawLinks).map(([key, value]) => ({
-      platform: key,
-      url: String(value),
-    }));
-  }
-
+  let links: SocialLink[] = safeParse(candidate.socialLinks, null) || [];
   const matchScore = application.profileScore || 0;
   const dialogContent = pendingStatus ? getDialogContent(pendingStatus) : null;
 

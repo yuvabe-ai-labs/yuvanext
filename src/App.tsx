@@ -38,6 +38,7 @@ import CandidateTasks from "./pages/CandidateTasks";
 import MyTasks from "./pages/MyTasks";
 import UnitCandidateTasks from "./pages/UnitCandidateTasks";
 import Settings from "./pages/Settings";
+import AcceptInvitation from "./pages/Acceptinvitation";
 import AuthCallback from "@/hooks/AuthCallback";
 import ScrollToTop from "@/components/ScrollToTop";
 import { useProfile } from "@/hooks/useProfile";
@@ -125,6 +126,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth/:role/signin" element={<SignIn />} />
             <Route path="/auth/:role/signup" element={<SignUp />} />
+            <Route path="/auth/accept-invitation" element={<AcceptInvitation />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 

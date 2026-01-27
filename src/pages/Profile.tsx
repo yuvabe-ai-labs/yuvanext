@@ -77,53 +77,6 @@ const Profile = () => {
     return Array.isArray(field) ? field : defaultValue;
   };
 
-  const parseLanguages = (field: any): Language[] => {
-    if (!field) return [];
-
-    // If it's already an array of Language objects, return it
-    if (Array.isArray(field)) {
-      // Check if items are already objects
-      if (field.length > 0 && typeof field[0] === "object" && field[0].id) {
-        return field;
-      }
-
-      // If items are JSON strings, parse them
-      return field
-        .map((lang) => {
-          if (typeof lang === "string") {
-            try {
-              const parsed = JSON.parse(lang);
-              // Handle double-stringification
-              if (typeof parsed === "string") {
-                return JSON.parse(parsed);
-              }
-              return parsed;
-            } catch {
-              return null;
-            }
-          }
-          return lang;
-        })
-        .filter(Boolean);
-    }
-
-    // If it's a string, try to parse it
-    if (typeof field === "string") {
-      try {
-        const parsed = JSON.parse(field);
-        // Handle double-stringification
-        if (typeof parsed === "string") {
-          return parseLanguages(JSON.parse(parsed));
-        }
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    }
-
-    return [];
-  };
-
   const handleDelete = async (field: string, itemId: string) => {
     try {
       const rawData = profileData?.[field as keyof typeof profileData];
@@ -176,7 +129,7 @@ const Profile = () => {
   const interests = parseJsonField(profileData?.interests, []).filter(
     (i: string) => i !== "No Ideas" && i !== "I want to explore",
   );
-  const languages: Language[] = parseLanguages(profileData?.language);
+  const languages: Language[] = parseJsonField(profileData?.language);
   const completedCourses = parseJsonField(profileData?.course, []);
   const internships = parseJsonField(profileData?.internship, []);
 

@@ -12,9 +12,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import AIIcon from "../ui/custom-icons";
 import { useUpdateProfile } from "@/hooks/useProfile";
+import { useEnhanceProfile } from "@/hooks/useAI"; //
 
 const summarySchema = z.object({
   cover_letter: z
@@ -37,10 +37,11 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
   onSave,
 }) => {
   const [open, setOpen] = React.useState(false);
-  const [isGenerating, setIsGenerating] = React.useState(false);
-  const [generatedText, setGeneratedText] = React.useState("");
   const { toast } = useToast();
   const { mutateAsync: updateProfile } = useUpdateProfile();
+  
+  // Initialize the AI enhancement mutation
+  const { mutateAsync: enhanceProfile, isPending: isGenerating } = useEnhanceProfile();
 
   const {
     register,
@@ -56,7 +57,6 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
   });
 
   const coverLetter = watch("cover_letter");
-  const characterCount = coverLetter?.length || 0;
   const wordCount =
     coverLetter
       ?.trim()
@@ -64,7 +64,7 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
       .filter((word) => word.length > 0).length || 0;
 
   const handleGenerate = async () => {
-    if (wordCount < 10) {
+    if (wordCount < 2) {
       toast({
         title: "Too short",
         description: "Please write at least a few sentences before enhancing.",
@@ -73,55 +73,38 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
       return;
     }
 
-    setIsGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("gemini-chat", {
-        body: JSON.stringify({
-          message: coverLetter,
-          conversationHistory: [],
-          userRole: "profile_summary",
-        }),
+      const result = await enhanceProfile({
+        description: coverLetter, 
       });
 
-      if (error) throw error;
-
-      const enhancedText =
-        data?.response ||
-        data?.text ||
-        data?.data?.response ||
-        (typeof data === "string" ? data : "") ||
-        "";
+      const enhancedText = result.enhanced;
 
       if (!enhancedText) {
-        throw new Error("No response received from AI function");
+        throw new Error("No enhanced content received");
       }
 
-      setGeneratedText(enhancedText);
       setValue("cover_letter", enhancedText);
 
       toast({
         title: "Success",
         description: "Profile summary enhanced successfully!",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating summary:", error);
       toast({
         title: "Error",
-        description: "Failed to enhance profile summary. Please try again.",
+        description: error.message || "Failed to enhance profile summary. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setIsGenerating(false);
     }
   };
 
   const onSubmit = async (data: SummaryFormData) => {
     try {
-      const textToSave = generatedText || data.cover_letter;
-
-      // Use updateProfile mutation
+      // data.cover_letter will contain the enhanced text if setValue was called
       await updateProfile({
-        profileSummary: textToSave,
+        profileSummary: data.cover_letter,
       });
 
       toast({
@@ -131,7 +114,6 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
 
       setOpen(false);
 
-      // Call optional callback
       if (onSave) {
         onSave();
       }
@@ -172,16 +154,17 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
               />
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleGenerate}
-              disabled={isGenerating || wordCount < 10}
-              className="absolute bottom-2 right-2 bg-white/30 rounded-full px-4 py-0 text-[12px] cursor-pointer hover:bg-blue-500 hover:text-white"
-            >
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleGenerate}
+                // Change "wordCount < 10" to a lower number like "wordCount < 1"
+                disabled={isGenerating || wordCount < 1} 
+                className="absolute bottom-2 right-2 bg-white/30 rounded-full px-4 py-0 text-[12px] cursor-pointer hover:bg-blue-500 hover:text-white"
+              >
               {isGenerating ? (
                 <>
-                  <AIIcon /> Generating...
+                  <span className="mr-2 animate-pulse"><AIIcon /></span> Generating...
                 </>
               ) : (
                 <>

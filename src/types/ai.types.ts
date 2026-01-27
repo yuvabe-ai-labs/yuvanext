@@ -15,3 +15,12 @@ export interface GenerateContentResponse {
   what_you_will_get?: string[];
   skills_required?: string[];
 }
+
+export interface EnhanceProfilePayload {
+  description: string;
+}
+
+export interface EnhanceProfileResponse {
+  original: string;
+  enhanced: string;
+}

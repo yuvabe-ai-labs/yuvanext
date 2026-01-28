@@ -14,21 +14,27 @@ export const getStudentTasksByApplication = async (
       `/tasks/application/${applicationId}`
     );
 
-    // 1. Use handleApiResponse to unwrap data safely
-    const rawData = await handleApiResponse<StudentTaskDTO[]>(response, []);
+    const rawData = await handleApiResponse<StudentTaskDTO>(
+      response,
+      {} as StudentTaskDTO
+    );
 
-    // 2. Map API DTO (CamelCase) -> UI Interface (snake_case)
-    const tasks: StudentTask[] = rawData.map((item) => ({
+    // Safety check: ensure rawData and tasks exist
+    if (!rawData || !rawData.tasks) {
+      throw new Error("Invalid response structure");
+    }
+
+    const tasks: StudentTask[] = rawData.tasks.map((item) => ({
       id: item.taskId,
-      application_id: item.applicationId,
-      student_id: item.applicantId,
+      application_id: rawData.applicationId,
+      student_id: rawData.applicantId,
       title: item.taskTitle,
       description: item.taskDescription || "",
       start_date: item.taskStartDate || new Date().toISOString(),
       start_time: item.taskStartTime || "09:00",
       end_date: item.taskEndDate || new Date().toISOString(),
       end_time: item.taskEndTime || "17:00",
-      color: "#3b82f6", // Default color
+      color: "#3b82f6",
       submission_link: item.taskSubmissionLink || "",
       status: item.taskStatus,
       submitted_at: item.taskSubmittedAt || "",
@@ -39,23 +45,19 @@ export const getStudentTasksByApplication = async (
       updated_at: new Date().toISOString(),
     }));
 
-    // 3. Extract Info (Using Optional Chaining)
-    const firstItem = rawData[0];
-
     const candidate = {
-      name: firstItem?.applicantName || "Unknown Candidate",
-      email: firstItem?.applicantEmail || "",
-      phone: firstItem?.candidatePhoneNumber || "",
-      avatarUrl: firstItem?.candidateAvatarUrl || null,
+      name: rawData.applicantName || "Unknown Candidate",
+      email: rawData.applicantEmail || "",
+      phone: rawData.candidatePhoneNumber || "",
+      avatarUrl: rawData.candidateAvatarUrl || null,
     };
 
     const internship = {
-      title: firstItem?.internshipName || "Internship",
+      title: rawData.internshipName || "Internship",
     };
 
     return { tasks, candidate, internship };
   } catch (error) {
-    // 4. Use handleApiError to standardize errors
     return handleApiError(error);
   }
 };

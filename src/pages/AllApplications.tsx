@@ -1,13 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ChevronLeft,
-  ChevronDown,
-  Search,
-  Bell,
-  Menu,
-  Sparkles,
-} from "lucide-react";
+import { ChevronLeft, ChevronDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,11 +16,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useUnitApplications } from "@/hooks/useUnitApplications";
+import { UnitApplication } from "@/types/unit.types";
 
 const AllApplications = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredApplications, setFilteredApplications] = useState<any[]>([]);
+  const [filteredApplications, setFilteredApplications] = useState<
+    UnitApplication[]
+  >([]);
   const [displayCount, setDisplayCount] = useState(6);
   const [filters, setFilters] = useState({
     exact: false,
@@ -37,10 +33,16 @@ const AllApplications = () => {
   });
   const observerTarget = useRef(null);
 
-  const { applications, loading, error } = useUnitApplications();
+  // --- FIX: Correct Hook Usage based on UnitDashboard ---
+  const {
+    data: rawApplications,
+    isLoading: loading,
+    error,
+  } = useUnitApplications();
+  const applications = (rawApplications || []) as UnitApplication[];
 
   // Safe parse function
-  const safeParse = (data: any, fallback: any) => {
+  const safeParse = (data, fallback) => {
     if (!data) return fallback;
     try {
       return typeof data === "string" ? JSON.parse(data) : data;
@@ -51,6 +53,8 @@ const AllApplications = () => {
 
   // Filter applications based on search query and match score filters
   useEffect(() => {
+    if (!applications) return;
+
     let filtered = applications;
 
     // Apply search filter
@@ -58,9 +62,9 @@ const AllApplications = () => {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (app) =>
-          app.profile.full_name.toLowerCase().includes(query) ||
-          app.internship.title.toLowerCase().includes(query) ||
-          app.status.toLowerCase().includes(query)
+          (app.candidate?.name || "").toLowerCase().includes(query) ||
+          (app.internship?.title || "").toLowerCase().includes(query) ||
+          (app.application?.status || "").toLowerCase().includes(query)
       );
     }
 
@@ -72,7 +76,7 @@ const AllApplications = () => {
       filters.between60and80
     ) {
       filtered = filtered.filter((app) => {
-        const matchScore = app.profile_match_score || 0;
+        const matchScore = app.application?.profileScore || 0;
 
         if (filters.exact && matchScore === 100) return true;
         if (filters.above90 && matchScore > 90 && matchScore < 100) return true;
@@ -86,6 +90,7 @@ const AllApplications = () => {
     }
 
     setFilteredApplications(filtered);
+    // Reset display count when filters change to ensure infinite scroll works correctly from top
     setDisplayCount(6);
   }, [applications, searchQuery, filters]);
 
@@ -115,24 +120,17 @@ const AllApplications = () => {
   }, [handleObserver]);
 
   const getMatchColor = (score: number) => {
-    if (score === 100) return "border-purple-500";
-    if (score > 90) return "border-green-500";
-    if (score >= 80) return "border-blue-500";
-    if (score >= 60) return "border-orange-500";
-    return "border-red-500";
+    if (score === 100) return "ring-purple-500";
+    if (score > 90) return "ring-green-500";
+    if (score >= 80) return "ring-blue-500";
+    if (score >= 60) return "ring-orange-500";
+    return "ring-red-500";
   };
 
-  const getMatchTextColor = (score: number) => {
-    if (score === 100) return "text-purple-600";
-    if (score > 90) return "text-green-600";
-    if (score >= 80) return "text-blue-600";
-    if (score >= 60) return "text-orange-600";
-    return "text-red-600";
-  };
-
-  const getDaysAgo = (date: string) => {
+  const getDaysAgo = (dateStr?: string) => {
+    if (!dateStr) return 0;
     const now = new Date();
-    const appliedDate = new Date(date);
+    const appliedDate = new Date(dateStr);
     const diffTime = Math.abs(now.getTime() - appliedDate.getTime());
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
@@ -163,7 +161,7 @@ const AllApplications = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <p className="text-destructive mb-4">{error}</p>
+          <p className="text-destructive mb-4">Failed to load applications</p>
           <Button onClick={() => window.location.reload()}>Retry</Button>
         </div>
       </div>
@@ -334,135 +332,115 @@ const AllApplications = () => {
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredApplications
-                  .slice(0, displayCount)
-                  .map((application) => {
-                    const skills = safeParse(
-                      application.studentProfile?.skills,
-                      []
-                    );
-                    const displaySkills = skills
-                      .slice(0, 3)
-                      .map((s: any) =>
-                        typeof s === "string" ? s : s.name || s
-                      );
-                    const matchScore = application.profile_match_score || 0;
-                    const daysAgo = getDaysAgo(application.applied_date);
+                {filteredApplications.slice(0, displayCount).map((appData) => {
+                  // Extract data using the UnitApplication type structure
+                  const candidate = appData.candidate;
+                  const application = appData.application;
+                  const internship = appData.internship;
 
-                    return (
-                      <Card
-                        key={application.id}
-                        className="border border-border/50 hover:shadow-lg transition-shadow w-full max-w-s min-h-[300px] rounded-3xl"
-                      >
-                        <CardContent className="p-8 space-y-5">
-                          {/* Header Section */}
-                          <div className="flex items-center gap-5">
-                            {/* Avatar with colored ring based on match score */}
-                            <div className="relative flex-shrink-0">
-                              <Avatar
-                                className={`w-20 h-20 ring-4 ${getMatchColor(
-                                  matchScore
-                                )}`}
-                              >
-                                <AvatarImage
-                                  src={
-                                    application.studentProfile?.avatar_url ||
-                                    undefined
-                                  }
-                                  alt={application.profile.full_name}
-                                />
-                                <AvatarFallback className="text-lg font-semibold">
-                                  {application.profile.full_name
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .join("")}
-                                </AvatarFallback>
-                              </Avatar>
-                              {/* Status Badge */}
-                              <div className="absolute -top-2 -right-2">
-                                {getStatusBadge(application.status)}
-                              </div>
-                            </div>
+                  const skills = safeParse(candidate?.skills, []);
+                  const displaySkills = skills
+                    .slice(0, 3)
+                    .map((s) => (typeof s === "string" ? s : s.name || s));
 
-                            {/* Name, Role, and Days Ago */}
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-lg mb-1 text-gray-900">
-                                {application.profile.full_name}
-                              </h3>
-                              <p className="text-sm text-muted-foreground mb-2">
-                                {application.internship.title}
-                              </p>
-                              <Badge className="bg-yellow-500 text-white hover:bg-yellow-500">
-                                Applied {daysAgo}{" "}
-                                {daysAgo === 1 ? "day" : "days"} ago
-                              </Badge>
+                  const matchScore = application?.profileScore || 0;
+                  const daysAgo = getDaysAgo(application?.createdAt);
+
+                  return (
+                    <Card
+                      key={application?.id}
+                      className="border border-border/50 hover:shadow-lg transition-shadow w-full max-w-s min-h-[300px] rounded-3xl"
+                    >
+                      <CardContent className="p-8 space-y-5">
+                        {/* Header Section */}
+                        <div className="flex items-center gap-5">
+                          {/* Avatar with colored ring based on match score */}
+                          <div className="relative flex-shrink-0">
+                            <Avatar
+                              className={`w-20 h-20 ring-4 ${getMatchColor(
+                                matchScore
+                              )}`}
+                            >
+                              <AvatarImage
+                                src={candidate?.avatarUrl || undefined}
+                                alt={candidate?.name || "Candidate"}
+                              />
+                              <AvatarFallback className="text-lg font-semibold">
+                                {(candidate?.name || "U")
+                                  .charAt(0)
+                                  .toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            {/* Status Badge */}
+                            <div className="absolute -top-2 -right-2">
+                              {getStatusBadge(application?.status || "applied")}
                             </div>
                           </div>
 
-                          {/* Bio */}
-                          <p className="text-base text-gray-700 leading-relaxed">
-                            {typeof application.studentProfile?.bio === "string"
-                              ? application.studentProfile.bio
-                              : Array.isArray(application.studentProfile?.bio)
-                              ? application.studentProfile.bio.join(" ")
-                              : "Passionate UI/UX designer with 3+ years of experience creating user-centered digital experiences."}
-                          </p>
-
-                          {/* Skills (Single Line) */}
-                          <div className="min-h-7">
-                            {skills.length > 0 && (
-                              <div className="flex gap-2 overflow-hidden">
-                                {skills.length > 2 ? (
-                                  <>
-                                    {skills.slice(0, 2).map((skill, i) => (
-                                      <Badge
-                                        key={i}
-                                        variant="outline"
-                                        className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                                      >
-                                        {skill}
-                                      </Badge>
-                                    ))}
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                                    >
-                                      +{skills.length - 2}
-                                    </Badge>
-                                  </>
-                                ) : (
-                                  skills.map((skill, i) => (
-                                    <Badge
-                                      key={i}
-                                      variant="outline"
-                                      className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                                    >
-                                      {skill}
-                                    </Badge>
-                                  ))
-                                )}
-                              </div>
-                            )}
+                          {/* Name, Role, and Days Ago */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-lg mb-1 text-gray-900 truncate">
+                              {candidate?.name || "Unknown Candidate"}
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-2 truncate">
+                              {internship?.title || "Internship"}
+                            </p>
+                            <Badge className="bg-yellow-500 text-white hover:bg-yellow-500">
+                              Applied {daysAgo} {daysAgo === 1 ? "day" : "days"}{" "}
+                              ago
+                            </Badge>
                           </div>
+                        </div>
 
-                          {/* Divider */}
-                          <div className="border-t border-border/40"></div>
+                        {/* Bio */}
+                        <p className="text-base text-gray-700 leading-relaxed line-clamp-2">
+                          {candidate?.profileSummary ||
+                            "Passionate professional looking for opportunities."}
+                        </p>
 
-                          {/* View Profile Button */}
-                          <Button
-                            variant="outline"
-                            size="lg"
-                            className="w-full border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full mt-4"
-                            onClick={() =>
-                              navigate(`/candidate/${application.id}`)
-                            }
-                          >
-                            View Profile
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+                        {/* Skills (Single Line) */}
+                        <div className="min-h-7">
+                          {displaySkills.length > 0 && (
+                            <div className="flex gap-2 overflow-hidden">
+                              {displaySkills.map((skill: string, i: number) => (
+                                <Badge
+                                  key={i}
+                                  variant="outline"
+                                  className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                >
+                                  {skill}
+                                </Badge>
+                              ))}
+                              {skills.length > 3 && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                >
+                                  +{skills.length - 3}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Divider */}
+                        <div className="border-t border-border/40"></div>
+
+                        {/* View Profile Button */}
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          className="w-full border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full mt-4"
+                          onClick={() =>
+                            navigate(`/candidate/${application?.id}`)
+                          }
+                        >
+                          View Profile
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
 
               {/* Infinite Scroll Target */}
@@ -472,7 +450,7 @@ const AllApplications = () => {
                   className="flex justify-center mt-8 py-4"
                 >
                   <Button variant="link" className="text-primary font-medium">
-                    View More
+                    Loading more...
                   </Button>
                 </div>
               )}

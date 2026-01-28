@@ -17,30 +17,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
 import { CandidateInternship } from "@/types/profiles.types";
-
-const internshipSchema = z
-  .object({
-    title: z.string().min(1, "Title is required"),
-    company: z.string().min(1, "Company is required"),
-    start_date: z.string().min(1, "Start date is required"),
-    end_date: z.string().optional(),
-    description: z.string().optional(),
-    is_current: z.boolean().default(false),
-  })
-  .refine(
-    (data) => {
-      if (data.is_current) return true;
-
-      if (!data.end_date) return false;
-
-      return new Date(data.end_date) >= new Date(data.start_date);
-    },
-    {
-      message:
-        "End date is required for past internships and must be after the start date",
-      path: ["end_date"],
-    },
-  );
+import { internshipSchema } from "@/lib/schemas";
 
 type InternshipFormData = z.infer<typeof internshipSchema>;
 
@@ -85,24 +62,27 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
   });
 
   const isCurrent = watch("is_current");
-  const parseJsonField = (field: any) => (Array.isArray(field) ? field : []);
 
   const onSubmit = async (data: InternshipFormData) => {
     try {
-      const existingInternships = parseJsonField(profileData?.internship);
+      // Use nullish coalescing to fall back to an empty array
+      const existingInternships = profileData?.internship ?? [];
 
+      // Use spread operator to build the payload
       const internshipPayload = {
         ...data,
+        // Ensure end_date is cleared if current, otherwise use form value
+        end_date: data.is_current ? "" : data.end_date,
       };
 
       let updatedInternships;
-
       if (internship?.index !== undefined) {
-        updatedInternships = existingInternships.map(
-          (i: InternshipWithId, idx: number) =>
-            idx === internship.index ? internshipPayload : i,
+        // Edit existing entry at the specified index
+        updatedInternships = existingInternships.map((i, idx) =>
+          idx === internship.index ? internshipPayload : i
         );
       } else {
+        // Append new internship
         updatedInternships = [...existingInternships, internshipPayload];
       }
 
@@ -114,12 +94,13 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save",
+        description: "Failed to save internship",
         variant: "destructive",
       });
     }
   };
 
+  // Logic to clear end date state when "Currently working" is checked
   React.useEffect(() => {
     if (isCurrent) {
       setValue("end_date", "");
@@ -170,7 +151,7 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
               )}
             </div>
             <div>
-              <Label>End Date</Label>
+              <Label>End Date {!isCurrent && "*"}</Label>
               <Input
                 type="date"
                 disabled={isCurrent}
@@ -186,14 +167,19 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
           </div>
           <div className="flex items-center space-x-2">
             <Checkbox
+              id="is_current_intern"
               checked={isCurrent}
               onCheckedChange={(c) => setValue("is_current", c as boolean)}
             />
-            <Label>Currently working here</Label>
+            <Label htmlFor="is_current_intern">Currently working here</Label>
           </div>
           <div>
             <Label>Description</Label>
-            <Textarea {...register("description")} className="rounded-xl" />
+            <Textarea 
+              {...register("description")} 
+              placeholder="Roles and responsibilities..."
+              className="rounded-xl" 
+            />
           </div>
           <div className="flex justify-end space-x-2 pt-4">
             <Button

@@ -30,7 +30,6 @@ export interface Project {
   id?: string;
   projectName: string;
   clientName?: string;
-  status?: string;
   completionDate?: string;
   description?: string;
   technologies?: string[];
@@ -80,7 +79,7 @@ export interface CandidateCourse {
 }
 
 export interface CandidateEducation {
-  id: string;
+  id?: string;
   is_current: boolean;
   degree?: string;
   name?: string;

@@ -15,13 +15,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
 import { CandidateCourse } from "@/types/profiles.types";
-
-const courseSchema = z.object({
-  title: z.string().min(1, "Course title is required"),
-  provider: z.string().min(1, "Provider is required"),
-  completion_date: z.string().min(1, "Completion date is required"),
-  certificate_url: z.string().url().optional().or(z.literal("")),
-});
+import { courseSchema } from "@/lib/schemas";
 
 type CourseFormData = z.infer<typeof courseSchema>;
 
@@ -60,30 +54,23 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({
     },
   });
 
-  const parseJsonField = (field: any, defaultValue: any = []) => {
-    if (!field) return defaultValue;
-    if (typeof field === "string") {
-      try {
-        return JSON.parse(field);
-      } catch {
-        return defaultValue;
-      }
-    }
-    return Array.isArray(field) ? field : defaultValue;
-  };
-
   const onSubmit = async (data: CourseFormData) => {
     try {
-      const existingCourses = parseJsonField(profileData?.course, []);
+      // Use nullish coalescing to avoid custom parsing helper functions
+      const existingCourses = profileData?.course ?? [];
+
+      // Use spread operator to create payload from form data
+      const payload = { ...data };
 
       let updatedCourses;
       if (course?.index !== undefined) {
-        updatedCourses = existingCourses.map(
-          (c: CandidateCourse, idx: number) =>
-            idx === course.index ? { ...data } : c,
+        // Map through and replace at specific index for edits
+        updatedCourses = existingCourses.map((c, idx) =>
+          idx === course.index ? payload : c
         );
       } else {
-        updatedCourses = [...existingCourses, { ...data }];
+        // Append new course for additions
+        updatedCourses = [...existingCourses, payload];
       }
 
       await updateProfile({
@@ -97,12 +84,8 @@ export const CourseDialog: React.FC<CourseDialogProps> = ({
 
       setOpen(false);
       reset();
-
-      if (onUpdate) {
-        onUpdate();
-      }
+      onUpdate?.();
     } catch (error) {
-      console.error("Error saving course:", error);
       toast({
         title: "Error",
         description: "Failed to save course",

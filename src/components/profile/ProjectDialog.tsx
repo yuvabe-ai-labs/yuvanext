@@ -19,33 +19,7 @@ import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
 import { CandidateProject } from "@/types/profiles.types";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
-
-const projectSchema = z
-  .object({
-    projectName: z.string().min(1, "Title is required"),
-    description: z.string().min(1, "Description is required"),
-    technologies: z
-      .array(z.string())
-      .min(1, "At least one technology is required"),
-    completionDate: z.string().optional(),
-    projectUrl: z.string().url().optional().or(z.literal("")),
-    is_current: z.boolean().default(false),
-    start_date: z.string().min(1, "Start date is required"),
-  })
-  .refine(
-    (data) => {
-      if (data.is_current || !data.completionDate || !data.start_date) {
-        return true;
-      }
-      const start = new Date(data.start_date);
-      const end = new Date(data.completionDate);
-      return end >= start;
-    },
-    {
-      message: "End date cannot be before start date",
-      path: ["completionDate"],
-    },
-  );
+import { projectSchema } from "@/lib/schemas";
 
 type ProjectFormData = z.infer<typeof projectSchema>;
 
@@ -70,29 +44,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
   const { data: profileData } = useProfile();
   const { mutateAsync: updateProfile, isPending } = useUpdateProfile();
 
-  const getDefaultValues = (): ProjectFormData => {
-    if (project) {
-      return {
-        projectName: project.title || project.name || "",
-        description: project.description || "",
-        technologies: project.technologies || [],
-        completionDate: project.end_date && project.end_date !== "Present" ? project.end_date : "",
-        projectUrl: project.project_url || "",
-        is_current: project.is_current || project.end_date === "Present",
-        start_date: project.start_date || "",
-      };
-    }
-    return {
-      projectName: "",
-      description: "",
-      technologies: [],
-      completionDate: "",
-      projectUrl: "",
-      is_current: false,
-      start_date: "",
-    };
-  };
-
   const {
     register,
     handleSubmit,
@@ -103,65 +54,51 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
     reset,
   } = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
-    defaultValues: getDefaultValues(),
+    defaultValues: {
+      projectName: project?.title || project?.name || "",
+      description: project?.description || "",
+      technologies: project?.technologies || [],
+      completionDate: project?.end_date !== "Present" ? project?.end_date : "",
+      projectUrl: project?.project_url || "",
+      is_current: project?.is_current || project?.end_date === "Present",
+      start_date: project?.start_date || "",
+    },
   });
 
   const isCurrent = watch("is_current");
   const technologies = watch("technologies");
 
-  const parseJsonField = (field: any, defaultValue: any = []) => {
-    if (!field) return defaultValue;
-    if (typeof field === "string") {
-      try {
-        return JSON.parse(field);
-      } catch {
-        return defaultValue;
-      }
-    }
-    return Array.isArray(field) ? field : defaultValue;
-  };
-
   const addTechnology = () => {
-    if (newTech.trim() && !technologies.includes(newTech.trim())) {
-      const updatedTech = [...technologies, newTech.trim()];
-      setValue("technologies", updatedTech);
+    const trimmed = newTech.trim();
+    if (trimmed && !technologies.includes(trimmed)) {
+      setValue("technologies", [...technologies, trimmed]);
       setNewTech("");
     }
   };
 
   const removeTechnology = (tech: string) => {
-    const updatedTech = technologies.filter((t) => t !== tech);
-    setValue("technologies", updatedTech);
+    setValue("technologies", technologies.filter((t) => t !== tech));
   };
 
   const onSubmit = async (data: ProjectFormData) => {
     try {
-      const existingProjects = parseJsonField(profileData?.projects, []);
+      // Use nullish coalescing instead of custom parsing function
+      const existingProjects = profileData?.projects ?? [];
 
       const projectPayload = {
-        title: data.projectName,
-        description: data.description,
-        technologies: data.technologies,
-        start_date: data.start_date,
-        end_date: data.is_current ? "Present" : data.completionDate || "",
-        is_current: data.is_current,
-        project_url: data.projectUrl || "",
+        ...data,
       };
 
       let updatedProjects;
       if (project?.index !== undefined) {
-        // Editing existing project at index
-        updatedProjects = existingProjects.map((p: CandidateProject, idx: number) =>
+        updatedProjects = existingProjects.map((p, idx) =>
           idx === project.index ? projectPayload : p
         );
       } else {
-        // Adding new project
         updatedProjects = [...existingProjects, projectPayload];
       }
 
-      await updateProfile({
-        projects: updatedProjects,
-      });
+      await updateProfile({ projects: updatedProjects });
 
       toast({
         title: "Success",
@@ -170,9 +107,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
       setOpen(false);
       reset();
       setNewTech("");
-      if (onUpdate) onUpdate();
+      onUpdate?.();
     } catch (error) {
-      console.error("Error saving project:", error);
       toast({
         title: "Error",
         description: "Failed to save project",
@@ -205,9 +141,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
               className="rounded-full"
             />
             {errors.projectName && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.projectName.message}
-              </p>
+              <p className="text-sm text-destructive mt-1">{errors.projectName.message}</p>
             )}
           </div>
 
@@ -221,9 +155,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
               className="rounded-xl"
             />
             {errors.description && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.description.message}
-              </p>
+              <p className="text-sm text-destructive mt-1">{errors.description.message}</p>
             )}
           </div>
 
@@ -234,9 +166,12 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
                 value={newTech}
                 onChange={(e) => setNewTech(e.target.value)}
                 placeholder="Add technology"
-                onKeyPress={(e) =>
-                  e.key === "Enter" && (e.preventDefault(), addTechnology())
-                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addTechnology();
+                  }
+                }}
                 className="rounded-full"
               />
               <Button
@@ -250,23 +185,14 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
             </div>
             <div className="flex flex-wrap gap-2">
               {technologies.map((tech) => (
-                <Badge
-                  key={tech}
-                  variant="secondary"
-                  className="flex items-center gap-1"
-                >
+                <Badge key={tech} variant="secondary" className="flex items-center gap-1">
                   {tech}
-                  <X
-                    className="w-3 h-3 cursor-pointer"
-                    onClick={() => removeTechnology(tech)}
-                  />
+                  <X className="w-3 h-3 cursor-pointer" onClick={() => removeTechnology(tech)} />
                 </Badge>
               ))}
             </div>
             {errors.technologies && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.technologies.message}
-              </p>
+              <p className="text-sm text-destructive mt-1">{errors.technologies.message}</p>
             )}
           </div>
 
@@ -280,9 +206,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
                 className="rounded-full"
               />
               {errors.start_date && (
-                <p className="text-sm text-destructive mt-1">
-                  {errors.start_date.message}
-                </p>
+                <p className="text-sm text-destructive mt-1">{errors.start_date.message}</p>
               )}
             </div>
 
@@ -296,9 +220,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
                 className="rounded-full"
               />
               {errors.completionDate && (
-                <p className="text-sm text-destructive mt-1">
-                  {errors.completionDate.message}
-                </p>
+                <p className="text-sm text-destructive mt-1">{errors.completionDate.message}</p>
               )}
             </div>
           </div>
@@ -307,13 +229,9 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
             <Checkbox
               id="is_current"
               checked={isCurrent}
-              onCheckedChange={(checked) =>
-                setValue("is_current", checked as boolean)
-              }
+              onCheckedChange={(checked) => setValue("is_current", checked as boolean)}
             />
-            <Label htmlFor="is_current">
-              Currently working on this project
-            </Label>
+            <Label htmlFor="is_current">Currently working on this project</Label>
           </div>
 
           <div>
@@ -326,9 +244,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
               placeholder="https://github.com/username/project"
             />
             {errors.projectUrl && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.projectUrl.message}
-              </p>
+              <p className="text-sm text-destructive mt-1">{errors.projectUrl.message}</p>
             )}
           </div>
 

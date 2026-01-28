@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -29,26 +29,21 @@ export const SkillsDialog = ({
   const { toast } = useToast();
   const { mutateAsync: updateProfile, isPending } = useUpdateProfile();
 
-  const parseJsonField = (field: any, defaultValue: any = []) => {
-    if (!field) return defaultValue;
-    if (typeof field === "string") {
-      try {
-        return JSON.parse(field);
-      } catch {
-        return defaultValue;
-      }
-    }
-    return Array.isArray(field) ? field : defaultValue;
-  };
-
-  const [skills, setSkills] = useState<string[]>(
-    parseJsonField(profile?.skills, [])
-  );
+  // Initialize state directly using nullish coalescing
+  const [skills, setSkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState("");
 
+  // Sync internal state when dialog opens or profile data changes
+  useEffect(() => {
+    if (open) {
+      setSkills(profile?.skills ?? []);
+    }
+  }, [open, profile?.skills]);
+
   const addSkill = () => {
-    if (newSkill.trim() && !skills.includes(newSkill.trim())) {
-      setSkills([...skills, newSkill.trim()]);
+    const trimmed = newSkill.trim();
+    if (trimmed && !skills.includes(trimmed)) {
+      setSkills([...skills, trimmed]);
       setNewSkill("");
     }
   };
@@ -59,6 +54,7 @@ export const SkillsDialog = ({
 
   const handleSave = async () => {
     try {
+      // Direct call to updateProfile using the simple string array
       await updateProfile({ skills });
 
       toast({
@@ -67,12 +63,8 @@ export const SkillsDialog = ({
       });
 
       setOpen(false);
-
-      if (onUpdate) {
-        onUpdate();
-      }
+      onUpdate?.();
     } catch (error) {
-      console.error("Error updating skills:", error);
       toast({
         title: "Error",
         description: "Failed to update skills",
@@ -81,7 +73,7 @@ export const SkillsDialog = ({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
       addSkill();
@@ -101,7 +93,7 @@ export const SkillsDialog = ({
               placeholder="Add a skill"
               value={newSkill}
               onChange={(e) => setNewSkill(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown} // Using onKeyDown instead of deprecated onKeyPress
               className="rounded-full"
             />
 
@@ -110,15 +102,14 @@ export const SkillsDialog = ({
             </Button>
           </div>
 
-          <div className="flex flex-wrap gap-2 max-h-40 items-center overflow-y-auto">
+          <div className="flex flex-wrap gap-2 max-h-40 items-center overflow-y-auto p-1">
             {skills.map((skill, index) => (
               <Badge
                 key={index}
                 variant="secondary"
-                className="px-3 py-1 bg-blue-50 text-blue-500"
+                className="px-3 py-1 bg-blue-50 text-blue-500 flex items-center gap-1"
               >
                 {skill}
-
                 <X
                   className="w-3 h-3 ml-1 cursor-pointer"
                   onClick={() => removeSkill(skill)}
@@ -127,7 +118,7 @@ export const SkillsDialog = ({
             ))}
           </div>
 
-          <div className="flex justify-end space-x-2">
+          <div className="flex justify-end space-x-2 pt-4">
             <Button
               type="button"
               variant="outline"

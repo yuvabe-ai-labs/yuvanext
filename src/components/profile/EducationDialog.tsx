@@ -16,35 +16,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
 import { CandidateEducation } from "@/types/profiles.types";
-
-const educationSchema = z
-  .object({
-    degree: z.string().min(1, "Degree is required"),
-    institution: z.string().min(1, "Institution is required"),
-    start_year: z.coerce.number().min(1900).max(new Date().getFullYear()),
-    end_year: z.coerce
-      .number()
-      .min(1900)
-      .max(new Date().getFullYear() + 10)
-      .optional()
-      .or(z.nan()),
-    score: z.string().optional(),
-    is_current: z.boolean().default(false),
-  })
-  .refine(
-    (data) => {
-      if (data.is_current) return true;
-
-      if (!data.end_year || isNaN(data.end_year)) return false;
-
-      return data.end_year >= data.start_year;
-    },
-    {
-      message:
-        "End year is required for completed education and must be after start year",
-      path: ["end_year"],
-    },
-  );
+import { educationSchema } from "@/lib/schemas";
 
 type EducationFormData = z.infer<typeof educationSchema>;
 
@@ -81,10 +53,8 @@ export const EducationDialog: React.FC<EducationDialogProps> = ({
     defaultValues: {
       degree: education?.degree || "",
       institution: education?.institution || education?.school || "",
-      start_year: education?.start_year
-        ? Number(education.start_year)
-        : undefined,
-      end_year: education?.end_year ? Number(education.end_year) : undefined,
+      start_year: education?.start_year || "",
+      end_year: education?.end_year || "",
       score: education?.score || "",
       is_current: education?.is_current || false,
     },
@@ -92,24 +62,17 @@ export const EducationDialog: React.FC<EducationDialogProps> = ({
 
   const isCurrent = watch("is_current");
 
-  const parseJsonField = (field: any) => (Array.isArray(field) ? field : []);
-
   const onSubmit = async (data: EducationFormData) => {
     try {
-      const existingEdu = parseJsonField(profileData?.education);
+      const existingEdu = profileData?.education ?? [];
 
       const payload = {
-        degree: data.degree,
-        institution: data.institution,
-        start_year: data.start_year.toString(),
-        end_year: data.is_current ? undefined : data.end_year?.toString(),
-        score: data.score,
-        is_current: data.is_current,
+        ...data,
       };
 
       let updatedEdu;
       if (education?.index !== undefined) {
-        updatedEdu = existingEdu.map((e: EducationWithId, idx: number) =>
+        updatedEdu = existingEdu.map((e, idx) =>
           idx === education.index ? payload : e,
         );
       } else {
@@ -130,9 +93,10 @@ export const EducationDialog: React.FC<EducationDialogProps> = ({
     }
   };
 
+  // Auto-clear end_year when "Currently studying" is checked
   React.useEffect(() => {
     if (isCurrent) {
-      setValue("end_year", NaN);
+      setValue("end_year", "");
       clearErrors("end_year");
     }
   }, [isCurrent, setValue, clearErrors]);
@@ -151,46 +115,48 @@ export const EducationDialog: React.FC<EducationDialogProps> = ({
             <Label>Degree *</Label>
             <Input {...register("degree")} className="rounded-full" />
             {errors.degree && (
-              <p className="text-xs text-destructive mt-1">
-                {errors.degree.message}
-              </p>
+              <p className="text-xs text-destructive mt-1">{errors.degree.message}</p>
             )}
           </div>
           <div>
             <Label>Institution *</Label>
             <Input {...register("institution")} className="rounded-full" />
             {errors.institution && (
-              <p className="text-xs text-destructive mt-1">
-                {errors.institution.message}
-              </p>
+              <p className="text-xs text-destructive mt-1">{errors.institution.message}</p>
             )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Start Year *</Label>
               <Input
-                type="number"
+                type="text"
+                maxLength={4}
                 {...register("start_year")}
+                onInput={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  e.target.value = e.target.value.replace(/\D/g, "");
+                }}
                 className="rounded-full"
+                placeholder="YYYY"
               />
               {errors.start_year && (
-                <p className="text-xs text-destructive mt-1">
-                  {errors.start_year.message}
-                </p>
+                <p className="text-xs text-destructive mt-1">{errors.start_year.message}</p>
               )}
             </div>
             <div>
               <Label>End Year</Label>
               <Input
-                type="number"
+                type="text"
+                maxLength={4}
                 disabled={isCurrent}
                 {...register("end_year")}
+                onInput={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  e.target.value = e.target.value.replace(/\D/g, "");
+                }}
                 className="rounded-full"
+                placeholder="YYYY"
               />
               {errors.end_year && (
-                <p className="text-xs text-destructive mt-1">
-                  {errors.end_year.message}
-                </p>
+                <p className="text-xs text-destructive mt-1">{errors.end_year.message}</p>
               )}
             </div>
           </div>

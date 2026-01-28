@@ -14,14 +14,9 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import AIIcon from "../ui/custom-icons";
 import { useUpdateProfile } from "@/hooks/useProfile";
-import { useEnhanceProfile } from "@/hooks/useAI"; //
+import { useEnhanceProfile } from "@/hooks/useAI";
+import { summarySchema } from "@/lib/schemas";
 
-const summarySchema = z.object({
-  cover_letter: z
-    .string()
-    .min(10, "Profile summary should be at least 10 characters long")
-    .max(1000, "Profile summary should not exceed 1000 characters"),
-});
 
 type SummaryFormData = z.infer<typeof summarySchema>;
 
@@ -39,8 +34,6 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
   const [open, setOpen] = React.useState(false);
   const { toast } = useToast();
   const { mutateAsync: updateProfile } = useUpdateProfile();
-  
-  // Initialize the AI enhancement mutation
   const { mutateAsync: enhanceProfile, isPending: isGenerating } = useEnhanceProfile();
 
   const {
@@ -52,22 +45,19 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
   } = useForm<SummaryFormData>({
     resolver: zodResolver(summarySchema),
     defaultValues: {
-      cover_letter: summary || "",
+      profileSummary: summary || "",
     },
   });
 
-  const coverLetter = watch("cover_letter");
-  const wordCount =
-    coverLetter
-      ?.trim()
-      .split(/\s+/)
-      .filter((word) => word.length > 0).length || 0;
+  const currentSummary = watch("profileSummary");
+  
+  const wordCount = currentSummary?.trim() ? currentSummary.trim().split(/\s+/).length : 0;
 
   const handleGenerate = async () => {
     if (wordCount < 2) {
       toast({
         title: "Too short",
-        description: "Please write at least a few sentences before enhancing.",
+        description: "Please write at least a few words before enhancing.",
         variant: "destructive",
       });
       return;
@@ -75,26 +65,23 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
 
     try {
       const result = await enhanceProfile({
-        description: coverLetter, 
+        description: currentSummary,
       });
 
-      const enhancedText = result.enhanced;
+      const enhancedText = result?.enhanced;
 
-      if (!enhancedText) {
-        throw new Error("No enhanced content received");
-      }
+      if (!enhancedText) throw new Error("No enhanced content received");
 
-      setValue("cover_letter", enhancedText);
+      setValue("profileSummary", enhancedText);
 
       toast({
         title: "Success",
         description: "Profile summary enhanced successfully!",
       });
     } catch (error: any) {
-      console.error("Error generating summary:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to enhance profile summary. Please try again.",
+        description: error.message || "Failed to enhance summary.",
         variant: "destructive",
       });
     }
@@ -102,9 +89,9 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
 
   const onSubmit = async (data: SummaryFormData) => {
     try {
-      // data.cover_letter will contain the enhanced text if setValue was called
+      // Direct call to updateProfile payload matching the UpdateProfilePayload interface
       await updateProfile({
-        profileSummary: data.cover_letter,
+        profileSummary: data.profileSummary,
       });
 
       toast({
@@ -113,12 +100,8 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
       });
 
       setOpen(false);
-
-      if (onSave) {
-        onSave();
-      }
+      onSave?.();
     } catch (error) {
-      console.error("Error updating profile summary:", error);
       toast({
         title: "Error",
         description: "Failed to update profile summary",
@@ -141,27 +124,23 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
             <div className="pl-4 my-1 text-[12px]">
               AI Assistance - Type something which you want to enhance
             </div>
-            <div className="bg-white p-2 rounded-2xl text-gray-400">
+            <div className="bg-white p-2 rounded-2xl">
               <Textarea
-                id="cover_letter"
-                {...register("cover_letter")}
+                {...register("profileSummary")}
                 placeholder="Get AI assistance to write your Profile Summary"
-                className="w-full p-2 pb-10 resize-none min-h-40 border-0 outline-none text-gray-900 focus:outline-none focus:border-0"
+                className="w-full p-2 pb-10 resize-none min-h-40 border-0 outline-none text-gray-900 focus:ring-0"
                 disabled={isGenerating}
-                style={{
-                  boxShadow: "none",
-                }}
+                style={{ boxShadow: "none" }}
               />
             </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleGenerate}
-                // Change "wordCount < 10" to a lower number like "wordCount < 1"
-                disabled={isGenerating || wordCount < 1} 
-                className="absolute bottom-2 right-2 bg-white/30 rounded-full px-4 py-0 text-[12px] cursor-pointer hover:bg-blue-500 hover:text-white"
-              >
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGenerate}
+              disabled={isGenerating || wordCount < 1}
+              className="absolute bottom-2 right-2 bg-white/30 rounded-full px-4 py-0 text-[12px] hover:bg-blue-500 hover:text-white"
+            >
               {isGenerating ? (
                 <>
                   <span className="mr-2 animate-pulse"><AIIcon /></span> Generating...
@@ -175,13 +154,13 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
             </Button>
           </div>
 
-          {errors.cover_letter && (
+          {errors.profileSummary && (
             <p className="px-4 text-[12px] text-rose-600">
-              {errors.cover_letter.message}
+              {errors.profileSummary.message}
             </p>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end pt-2">
             <Button
               type="button"
               variant="outline"

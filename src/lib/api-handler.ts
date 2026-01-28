@@ -1,12 +1,5 @@
 import { AxiosError, AxiosResponse } from "axios";
-// import { BaseApiResponse } from "@/lib/utils";
-
-export interface BaseApiResponse<T> {
-  status_code: number;
-  message: string;
-  data: T | null;
-}
-
+import { BaseApiResponse } from "@/lib/utils";
 
 //  Handles success/error responses and throws appropriate errors
 

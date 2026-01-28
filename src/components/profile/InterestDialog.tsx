@@ -12,12 +12,12 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useUpdateProfile } from "@/hooks/useProfile"; // Integrated hook
+import { useUpdateProfile } from "@/hooks/useProfile"; 
 
 interface InterestDialogProps {
   children: React.ReactNode;
   interests: string[];
-  onUpdate?: () => void; // Renamed to match SkillsDialog pattern
+  onUpdate?: () => void;
 }
 
 export const InterestDialog: React.FC<InterestDialogProps> = ({
@@ -30,12 +30,11 @@ export const InterestDialog: React.FC<InterestDialogProps> = ({
   const [currentInterests, setCurrentInterests] = useState<string[]>(interests);
 
   const { toast } = useToast();
-  const { mutateAsync: updateProfile, isPending } = useUpdateProfile(); // Hook usage
+  const { mutateAsync: updateProfile, isPending } = useUpdateProfile(); 
 
-  // Synchronize state when dialog opens or interests prop changes
   useEffect(() => {
     if (open) {
-      setCurrentInterests(interests);
+      setCurrentInterests(interests ?? []); 
     }
   }, [open, interests]);
 
@@ -53,7 +52,6 @@ export const InterestDialog: React.FC<InterestDialogProps> = ({
 
   const handleSave = async () => {
     try {
-      // Direct call to the profile update mutation
       await updateProfile({ interests: currentInterests });
 
       toast({
@@ -62,12 +60,8 @@ export const InterestDialog: React.FC<InterestDialogProps> = ({
       });
 
       setOpen(false);
-
-      if (onUpdate) {
-        onUpdate();
-      }
+      onUpdate?.();
     } catch (error) {
-      console.error("Error updating interests:", error);
       toast({
         title: "Error",
         description: "Failed to update interests",
@@ -76,7 +70,7 @@ export const InterestDialog: React.FC<InterestDialogProps> = ({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
       addInterest();
@@ -99,7 +93,7 @@ export const InterestDialog: React.FC<InterestDialogProps> = ({
                 placeholder="e.g. Machine Learning, Photography"
                 value={newInterest}
                 onChange={(e) => setNewInterest(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyDown} // Replaced deprecated onKeyPress with onKeyDown
                 className="rounded-full"
               />
               <Button

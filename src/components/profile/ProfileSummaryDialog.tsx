@@ -6,6 +6,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+} from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
@@ -16,7 +23,6 @@ import AIIcon from "../ui/custom-icons";
 import { useUpdateProfile } from "@/hooks/useProfile";
 import { useEnhanceProfile } from "@/hooks/useAI";
 import { summarySchema } from "@/lib/schemas";
-
 
 type SummaryFormData = z.infer<typeof summarySchema>;
 
@@ -36,21 +42,14 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
   const { mutateAsync: updateProfile } = useUpdateProfile();
   const { mutateAsync: enhanceProfile, isPending: isGenerating } = useEnhanceProfile();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    watch,
-    setValue,
-  } = useForm<SummaryFormData>({
+  const form = useForm<SummaryFormData>({
     resolver: zodResolver(summarySchema),
     defaultValues: {
       profileSummary: summary || "",
     },
   });
 
-  const currentSummary = watch("profileSummary");
-  
+  const currentSummary = form.watch("profileSummary");
   const wordCount = currentSummary?.trim() ? currentSummary.trim().split(/\s+/).length : 0;
 
   const handleGenerate = async () => {
@@ -72,7 +71,7 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
 
       if (!enhancedText) throw new Error("No enhanced content received");
 
-      setValue("profileSummary", enhancedText);
+      form.setValue("profileSummary", enhancedText);
 
       toast({
         title: "Success",
@@ -89,7 +88,6 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
 
   const onSubmit = async (data: SummaryFormData) => {
     try {
-      // Direct call to updateProfile payload matching the UpdateProfilePayload interface
       await updateProfile({
         profileSummary: data.profileSummary,
       });
@@ -119,66 +117,77 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
             Profile Summary
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
-          <div className="relative bg-gradient-to-r from-[#DF10FF] to-[#005EFF] px-[1px] py-[1px] rounded-2xl text-white">
-            <div className="pl-4 my-1 text-[12px]">
-              AI Assistance - Type something which you want to enhance
-            </div>
-            <div className="bg-white p-2 rounded-2xl">
-              <Textarea
-                {...register("profileSummary")}
-                placeholder="Get AI assistance to write your Profile Summary"
-                className="w-full p-2 pb-10 resize-none min-h-40 border-0 outline-none text-gray-900 focus:ring-0"
-                disabled={isGenerating}
-                style={{ boxShadow: "none" }}
-              />
-            </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleGenerate}
-              disabled={isGenerating || wordCount < 1}
-              className="absolute bottom-2 right-2 bg-white/30 rounded-full px-4 py-0 text-[12px] hover:bg-blue-500 hover:text-white"
-            >
-              {isGenerating ? (
-                <>
-                  <span className="mr-2 animate-pulse"><AIIcon /></span> Generating...
-                </>
-              ) : (
-                <>
-                  <AIIcon />
-                  Create
-                </>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
+            <FormField
+              control={form.control}
+              name="profileSummary"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="relative bg-gradient-to-r from-[#DF10FF] to-[#005EFF] px-[1px] py-[1px] rounded-2xl text-white">
+                    <div className="pl-4 my-1 text-[12px]">
+                      AI Assistance - Type something which you want to enhance
+                    </div>
+                    <div className="bg-white p-2 rounded-2xl">
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Get AI assistance to write your Profile Summary"
+                          className="w-full p-2 pb-10 resize-none min-h-40 border-0 outline-none text-gray-900 focus:ring-0"
+                          disabled={isGenerating}
+                          style={{ boxShadow: "none" }}
+                        />
+                      </FormControl>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleGenerate}
+                      disabled={isGenerating || wordCount < 1}
+                      className="absolute bottom-2 right-2 bg-white/30 rounded-full px-4 py-0 text-[12px] hover:bg-blue-500 hover:text-white"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <span className="mr-2 animate-pulse">
+                            <AIIcon />
+                          </span>{" "}
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <AIIcon />
+                          Create
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <FormMessage className="px-4 text-[12px]" />
+                </FormItem>
               )}
-            </Button>
-          </div>
+            />
 
-          {errors.profileSummary && (
-            <p className="px-4 text-[12px] text-rose-600">
-              {errors.profileSummary.message}
-            </p>
-          )}
-
-          <div className="flex justify-end pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={isSubmitting}
-              className="rounded-full"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || isGenerating}
-              className="rounded-full ml-2"
-            >
-              {isSubmitting ? "Saving..." : "Save"}
-            </Button>
-          </div>
-        </form>
+            <div className="flex justify-end pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={form.formState.isSubmitting}
+                className="rounded-full"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting || isGenerating}
+                className="rounded-full ml-2"
+              >
+                {form.formState.isSubmitting ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

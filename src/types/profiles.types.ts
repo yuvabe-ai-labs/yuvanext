@@ -1,5 +1,3 @@
-// src/types/profile.types.ts
-
 // --- Enums ---
 export enum UserRole {
   CANDIDATE = "candidate",

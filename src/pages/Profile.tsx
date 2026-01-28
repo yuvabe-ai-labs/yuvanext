@@ -15,7 +15,6 @@ import {
   CircleCheckBig,
   CircleX,
 } from "lucide-react";
-import { AvatarUploadDialog } from "@/components/AvatarUploadDialog";
 import { useState } from "react";
 import { PersonalDetailsDialog } from "@/components/profile/PersonalDetailsDialog";
 import { SkillsDialog } from "@/components/profile/SkillsDialog";

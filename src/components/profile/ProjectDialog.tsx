@@ -6,12 +6,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +29,9 @@ import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { projectSchema } from "@/lib/schemas";
 
-type ProjectFormData = z.infer<typeof projectSchema>;
+type ProjectFormData = Omit<z.infer<typeof projectSchema>, "technologies"> & {
+  technologies: { value: string }[];
+};
 
 interface ProjectWithIndex extends CandidateProject {
   index?: number;
@@ -44,20 +54,12 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
   const { data: profileData } = useProfile();
   const { mutateAsync: updateProfile, isPending } = useUpdateProfile();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    watch,
-    setValue,
-    clearErrors,
-    reset,
-  } = useForm<ProjectFormData>({
+  const form = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
       projectName: project?.title || project?.name || "",
       description: project?.description || "",
-      technologies: project?.technologies || [],
+      technologies: (project?.technologies || []).map((t) => ({ value: t })),
       completionDate: project?.end_date !== "Present" ? project?.end_date : "",
       projectUrl: project?.project_url || "",
       is_current: project?.is_current || project?.end_date === "Present",
@@ -65,28 +67,30 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
     },
   });
 
-  const isCurrent = watch("is_current");
-  const technologies = watch("technologies");
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "technologies",
+  });
+
+  const isCurrent = form.watch("is_current");
 
   const addTechnology = () => {
     const trimmed = newTech.trim();
-    if (trimmed && !technologies.includes(trimmed)) {
-      setValue("technologies", [...technologies, trimmed]);
-      setNewTech("");
+    if (trimmed) {
+      const currentValues = fields.map((f) => f.value);
+      if (!currentValues.includes(trimmed)) {
+        append({ value: trimmed });
+        setNewTech("");
+      }
     }
-  };
-
-  const removeTechnology = (tech: string) => {
-    setValue("technologies", technologies.filter((t) => t !== tech));
   };
 
   const onSubmit = async (data: ProjectFormData) => {
     try {
-      // Use nullish coalescing instead of custom parsing function
       const existingProjects = profileData?.projects ?? [];
-
       const projectPayload = {
         ...data,
+        technologies: data.technologies.map((t) => t.value),
       };
 
       let updatedProjects;
@@ -105,7 +109,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
         description: `Project ${project ? "updated" : "added"} successfully`,
       });
       setOpen(false);
-      reset();
+      form.reset();
       setNewTech("");
       onUpdate?.();
     } catch (error) {
@@ -119,10 +123,10 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
 
   React.useEffect(() => {
     if (isCurrent) {
-      setValue("completionDate", "");
-      clearErrors("completionDate");
+      form.setValue("completionDate", "");
+      form.clearErrors("completionDate");
     }
-  }, [isCurrent, setValue, clearErrors]);
+  }, [isCurrent, form]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -131,137 +135,156 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
         <DialogHeader>
           <DialogTitle>{project ? "Edit Project" : "Add Project"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <Label htmlFor="projectName">Project Title *</Label>
-            <Input
-              id="projectName"
-              {...register("projectName")}
-              placeholder="e.g. E-commerce Website"
-              className="rounded-full"
+        
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="projectName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Project Title *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. E-commerce Website" className="rounded-full" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {errors.projectName && (
-              <p className="text-sm text-destructive mt-1">{errors.projectName.message}</p>
-            )}
-          </div>
 
-          <div>
-            <Label htmlFor="description">Description *</Label>
-            <Textarea
-              id="description"
-              {...register("description")}
-              placeholder="Describe what this project does and your role in it"
-              rows={3}
-              className="rounded-xl"
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description *</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Describe what this project does" 
+                      rows={3} 
+                      className="rounded-xl" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {errors.description && (
-              <p className="text-sm text-destructive mt-1">{errors.description.message}</p>
-            )}
-          </div>
 
-          <div>
-            <Label>Technologies *</Label>
-            <div className="flex space-x-2 mb-2">
-              <Input
-                value={newTech}
-                onChange={(e) => setNewTech(e.target.value)}
-                placeholder="Add technology"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addTechnology();
-                  }
-                }}
-                className="rounded-full"
+            <FormItem>
+              <FormLabel>Technologies *</FormLabel>
+              <div className="flex space-x-2 mb-2">
+                <Input
+                  value={newTech}
+                  onChange={(e) => setNewTech(e.target.value)}
+                  placeholder="Add technology"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addTechnology();
+                    }
+                  }}
+                  className="rounded-full"
+                />
+                <Button type="button" onClick={addTechnology} size="sm" className="rounded-full">
+                  Add
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {fields.map((field, index) => (
+                  <Badge key={field.id} variant="secondary" className="flex items-center gap-1">
+                    {field.value}
+                    <X className="w-3 h-3 cursor-pointer" onClick={() => remove(index)} />
+                  </Badge>
+                ))}
+              </div>
+              <FormMessage>{form.formState.errors.technologies?.message}</FormMessage>
+            </FormItem>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="start_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Date *</FormLabel>
+                    <FormControl>
+                      <Input type="date" className="rounded-full" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
+
+              <FormField
+                control={form.control}
+                name="completionDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Date</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="date" 
+                        disabled={isCurrent} 
+                        className="rounded-full" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="is_current"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <Label className="font-normal">Currently working on this project</Label>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="projectUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Project URL</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="https://github.com/..." 
+                      className="rounded-full" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end space-x-2 pt-4">
               <Button
                 type="button"
-                onClick={addTechnology}
-                size="sm"
+                variant="outline"
+                onClick={() => setOpen(false)}
                 className="rounded-full"
               >
-                Add
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isPending} className="rounded-full">
+                {isPending ? "Saving..." : project ? "Update" : "Add"}
               </Button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {technologies.map((tech) => (
-                <Badge key={tech} variant="secondary" className="flex items-center gap-1">
-                  {tech}
-                  <X className="w-3 h-3 cursor-pointer" onClick={() => removeTechnology(tech)} />
-                </Badge>
-              ))}
-            </div>
-            {errors.technologies && (
-              <p className="text-sm text-destructive mt-1">{errors.technologies.message}</p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="start_date">Start Date *</Label>
-              <Input
-                id="start_date"
-                type="date"
-                {...register("start_date")}
-                className="rounded-full"
-              />
-              {errors.start_date && (
-                <p className="text-sm text-destructive mt-1">{errors.start_date.message}</p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="completionDate">End Date</Label>
-              <Input
-                id="completionDate"
-                type="date"
-                disabled={isCurrent}
-                {...register("completionDate")}
-                className="rounded-full"
-              />
-              {errors.completionDate && (
-                <p className="text-sm text-destructive mt-1">{errors.completionDate.message}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="is_current"
-              checked={isCurrent}
-              onCheckedChange={(checked) => setValue("is_current", checked as boolean)}
-            />
-            <Label htmlFor="is_current">Currently working on this project</Label>
-          </div>
-
-          <div>
-            <Label htmlFor="projectUrl">Project URL</Label>
-            <Input
-              className="rounded-full"
-              id="projectUrl"
-              type="url"
-              {...register("projectUrl")}
-              placeholder="https://github.com/username/project"
-            />
-            {errors.projectUrl && (
-              <p className="text-sm text-destructive mt-1">{errors.projectUrl.message}</p>
-            )}
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              className="rounded-full"
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isPending} className="rounded-full">
-              {isPending ? "Saving..." : project ? "Update" : "Add"}
-            </Button>
-          </div>
-        </form>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

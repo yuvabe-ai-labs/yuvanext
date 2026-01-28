@@ -228,3 +228,21 @@ export const projectSchema = z
       path: ["completionDate"],
     }
   );
+
+export const acceptInvitationSchema = z.object({
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[a-z]/, "Password must contain at least one lowercase character")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase character")
+    .regex(/\d/, "Password must contain at least one number")
+    .regex(/[!@#$%^&*(),.?":{}|<>]/, "Password must contain at least one special character"),
+});
+
+export const interestsSchema = z.object({
+  interests: z.array(z.object({ value: z.string() })),
+});
+
+export const skillsFormSchema = z.object({
+  skills: z.array(z.object({ value: z.string() })),
+});

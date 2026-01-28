@@ -19,7 +19,7 @@ import {
   CircleX,
   Camera,
 } from "lucide-react";
-import { AvatarUploadDialog } from "@/components/AvatarUploadDialog";
+import { ImageUploadDialog } from "@/components/ImageUploadDialog";
 import { useState } from "react";
 import { PersonalDetailsDialog } from "@/components/profile/PersonalDetailsDialog";
 import { SkillsDialog } from "@/components/profile/SkillsDialog";
@@ -32,15 +32,16 @@ import { ProfileSummaryDialog } from "@/components/profile/ProfileSummaryDialog"
 import { format, formatDistanceToNow } from "date-fns";
 import { CircularProgress } from "@/components/CircularProgress";
 import AIEditIcon from "@/components/ui/custom-icons";
-import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { useProfile, useUpdateProfile, useAvatarOperations } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { UnitSocialLinksDialog } from "@/components/unit/UnitSocialLinksDialog";
-import { Language } from "@/types/profiles.types";
+import { Language, CandidateCourse, CandidateEducation, CandidateInternship, Project, SocialLink} from "@/types/profiles.types";
 
 const Profile = () => {
   const { data: session } = useSession();
   const { data: profileData, isLoading, refetch } = useProfile();
   const { mutateAsync: updateProfile } = useUpdateProfile();
+  const { uploadAvatar, deleteAvatar } = useAvatarOperations();
   const { toast } = useToast();
 
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
@@ -200,262 +201,84 @@ const Profile = () => {
                   <h1 className="text-2xl font-bold">
                     {profileData?.name?.toLocaleUpperCase() || "Student Name"}
                   </h1>
-                  {profileData && (
-                    <PersonalDetailsDialog
-                      profile={profileData}
-                      onUpdate={() => refetch()}
-                    >
-                      <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
-                    </PersonalDetailsDialog>
-                  )}
+                  <PersonalDetailsDialog
+                    profile={profileData}
+                    onUpdate={refetch}
+                  >
+                    <Pencil className="w-4 h-4 text-muted-foreground cursor-pointer hover:text-primary" />
+                  </PersonalDetailsDialog>
                 </div>
-                <p className="text-muted-foreground mb-2">
-                  {profileData?.type || profileData?.role || "User"}
-                </p>
-
-                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
-                  <div className="flex items-center space-x-1">
+                <div className="flex flex-col space-y-2 text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-2">
                     <Mail className="w-4 h-4" />
-                    <span>
-                      {profileData?.email ||
-                        session?.user?.email ||
-                        "No email provided"}
-                    </span>
+                    <span>{profileData?.email || "Not provided"}</span>
                   </div>
                   {profileData?.phone && (
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-2">
                       <Phone className="w-4 h-4" />
                       <span>{profileData.phone}</span>
                     </div>
                   )}
-                  <div className="flex items-center space-x-1">
-                    <MapPin className="w-4 h-4" />
-                    <span>
-                      {profileData?.location
-                        ? profileData.location[0].toLocaleUpperCase() +
-                          profileData.location.slice(1)
-                        : "Location not provided"}
-                    </span>
+                  {profileData?.location && (
+                    <div className="flex items-center space-x-2">
+                      <MapPin className="w-4 h-4" />
+                      <span>{profileData.location}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center space-y-2">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-primary">
+                    {profileCompletion}%
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Profile Complete
                   </div>
                 </div>
-                <p className="text-muted-foreground text-sm text-gray-400 mt-2.5">
-                  {`Last updated - ${
-                    profileData?.updatedAt
-                      ? formatDistanceToNow(new Date(profileData.updatedAt), {
-                          addSuffix: true,
-                        })
-                      : "recently"
-                  }`}
-                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">
-          {/* Left Sidebar - Quick Links */}
-          <div className="lg:col-span-1 mb-4 lg:mb-0">
-            <Card className="rounded-3xl border-gray-200">
-              <CardContent className="p-6">
-                <h3 className="font-semibold text-lg mb-4">Quick Links</h3>
-                <div className="space-y-3 text-sm">
-                  {[
-                    {
-                      name: "Profile Summary",
-                      component: ProfileSummaryDialog,
-                      props: {
-                        summary: profileData?.profileSummary || "",
-                        onSave: refetch,
-                      },
-                    },
-                    {
-                      name: "Courses",
-                      component: CourseDialog,
-                      props: { onUpdate: refetch },
-                    },
-                    {
-                      name: "Key Skills",
-                      component: SkillsDialog,
-                      props: { profile: profileData, onUpdate: refetch },
-                    },
-                    {
-                      name: "Education",
-                      component: EducationDialog,
-                      props: { onUpdate: refetch },
-                    },
-                    {
-                      name: "Projects",
-                      component: ProjectDialog,
-                      props: { onUpdate: refetch },
-                    },
-                    {
-                      name: "Interests",
-                      component: InterestDialog,
-                      props: { interests, onUpdate: refetch },
-                    },
-                    {
-                      name: "Internships",
-                      component: InternshipDialog,
-                      props: { onUpdate: refetch },
-                    },
-                    {
-                      name: "Personal Details",
-                      component: PersonalDetailsDialog,
-                      props: { profile: profileData, onUpdate: refetch },
-                    },
-                    {
-                      name: "Links",
-                      component: UnitSocialLinksDialog,
-                      props: {
-                        currentLinks: links, // Pass the converted links array
-                        onSave: async (updatedLinksArray: any) => {
-                          try {
-                            const socialLinksRecord = updatedLinksArray.reduce(
-                              (acc: any, curr: any) => {
-                                if (curr.platform && curr.url)
-                                  acc[curr.platform] = curr.url;
-                                return acc;
-                              },
-                              {},
-                            );
-                            await updateProfile({
-                              socialLinks: socialLinksRecord,
-                            });
-                            refetch();
-                          } catch (error) {
-                            console.error(error);
-                          }
-                        },
-                      },
-                    },
-                  ].map((link) => {
-                    // Cast to any to handle the heterogeneous props across different dialogs
-                    const DialogComponent = link.component as any;
-
-                    return (
-                      <div
-                        key={link.name}
-                        className="flex items-center justify-between"
-                      >
-                        <span>{link.name}</span>
-                        <DialogComponent {...link.props}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-primary p-0 h-auto"
-                          >
-                            Add
-                          </Button>
-                        </DialogComponent>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Main Content */}
-          <div className="lg:col-span-3 space-y-2">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          {/* Left Column */}
+          <div className="lg:col-span-1 space-y-4 sm:space-y-6">
             {/* Profile Summary */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-6">
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Profile Summary</h3>
                   <ProfileSummaryDialog
-                    summary={profileData?.profileSummary || ""}
-                    onSave={refetch}
+                    profile={profileData}
+                    onUpdate={refetch}
                   >
-                    <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="p-0 h-auto hover:bg-transparent"
+                    >
+                      <AIEditIcon className="w-5 h-5" />
+                    </Button>
                   </ProfileSummaryDialog>
                 </div>
-                <div className="border border-gray-400 rounded-2xl p-3 min-h-28">
-                  <div className="text-muted-foreground">
-                    {profileData?.profileSummary || (
-                      <div className="flex pr-2 items-center gap-1">
-                        <AIEditIcon />
-                        Get AI assistance to write your Profile Summary
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {profileData?.summary ||
+                    "Add a brief summary about yourself, your skills, and career goals."}
+                </p>
               </CardContent>
             </Card>
 
-            {/* Completed Courses */}
+            {/* Skills */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Completed Courses</h3>
-                  <CourseDialog onUpdate={refetch}>
-                    <Button variant="ghost" size="sm" className="text-primary">
-                      Add Completed Course
-                    </Button>
-                  </CourseDialog>
-                </div>
-                <div className="space-y-4">
-                  {completedCourses.length > 0 ? (
-                    completedCourses.map((course: any, index: number) => (
-                      <div key={course.id || index}>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-medium">{course.title}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              {course.provider}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Completed on{" "}
-                              {course.completion_date
-                                ? format(
-                                    new Date(course.completion_date),
-                                    "MMM dd, yyyy",
-                                  )
-                                : "N/A"}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CourseDialog
-                              course={{ ...course, index }}
-                              onUpdate={refetch}
-                            >
-                              <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary mr-2" />
-                            </CourseDialog>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                handleDelete(
-                                  "course",
-                                  course.id || course.title,
-                                )
-                              }
-                              className="text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        {index < completedCourses.length - 1 && (
-                          <hr className="border-gray-200 mt-2.5" />
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-muted-foreground">
-                      No completed courses yet.
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Key Skills */}
-            <Card className="rounded-3xl border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <h3 className="text-lg font-semibold">Key Skills</h3>
+                  <h3 className="text-lg font-semibold">Skills</h3>
                   <SkillsDialog profile={profileData} onUpdate={refetch}>
-                    <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
+                    <Button variant="ghost" size="sm" className="text-primary">
+                      Add Skills
+                    </Button>
                   </SkillsDialog>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -463,142 +286,17 @@ const Profile = () => {
                     skills.map((skill: string, index: number) => (
                       <Badge
                         key={index}
-                        variant="outline"
-                        className="px-4 py-2 border-gray-400 bg-transparent"
+                        variant="secondary"
+                        className="bg-primary/10 text-primary hover:bg-primary/20"
                       >
                         {skill}
                       </Badge>
                     ))
                   ) : (
-                    <p className="text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       No skills added yet.
                     </p>
                   )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Education */}
-            <Card className="rounded-3xl border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Education</h3>
-                  <EducationDialog onUpdate={refetch}>
-                    <Button variant="ghost" size="sm" className="text-primary">
-                      Add Education
-                    </Button>
-                  </EducationDialog>
-                </div>
-                <div className="space-y-4">
-                  {education.map((edu: any, index: number) => (
-                    <div
-                      key={edu.id || index}
-                      className="flex items-center justify-between"
-                    >
-                      <div>
-                        <h4 className="font-medium">{edu.degree}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {edu.institution}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-sm">
-                            {edu.start_year} - {edu.end_year || "Present"}
-                          </p>
-                          {edu.score && (
-                            <p className="text-sm text-primary font-medium">
-                              {edu.score} - CGPA
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <EducationDialog
-                            education={{ ...edu, index }}
-                            onUpdate={refetch}
-                          >
-                            <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary mr-2" />
-                          </EducationDialog>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              handleDelete("education", edu.id || edu.degree)
-                            }
-                            className="text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Projects */}
-            <Card className="rounded-3xl border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Projects</h3>
-                  <ProjectDialog onUpdate={refetch}>
-                    <Button variant="ghost" size="sm" className="text-primary">
-                      Add Project
-                    </Button>
-                  </ProjectDialog>
-                </div>
-                <div className="space-y-4">
-                  {projects.map((project: any, index: number) => (
-                    <div
-                      key={project.id || index}
-                      className="flex items-start justify-between"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-medium">
-                            {project.projectName || project.title}
-                          </h4>
-                          <span className="text-xs text-muted-foreground">
-                            {project.start_date
-                              ? format(new Date(project.start_date), "MMM yyyy")
-                              : ""}{" "}
-                            -{" "}
-                            {project.completionDate ||
-                              project.end_date ||
-                              "Present"}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {project.description}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {/* Pass project WITH index */}
-                        <ProjectDialog 
-                          project={{ ...project, index }} 
-                          onUpdate={refetch}
-                        >
-                          <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary mr-2" />
-                        </ProjectDialog>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            handleDelete(
-                              "projects",
-                              project.id ||
-                                project.projectName ||
-                                project.title,
-                            )
-                          }
-                          className="text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -608,22 +306,183 @@ const Profile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Interests</h3>
-                  <InterestDialog interests={interests} onUpdate={refetch}>
+                  <InterestDialog profile={profileData} onUpdate={refetch}>
                     <Button variant="ghost" size="sm" className="text-primary">
-                      Add Interest
+                      Add Interests
                     </Button>
                   </InterestDialog>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {interests.map((interest: string, index: number) => (
-                    <Badge
-                      key={index}
-                      variant="outline"
-                      className="px-4 py-2 border-gray-400"
-                    >
-                      {interest}
-                    </Badge>
-                  ))}
+                  {interests.length > 0 ? (
+                    interests.map((interest: string, index: number) => (
+                      <Badge
+                        key={index}
+                        variant="outline"
+                        className="border-primary text-primary"
+                      >
+                        {interest}
+                      </Badge>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No interests added yet.
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Column */}
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+            {/* Education */}
+            <Card className="rounded-3xl border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Education</h3>
+                  <EducationDialog profile={profileData} onUpdate={refetch}>
+                    <Button variant="ghost" size="sm" className="text-primary">
+                      Add Education
+                    </Button>
+                  </EducationDialog>
+                </div>
+                <div className="space-y-4">
+                  {education.length > 0 ? (
+                    education.map(
+                      (edu: CandidateEducation, index: number) => (
+                        <div
+                          key={edu.id || index}
+                          className="border-l-2 border-primary pl-4 relative"
+                        >
+                          <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-primary" />
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-semibold">{edu.degree}</h4>
+                              <p className="text-sm text-muted-foreground">
+                                {edu.institution}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {edu.startDate && edu.endDate
+                                  ? `${format(
+                                      new Date(edu.startDate),
+                                      "MMM yyyy",
+                                    )} - ${
+                                      edu.current
+                                        ? "Present"
+                                        : format(
+                                            new Date(edu.endDate),
+                                            "MMM yyyy",
+                                          )
+                                    }`
+                                  : "Duration not specified"}
+                              </p>
+                              {edu.grade && (
+                                <p className="text-sm mt-1">
+                                  Grade: {edu.grade}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                handleDelete(
+                                  "education",
+                                  edu.id || edu.degree,
+                                )
+                              }
+                              className="text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ),
+                    )
+                  ) : (
+                    <p className="text-muted-foreground">
+                      No education added yet.
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Projects */}
+            <Card className="rounded-3xl border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Projects</h3>
+                  <ProjectDialog profile={profileData} onUpdate={refetch}>
+                    <Button variant="ghost" size="sm" className="text-primary">
+                      Add Project
+                    </Button>
+                  </ProjectDialog>
+                </div>
+                <div className="space-y-4">
+                  {projects.length > 0 ? (
+                    projects.map((project: Project, index: number) => (
+                      <div
+                        key={project.id || index}
+                        className="border border-gray-200 rounded-lg p-4"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="font-semibold">
+                            {project.projectName || project.title}
+                          </h4>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleDelete(
+                                "projects",
+                                project.id || project.projectName,
+                              )
+                            }
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {project.description}
+                        </p>
+                        {project.technologies && (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {(
+                              Array.isArray(project.technologies)
+                                ? project.technologies
+                                : typeof project.technologies === "string"
+                                  ? project.technologies.split(",")
+                                  : []
+                            ).map((tech: string, techIndex: number) => (
+                              <Badge
+                                key={techIndex}
+                                variant="secondary"
+                                className="text-xs"
+                              >
+                                {tech.trim()}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        {project.link && (
+                          <a
+                            href={project.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:underline"
+                          >
+                            View Project →
+                          </a>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground">
+                      No projects added yet.
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -633,153 +492,140 @@ const Profile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Internships</h3>
-                  <InternshipDialog onUpdate={refetch}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-primary hover:bg-transparent p-0"
-                    >
+                  <InternshipDialog profile={profileData} onUpdate={refetch}>
+                    <Button variant="ghost" size="sm" className="text-primary">
                       Add Internship
                     </Button>
                   </InternshipDialog>
                 </div>
-
-                {internships.length > 0 ? (
-                  <div className="space-y-6">
-                    {internships.map((internship: any, index: number) => (
-                      <div
-                        key={internship.id || index}
-                        className="group relative"
-                      >
-                        <div className="flex justify-between items-start">
-                          {/* Left Content Area */}
-                          <div className="flex-1 pr-4">
-                            <h4 className="text-lg font-medium text-gray-900 leading-tight">
-                              {internship.title || "Internship Title"}
-                            </h4>
-
-                            <p className="text-sm text-gray-400 mt-0.5 mb-2">
-                              {internship.company || "Company Name"}
-                            </p>
-
-                            <p className="text-sm text-gray-500 leading-relaxed mb-3 max-w-[95%]">
-                              {internship.description ||
-                                "No description provided."}
-                            </p>
-
-                            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
-                              {internship.start_date
-                                ? format(
-                                    new Date(internship.start_date),
-                                    "MMM yyyy",
-                                  )
-                                : "Start Date"}{" "}
-                              -{" "}
-                              {internship.is_current
-                                ? "Present"
-                                : internship.end_date
-                                  ? format(
-                                      new Date(internship.end_date),
+                <div className="space-y-4">
+                  {internships.length > 0 ? (
+                    internships.map(
+                      (internship: CandidateInternship, index: number) => (
+                        <div
+                          key={internship.id || index}
+                          className="border-l-2 border-primary pl-4 relative"
+                        >
+                          <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-primary" />
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-semibold">
+                                {internship.role}
+                              </h4>
+                              <p className="text-sm text-muted-foreground">
+                                {internship.company}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {internship.startDate && internship.endDate
+                                  ? `${format(
+                                      new Date(internship.startDate),
                                       "MMM yyyy",
-                                    )
-                                  : "End date"}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-6">
-                            <InternshipDialog
-                              internship={{ ...internship, index }}
-                              onUpdate={refetch}
-                            >
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-gray-500 hover:text-primary hover:bg-transparent h-auto p-1"
-                              >
-                                <Pen className="w-4 h-4" />
-                              </Button>
-                            </InternshipDialog>
-
+                                    )} - ${
+                                      internship.current
+                                        ? "Present"
+                                        : format(
+                                            new Date(internship.endDate),
+                                            "MMM yyyy",
+                                          )
+                                    }`
+                                  : "Duration not specified"}
+                              </p>
+                              {internship.description && (
+                                <p className="text-sm mt-2">
+                                  {internship.description}
+                                </p>
+                              )}
+                            </div>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() =>
                                 handleDelete(
                                   "internship",
-                                  internship.id || internship.title,
+                                  internship.id || internship.role,
                                 )
                               }
-                              className="text-gray-500 hover:text-destructive hover:bg-transparent h-auto p-1"
+                              className="text-muted-foreground hover:text-destructive"
                             >
-                              <Trash2 className="w-5 h-5" />
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    No internships added yet. Add your internship experience!
-                  </p>
-                )}
+                      ),
+                    )
+                  ) : (
+                    <p className="text-muted-foreground">
+                      No internships added yet.
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
-            {/* Personal Details */}
+            {/* Completed Courses */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <h3 className="text-lg font-semibold">Personal Details</h3>
-                  {profileData && (
-                    <PersonalDetailsDialog
-                      profile={profileData}
-                      onUpdate={refetch}
-                    >
-                      <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
-                    </PersonalDetailsDialog>
-                  )}
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Completed Courses</h3>
+                  <CourseDialog profile={profileData} onUpdate={refetch}>
+                    <Button variant="ghost" size="sm" className="text-primary">
+                      Add Course
+                    </Button>
+                  </CourseDialog>
                 </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Personal
+                <div className="space-y-3">
+                  {completedCourses.length > 0 ? (
+                    completedCourses.map(
+                      (course: CandidateCourse, index: number) => (
+                        <div
+                          key={course.id || index}
+                          className="flex items-start justify-between p-3 border border-gray-200 rounded-lg"
+                        >
+                          <div className="flex-1">
+                            <h4 className="font-medium">{course.title}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {course.provider}
+                            </p>
+                            {course.completionDate && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Completed{" "}
+                                {formatDistanceToNow(
+                                  new Date(course.completionDate),
+                                  {
+                                    addSuffix: true,
+                                  },
+                                )}
+                              </p>
+                            )}
+                            {course.certificateUrl && (
+                              <a
+                                href={course.certificateUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-primary hover:underline mt-1 inline-block"
+                              >
+                                View Certificate →
+                              </a>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleDelete("course", course.id || course.title)
+                            }
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ),
+                    )
+                  ) : (
+                    <p className="text-muted-foreground">
+                      No courses added yet.
                     </p>
-                    <p className="font-medium">
-                      {`${profileData?.gender || "Not specified"}, ${
-                        profileData?.maritalStatus || "Single/ Unmarried"
-                      }`}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Career Break
-                    </p>
-                    <p className="font-medium">
-                      {profileData?.hasCareerBreak ? "Yes" : "No"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Date Of Birth
-                    </p>
-                    <p className="font-medium">
-                      {profileData?.dateOfBirth
-                        ? format(
-                            new Date(profileData.dateOfBirth),
-                            "dd MMM yyyy",
-                          )
-                        : "Not provided"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Differently Abled
-                    </p>
-                    <p className="font-medium">
-                      {profileData?.isDifferentlyAbled ? "Yes" : "No"}
-                    </p>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -973,14 +819,20 @@ const Profile = () => {
         </div>
       </div>
 
+      {/* Avatar Upload Dialog - Using ImageUploadDialog like UnitProfile */}
       {profileData && (
-        <AvatarUploadDialog
+        <ImageUploadDialog
           isOpen={isAvatarDialogOpen}
           onClose={() => setIsAvatarDialogOpen(false)}
-          currentAvatarUrl={profileData.avatarUrl || profileData.image || ""}
+          currentImageUrl={profileData.avatarUrl || profileData.image || ""}
           userId={profileData.id}
           userName={profileData.name}
+          imageType="avatar"
+          entityType="candidate"
           onSuccess={handleAvatarUploadSuccess}
+          onUpload={(file) => uploadAvatar.mutateAsync(file)}
+          onDelete={() => deleteAvatar.mutateAsync()}
+          isProcessing={uploadAvatar.isPending || deleteAvatar.isPending}
         />
       )}
     </div>

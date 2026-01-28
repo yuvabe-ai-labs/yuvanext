@@ -23,7 +23,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { X } from "lucide-react";
-import { Profile, Language } from "@/types/profiles.types";
+import { Profile, Language, Gender, MaritalStatus } from "@/types/profiles.types";
 import { useUpdateProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 
@@ -51,12 +51,12 @@ interface PersonalDetailsDialogProps {
 }
 
 const LOCATIONS = ["Auroville", "Pondicherry", "Tamil Nadu", "Other"];
+
+// Updated to match the enum values
 const MARITAL_STATUS_OPTIONS = [
-  "single",
-  "married",
-  "divorced",
-  "widowed",
-  "prefer_not_to_say",
+  { value: MaritalStatus.SINGLE, label: "Single" },
+  { value: MaritalStatus.MARRIED, label: "Married" },
+  { value: MaritalStatus.PREFER_NOT_TO_SAY, label: "Prefer not to say" },
 ];
 
 const AVAILABLE_LANGUAGES = [
@@ -98,32 +98,28 @@ export const PersonalDetailsDialog = ({
   const birthYear = dateOfBirth ? String(dateOfBirth.getFullYear()) : "";
 
   // Parse languages from profile
-  const parseLanguages = (langs: any): Language[] => {
+  const parseLanguages = (langs: unknown): Language[] => {
     if (!langs) return [];
 
-    // If it's already an array of Language objects, return it
     if (Array.isArray(langs)) {
-      // Check if items are already objects
-      if (langs.length > 0 && typeof langs[0] === "object" && langs[0].id) {
-        return langs;
+      if (langs.length > 0 && typeof langs[0] === "object" && langs[0] !== null && "name" in langs[0]) {
+        return langs as Language[];
       }
 
-      // If items are JSON strings, parse them
       return langs
         .map((lang) => {
           if (typeof lang === "string") {
             try {
-              return JSON.parse(lang);
+              return JSON.parse(lang) as Language;
             } catch {
               return null;
             }
           }
-          return lang;
+          return lang as Language;
         })
-        .filter(Boolean);
+        .filter((lang): lang is Language => lang !== null);
     }
 
-    // If it's a string, try to parse it
     if (typeof langs === "string") {
       try {
         const parsed = JSON.parse(langs);
@@ -165,7 +161,6 @@ export const PersonalDetailsDialog = ({
     setLanguages([
       ...languages,
       {
-        id: crypto.randomUUID(),
         name: "",
         read: false,
         write: false,
@@ -174,99 +169,95 @@ export const PersonalDetailsDialog = ({
     ]);
   };
 
-  const updateLanguage = (id: string, field: keyof Language, value: any) => {
+  const updateLanguage = (index: number, field: keyof Language, value: string | boolean) => {
     setLanguages(
-      languages.map((lang) =>
-        lang.id === id ? { ...lang, [field]: value } : lang,
-      ),
+      languages.map((lang, i) =>
+        i === index ? { ...lang, [field]: value } : lang
+      )
     );
   };
 
-  const removeLanguage = (id: string) => {
-    setLanguages(languages.filter((lang) => lang.id !== id));
+  const removeLanguage = (index: number) => {
+    setLanguages(languages.filter((_, i) => i !== index));
     setLanguageError(null);
   };
 
-const onSubmit = async (data: PersonalDetailsForm) => {
-  try {
-    // Combine first and last name
-    const fullName = `${data.first_name} ${data.last_name || ""}`.trim();
+  const onSubmit = async (data: PersonalDetailsForm) => {
+    try {
+      const fullName = `${data.first_name} ${data.last_name || ""}`.trim();
 
-    // Construct date of birth from separate fields
-    let dateOfBirth: string | null = null;
-    if (data.birth_date && data.birth_month && data.birth_year) {
-      const date = new Date(
-        parseInt(data.birth_year),
-        parseInt(data.birth_month) - 1,
-        parseInt(data.birth_date),
-      );
-      dateOfBirth = date.toISOString();
-    }
-
-    if (languages.length > 0) {
-      const languageNames = languages.map((l) => l.name).filter(Boolean);
-      const duplicates = languageNames.filter(
-        (name, index) => languageNames.indexOf(name) !== index,
-      );
-
-      const emptyLanguages = languages.filter(
-        (lang) => !lang.name || lang.name.trim() === "",
-      );
-
-      if (duplicates.length > 0) {
-        setLanguageError(
-          `${duplicates[0]} language added more than once. Please remove or update it.`,
+      let dateOfBirth: string | null = null;
+      if (data.birth_date && data.birth_month && data.birth_year) {
+        const date = new Date(
+          parseInt(data.birth_year),
+          parseInt(data.birth_month) - 1,
+          parseInt(data.birth_date)
         );
-        return;
-      } else if (emptyLanguages.length > 0) {
-        setLanguageError("Please select a language before saving.");
-        return;
+        dateOfBirth = date.toISOString();
       }
 
-      // Validate that at least one proficiency is selected
-      const invalidLanguages = languages.filter(
-        (lang) => lang.name && !lang.read && !lang.write && !lang.speak,
-      );
-
-      if (invalidLanguages.length > 0) {
-        setLanguageError(
-          "Please select at least one proficiency (Read, Write, or Speak) for each language.",
+      if (languages.length > 0) {
+        const languageNames = languages.map((l) => l.name).filter(Boolean);
+        const duplicates = languageNames.filter(
+          (name, index) => languageNames.indexOf(name) !== index
         );
-        return;
+
+        const emptyLanguages = languages.filter(
+          (lang) => !lang.name || lang.name.trim() === ""
+        );
+
+        if (duplicates.length > 0) {
+          setLanguageError(
+            `${duplicates[0]} language added more than once. Please remove or update it.`
+          );
+          return;
+        } else if (emptyLanguages.length > 0) {
+          setLanguageError("Please select a language before saving.");
+          return;
+        }
+
+        const invalidLanguages = languages.filter(
+          (lang) => lang.name && !lang.read && !lang.write && !lang.speak
+        );
+
+        if (invalidLanguages.length > 0) {
+          setLanguageError(
+            "Please select at least one proficiency (Read, Write, or Speak) for each language."
+          );
+          return;
+        }
       }
+
+      setLanguageError(null);
+
+      await updateProfileMutation({
+        name: fullName,
+        phone: data.phone || null,
+        location: data.location || null,
+        gender: data.gender as Gender || null,
+        maritalStatus: data.marital_status || null,
+        dateOfBirth: dateOfBirth,
+        isDifferentlyAbled: data.is_differently_abled || false,
+        hasCareerBreak: data.has_career_break || false,
+        language: languages.length > 0 ? languages : [],
+      });
+
+      toast({
+        title: "Success",
+        description: "Personal details updated successfully",
+      });
+
+      onUpdate();
+      setOpen(false);
+    } catch (error) {
+      console.error("Error updating personal details:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update personal details",
+        variant: "destructive",
+      });
     }
-
-    setLanguageError(null);
-
-    await updateProfileMutation({
-      name: fullName,
-      phone: data.phone || null,
-      location: data.location || null,
-      gender: data.gender || null,
-      maritalStatus: data.marital_status || null,
-      dateOfBirth: dateOfBirth,
-      isDifferentlyAbled: data.is_differently_abled || false,
-      hasCareerBreak: data.has_career_break || false,
-      // ✅ FIXED: Send as array of objects, not JSON strings
-      language: languages.length > 0 ? languages : [],
-    });
-
-    toast({
-      title: "Success",
-      description: "Personal details updated successfully",
-    });
-
-    onUpdate();
-    setOpen(false);
-  } catch (error) {
-    console.error("Error updating personal details:", error);
-    toast({
-      title: "Error",
-      description: "Failed to update personal details",
-      variant: "destructive",
-    });
-  }
-};
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -389,7 +380,7 @@ const onSubmit = async (data: PersonalDetailsForm) => {
                   >
                     <div className="flex items-center">
                       <RadioGroupItem
-                        value="male"
+                        value={Gender.MALE}
                         id="male"
                         className="peer sr-only"
                       />
@@ -402,7 +393,7 @@ const onSubmit = async (data: PersonalDetailsForm) => {
                     </div>
                     <div className="flex items-center">
                       <RadioGroupItem
-                        value="female"
+                        value={Gender.FEMALE}
                         id="female"
                         className="peer sr-only"
                       />
@@ -415,15 +406,15 @@ const onSubmit = async (data: PersonalDetailsForm) => {
                     </div>
                     <div className="flex items-center">
                       <RadioGroupItem
-                        value="others"
-                        id="other"
+                        value={Gender.PREFER_NOT_SAY}
+                        id="prefer_not_say"
                         className="peer sr-only"
                       />
                       <Label
-                        htmlFor="other"
+                        htmlFor="prefer_not_say"
                         className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground"
                       >
-                        Other
+                        Prefer not to say
                       </Label>
                     </div>
                   </RadioGroup>
@@ -453,17 +444,17 @@ const onSubmit = async (data: PersonalDetailsForm) => {
                     className="flex flex-wrap gap-3 mt-2"
                   >
                     {MARITAL_STATUS_OPTIONS.map((status) => (
-                      <div key={status} className="flex items-center">
+                      <div key={status.value} className="flex items-center">
                         <RadioGroupItem
-                          value={status}
-                          id={status}
+                          value={status.value}
+                          id={status.value}
                           className="peer sr-only"
                         />
                         <Label
-                          htmlFor={status}
+                          htmlFor={status.value}
                           className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm"
                         >
-                          {status}
+                          {status.label}
                         </Label>
                       </div>
                     ))}
@@ -593,16 +584,16 @@ const onSubmit = async (data: PersonalDetailsForm) => {
             {/* Language Proficiency */}
             <div>
               <Label className="mb-4 block">Language Proficiency</Label>
-              {languages.map((language) => (
+              {languages.map((language, index) => (
                 <div
-                  key={language.id}
+                  key={index}
                   className="flex items-center gap-4 justify-between mb-4 rounded-lg"
                 >
                   <div className="flex-1">
                     <Select
                       value={language.name}
                       onValueChange={(value) => {
-                        updateLanguage(language.id, "name", value);
+                        updateLanguage(index, "name", value);
                       }}
                     >
                       <SelectTrigger>
@@ -621,57 +612,45 @@ const onSubmit = async (data: PersonalDetailsForm) => {
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         disabled={!language.name}
-                        id={`read-${language.id}`}
+                        id={`read-${index}`}
                         checked={language.read}
                         onCheckedChange={(checked) =>
-                          updateLanguage(
-                            language.id,
-                            "read",
-                            checked as boolean,
-                          )
+                          updateLanguage(index, "read", checked as boolean)
                         }
                         className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 data-[state=checked]:text-white"
                       />
-                      <Label htmlFor={`read-${language.id}`}>Read</Label>
+                      <Label htmlFor={`read-${index}`}>Read</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         disabled={!language.name}
-                        id={`write-${language.id}`}
+                        id={`write-${index}`}
                         checked={language.write}
                         onCheckedChange={(checked) =>
-                          updateLanguage(
-                            language.id,
-                            "write",
-                            checked as boolean,
-                          )
+                          updateLanguage(index, "write", checked as boolean)
                         }
                         className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 data-[state=checked]:text-white"
                       />
-                      <Label htmlFor={`write-${language.id}`}>Write</Label>
+                      <Label htmlFor={`write-${index}`}>Write</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         disabled={!language.name}
-                        id={`speak-${language.id}`}
+                        id={`speak-${index}`}
                         checked={language.speak}
                         onCheckedChange={(checked) =>
-                          updateLanguage(
-                            language.id,
-                            "speak",
-                            checked as boolean,
-                          )
+                          updateLanguage(index, "speak", checked as boolean)
                         }
                         className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 data-[state=checked]:text-white"
                       />
-                      <Label htmlFor={`speak-${language.id}`}>Speak</Label>
+                      <Label htmlFor={`speak-${index}`}>Speak</Label>
                     </div>
                   </div>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => removeLanguage(language.id)}
+                    onClick={() => removeLanguage(index)}
                     className="text-muted-foreground hover:text-destructive"
                   >
                     <X className="w-4 h-4" />

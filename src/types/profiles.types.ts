@@ -7,10 +7,16 @@ export enum UserRole {
   ADMIN = "admin",
 }
 
-export enum UserRole {
+export enum Gender {
   MALE = "male",
   FEMALE = "female",
   PREFER_NOT_SAY = "prefer_not_to_say",
+}
+
+export enum MaritalStatus {
+  SINGLE = "single",
+  MARRIED = "married",
+  PREFER_NOT_TO_SAY = "prefer_not_to_say",
 }
 
 // --- Shared Sub-Types ---
@@ -21,6 +27,7 @@ export interface SocialLink {
 }
 
 export interface Project {
+  id?: string;
   projectName: string;
   clientName?: string;
   status?: string;
@@ -34,7 +41,7 @@ export interface Project {
 }
 
 export interface Language {
-  id: string;
+  id?: string;
   name: string;
   read: boolean;
   write: boolean;
@@ -42,6 +49,7 @@ export interface Language {
 }
 
 export interface CandidateInternship {
+  id?: string;
   title: string;
   company?: string;
   description?: string;
@@ -51,7 +59,7 @@ export interface CandidateInternship {
 }
 
 export interface CandidateProject {
-  id: string;
+  id?: string;
   title?: string;
   name?: string;
   client_name?: string;
@@ -64,6 +72,7 @@ export interface CandidateProject {
 }
 
 export interface CandidateCourse {
+  id?: string;
   title: string;
   provider?: string;
   completion_date?: string;
@@ -71,6 +80,7 @@ export interface CandidateCourse {
 }
 
 export interface CandidateEducation {
+  id: string;
   is_current: boolean;
   degree?: string;
   name?: string;
@@ -93,7 +103,7 @@ export interface Profile {
   userId: string;
   name: string;
   email: string;
-  role: string;
+  role: UserRole;
   image: string | null;
   avatarUrl: string | null;
   phone: string | null;
@@ -114,10 +124,10 @@ export interface Profile {
   type: string | null;
   experienceLevel: string | null;
   profileSummary: string | null;
-  maritalStatus: string | null;
+  maritalStatus: MaritalStatus;
   isDifferentlyAbled: boolean | null;
   hasCareerBreak: boolean | null;
-  gender: string | null;
+  gender: Gender;
   dateOfBirth: string | null;
   onboardingCompleted: boolean | null;
   skills: string[];
@@ -127,7 +137,7 @@ export interface Profile {
   education: CandidateEducation[];
   course: CandidateCourse[];
   internship: CandidateInternship[];
-  projects: Project[];
+  projects: CandidateProject[];
   socialLinks: SocialLink[];
   profileScore: number;
   createdAt: string;
@@ -146,7 +156,7 @@ export interface UpdateProfilePayload {
   type?: string | null;
   experienceLevel?: string | null;
   maritalStatus?: string | null;
-  gender?: string | null;
+  gender?: Gender;
   dateOfBirth?: string | null;
   isDifferentlyAbled?: boolean | null;
   hasCareerBreak?: boolean | null;

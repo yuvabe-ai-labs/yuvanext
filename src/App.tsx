@@ -126,7 +126,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth/:role/signin" element={<SignIn />} />
             <Route path="/auth/:role/signup" element={<SignUp />} />
-            <Route path="/auth/accept-invitation" element={<AcceptInvitation />} />
+            <Route path="/auth/accept-invitation/:id" element={<AcceptInvitation />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 

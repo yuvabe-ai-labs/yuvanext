@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom"; // Changed useSearchParams to useParams
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
@@ -32,8 +32,7 @@ interface InvitationData {
 }
 
 const AcceptInvitation = () => {
-  const [searchParams] = useSearchParams();
-  const invitationId = searchParams.get("id");
+  const { id: invitationId } = useParams<{ id: string }>(); // Extract ID from URL path
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -69,7 +68,7 @@ const AcceptInvitation = () => {
       }
       try {
         const { data } = await axios.get(`${API_BASE_URL}/auth/verify-invitation`, {
-          params: { id: invitationId },
+          params: { id: invitationId }, // Still pass it as a query param to your backend if required
         });
         setInvitationData(data.data);
       } catch (error: any) {
@@ -113,7 +112,6 @@ const AcceptInvitation = () => {
 
   return (
     <div className="min-h-screen bg-white flex">
-      {/* Left Side - Illustration */}
       <div className="hidden lg:flex w-[41%] h-screen relative p-4">
         <div className="w-full h-full rounded-3xl overflow-hidden relative">
           <img src={signupIllustrate} alt="Background" className="w-full h-full object-cover" />
@@ -130,7 +128,6 @@ const AcceptInvitation = () => {
         </div>
       </div>
 
-      {/* Right Side - Form */}
       <div className="flex-1 flex items-center justify-center px-4">
         <div className="w-full max-w-[474px]">
           <div className="px-6 sm:px-12 py-8">
@@ -170,8 +167,9 @@ const AcceptInvitation = () => {
                           />
                           <Button
                             type="button"
+                            variant="ghost" // Added variant for better styling
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 p-0 h-auto"
                           >
                             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                           </Button>

@@ -10,9 +10,7 @@ export enum UserRole {
 // --- Shared Sub-Types ---
 
 export interface SocialLink {
-  id: string;
-  platform: string;
-  url: string;
+  [platform: string]: string;
 }
 
 export interface Project {
@@ -225,11 +223,12 @@ export interface CandidateProfileData {
 }
 
 export interface InterviewDetails {
-  scheduledAt: string;
-  meetingLink: string;
-  notes?: string;
+  title: string;
+  description: string;
+  scheduledDate: string;
   durationMinutes: number;
-  provider: "zoom" | "google_meet" | "teams" | "other";
+  provider: string;
+  link?: string;
 }
 
 export interface UpdateApplicationStatusResponse {

@@ -28,6 +28,8 @@ import {
   useBannerOperations,
 } from "@/hooks/useUnitProfile";
 import { useSession } from "@/lib/auth-client";
+// ADDED: Import useQueryClient for manual cache updates
+import { useQueryClient } from "@tanstack/react-query";
 
 // 2. IMPORT TYPES
 import type { Profile, Project, SocialLink } from "@/types/profiles.types";
@@ -42,22 +44,19 @@ import { GlimpseDialog } from "@/components/GlimpseDialog";
 import { CircularProgress } from "@/components/CircularProgress";
 import { ImageUploadDialog } from "@/components/ImageUploadDialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import {
-  type ProjectFormValues, // Import the type here
-} from "@/lib/unitDialogSchemas";
+import { type ProjectFormValues } from "@/lib/unitDialogSchemas";
 
 const UnitProfile = () => {
   const { data: session } = useSession();
   const user = session?.user;
+  const queryClient = useQueryClient(); // Initialize Query Client
 
   // 3. USE REACT QUERY HOOKS WITH TYPE
   const { data: profileData, isLoading, refetch } = useUnitProfile();
   const { uploadAvatar, deleteAvatar } = useAvatarOperations();
   const { uploadBanner, deleteBanner } = useBannerOperations();
 
-  // Cast strictly if the hook returns a generic type, otherwise rely on hook inference
   const profile = profileData as Profile | undefined;
-
   const updateMutation = useUpdateUnitProfile();
 
   // Dialog States
@@ -69,53 +68,108 @@ const UnitProfile = () => {
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // 4. ACTION HANDLERS
+  // --- 4. OPTIMISTIC UPDATE HELPER ---
+  const performOptimisticUpdate = (updates: Partial<Profile>) => {
+    const previousProfile = queryClient.getQueryData<Profile>(["unitProfile"]);
 
-  // Update Profile fields (Mission, Values, Description, etc.)
-  const handleUpdateProfile = (updates: Partial<Profile>) => {
-    updateMutation.mutate(updates);
+    queryClient.setQueryData<Profile>(["unitProfile"], (old) => {
+      if (!old) return old;
+      return { ...old, ...updates };
+    });
+
+    updateMutation.mutate(updates, {
+      onError: (err) => {
+        console.error("Update failed, rolling back", err);
+        if (previousProfile) {
+          queryClient.setQueryData(["unitProfile"], previousProfile);
+        }
+      },
+    });
   };
 
-  // Add Project
+  // --- HANDLERS ---
+
+  const handleUpdateProfile = (updates: Partial<Profile>) => {
+    performOptimisticUpdate(updates);
+  };
+
   const handleAddProject = (projectData: ProjectFormValues) => {
     const currentProjects = profile?.projects || [];
-    // Optimistic update logic handled by React Query cache or refetch
-    // For now, assume backend adds it and we refetch or we send full array
-    const updatedProjects = [...currentProjects, projectData] as Project[];
-    updateMutation.mutate({ projects: updatedProjects });
+    const tempProject: Project = {
+      ...projectData,
+      id: `temp-${Date.now()}`,
+    } as Project;
+    const updatedProjects = [...currentProjects, tempProject];
+    performOptimisticUpdate({ projects: updatedProjects });
   };
 
-  // Remove Project
   const handleRemoveProject = (projectId: string) => {
     if (!projectId) return;
     const currentProjects = profile?.projects || [];
     const updatedProjects = currentProjects.filter((p) => p.id !== projectId);
-    updateMutation.mutate({ projects: updatedProjects });
+    performOptimisticUpdate({ projects: updatedProjects });
   };
 
-  // Update Social Links
+  // 1. Update Social Links (Convert Array -> Object for Backend)
   const handleUpdateSocialLinks = (links: SocialLink[]) => {
-    updateMutation.mutate({ socialLinks: [...links] });
+    // Convert the array back to the Object format the backend expects
+    // e.g. [{platform: 'linkedin', url: '...'}] -> { linkedin: '...' }
+    const socialLinksRecord = links.reduce((acc, curr) => {
+      if (curr.platform && curr.url) {
+        acc[curr.platform] = curr.url;
+      }
+      return acc;
+    }, {} as Record<string, string>);
+
+    performOptimisticUpdate({ socialLinks: socialLinksRecord });
   };
 
-  // Remove Social Link
-  const handleRemoveSocialLink = (linkId: string) => {
-    const currentLinks = profile?.socialLinks || [];
-    const updatedLinks = currentLinks.filter((l) => l.id !== linkId);
-    updateMutation.mutate({ socialLinks: updatedLinks });
+  // 2. Remove Social Link (Handle Object Key Deletion)
+  const handleRemoveSocialLink = (platformId: string) => {
+    // Get current raw data (Object)
+    const currentLinksRecord = (profile?.socialLinks ||
+      {}) as unknown as Record<string, string>;
+
+    // Create new object without the deleted key
+    const updatedPayload = Object.keys(currentLinksRecord)
+      .filter((key) => key !== platformId)
+      .reduce((acc, key) => {
+        acc[key] = currentLinksRecord[key];
+        return acc;
+      }, {});
+
+    performOptimisticUpdate({ socialLinks: updatedPayload });
   };
 
-  // Refetch after image uploads
   const handleImageSuccess = () => {
     refetch();
   };
 
-  // 5. DATA MAPPING (Safe Defaults)
+  // 5. DATA MAPPING
   const projects = profile?.projects || [];
   const galleryImages = profile?.galleryImages || [];
-  const socialLinks = profile?.socialLinks || [];
   const glimpseUrl = profile?.galleryVideos || null;
   const profileScore = profile?.profileScore || 0;
+
+  // --- FIX: Parse Social Links (Object -> Array for UI) ---
+  const rawSocialLinks = profile?.socialLinks;
+  let socialLinks: SocialLink[] = [];
+
+  if (rawSocialLinks) {
+    // If backend returns Object: { linkedin: "url", facebook: "url" }
+    if (typeof rawSocialLinks === "object" && !Array.isArray(rawSocialLinks)) {
+      socialLinks = Object.entries(rawSocialLinks).map(([key, value]) => ({
+        id: key, // Use platform name as ID for deletion
+        platform: key,
+        url: String(value),
+      }));
+    }
+    // If backend happens to return Array (fallback)
+    else if (Array.isArray(rawSocialLinks)) {
+      socialLinks = rawSocialLinks;
+    }
+  }
+  // -------------------------------------------------------
 
   if (isLoading) {
     return (
@@ -572,6 +626,7 @@ const UnitProfile = () => {
                         <Button
                           variant="ghost"
                           size="sm"
+                          // Use link.id which is mapped to platform name in our parsing logic
                           onClick={() => handleRemoveSocialLink(link.id)}
                           className="text-muted-foreground hover:text-destructive sm:justify-self-end self-end"
                         >

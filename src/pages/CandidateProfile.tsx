@@ -236,7 +236,9 @@ const CandidateProfile = () => {
     []
   );
 
-  let links: SocialLink[] = safeParse(candidate.socialLinks, null) || [];
+  // FIX: Robustly parse links (handling stringified JSON from DB)
+  const links = safeParse<SocialLink[]>(candidate.socialLinks, []);
+
   const matchScore = application.profileScore || 0;
   const dialogContent = pendingStatus ? getDialogContent(pendingStatus) : null;
 
@@ -298,20 +300,25 @@ const CandidateProfile = () => {
   };
 
   // Helper for icon resolution
-  const getSocialIcon = (platformStr: string, urlStr: string) => {
+  const getSocialIcon = (platformStr: string) => {
     const p = (platformStr || "").toLowerCase();
-    const u = (urlStr || "").toLowerCase();
 
-    if (p.includes("linkedin") || u.includes("linkedin.com")) return Linkedin;
-    if (p.includes("instagram") || u.includes("instagram.com"))
-      return Instagram;
-    if (p.includes("facebook") || u.includes("facebook.com")) return Facebook;
-    if (p.includes("twitter") || p.includes("x") || u.includes("twitter.com"))
-      return Twitter;
-    if (p.includes("youtube") || u.includes("youtube.com")) return Youtube;
-    if (p.includes("dribbble")) return Dribbble;
-    if (p.includes("behance")) return Palette;
-
+    switch (p) {
+      case "linkedin":
+        return Linkedin;
+      case "instagram":
+        return Instagram;
+      case "facebook":
+        return Facebook;
+      case "twitter":
+        return Twitter;
+      case "youtube":
+        return Youtube;
+      case "dribbble":
+        return Dribbble;
+      case "behance":
+        return Palette;
+    }
     return Globe;
   };
 
@@ -329,11 +336,9 @@ const CandidateProfile = () => {
           >
             <ArrowLeft className="w-4 h-4" /> Back
           </Button>
-
           <h1 className="text-2xl font-bold text-center flex-1">
             Applied for "{internship.title || "Internship"}"
           </h1>
-
           {/* <div className="flex items-center gap-2">
             <span className="text-l font-medium">Profile Match</span>
             <div className="relative w-10 h-10">
@@ -802,11 +807,12 @@ const CandidateProfile = () => {
                 <CardContent className="p-6">
                   <h3 className="text-2xl font-bold mb-4">Links</h3>
                   <div className="flex flex-wrap gap-3 items-center">
+                    {/* FIX: Corrected ternary logic to show links if array is NOT empty */}
                     {links.length > 0 ? (
                       links.map((link, idx) => {
                         const platform = link.platform || "";
                         const url = link.url || "";
-                        const Icon = getSocialIcon(platform, url);
+                        const Icon = getSocialIcon(platform);
 
                         return (
                           <Button

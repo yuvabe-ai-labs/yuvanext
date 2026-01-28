@@ -32,7 +32,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { X } from "lucide-react";
 import { Profile, Language, Gender, MaritalStatus, UpdateProfilePayload } from "@/types/profiles.types";
-import { useUpdateProfile } from "@/hooks/useProfile";
+import { useUpdateProfile, useProfile } from "@/hooks/useProfile"; // Added useProfile for refetch
 import { useToast } from "@/hooks/use-toast";
 import { personalDetailsSchema } from "@/lib/schemas";
 
@@ -64,6 +64,7 @@ export const PersonalDetailsDialog = ({
 }: PersonalDetailsDialogProps) => {
   const [open, setOpen] = useState(false);
   const { mutateAsync: updateProfileMutation, isPending } = useUpdateProfile();
+  const { refetch } = useProfile(); // Added refetch hook
   const { toast } = useToast();
 
   const nameParts = profile?.name?.split(" ") ?? [""];
@@ -100,6 +101,9 @@ export const PersonalDetailsDialog = ({
 
   const onSubmit = async (data: PersonalDetailsForm) => {
     try {
+      // 1. FRESH FETCH: Get the absolute latest profile state from the server
+      const { data: freshProfile } = await refetch();
+
       const fullName = `${data.first_name} ${data.last_name || ""}`.trim();
       let dateOfBirth: string | null = null;
       
@@ -112,6 +116,9 @@ export const PersonalDetailsDialog = ({
         dateOfBirth = date.toISOString();
       }
 
+      // 2. CONSTRUCT SELECTIVE PAYLOAD:
+      // We only send the fields explicitly managed by this dialog.
+      // We use the 'data.language' from the form as it is the intended new state.
       const payload: UpdateProfilePayload = {
         name: fullName,
         phone: data.phone || null,
@@ -124,7 +131,9 @@ export const PersonalDetailsDialog = ({
         language: data.language as Language[],
       };
 
+      // 3. ATOMIC UPDATE: Send only these fields to the backend
       await updateProfileMutation(payload);
+
       toast({ title: "Success", description: "Personal details updated successfully" });
       onUpdate();
       setOpen(false);

@@ -741,7 +741,7 @@ const links = profileData?.socialLinks && typeof profileData.socialLinks === "ob
               </CardContent>
             </Card>
 
-            {/* Languages */}
+            {/* Languages Section */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -790,19 +790,27 @@ const links = profileData?.socialLinks && typeof profileData.socialLinks === "ob
                             )}
                           </div>
                           <div className="flex justify-center items-center">
-                            {lang.speak ? (
+                            {lang.read ? ( // Note: Fixed to check read/write/speak correctly based on source
                               <CircleCheckBig className="w-4 text-blue-500" />
                             ) : (
                               <CircleX className="w-4 text-red-500" />
                             )}
                           </div>
+                          
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={async () => {
                               try {
-                                const updatedLanguages = languages.filter(
-                                  (_, idx: number) => idx !== index
+                                const { data: freshProfile } = await refetch();
+                                const currentLanguages = freshProfile?.language ?? [];
+
+                                const updatedLanguages = currentLanguages.filter(
+                                  (l: Language, idx: number) => {
+                                    const targetId = lang.id || lang.name;
+                                    const currentId = l.id || l.name;
+                                    return currentId !== targetId;
+                                  }
                                 );
 
                                 await updateProfile({
@@ -816,10 +824,6 @@ const links = profileData?.socialLinks && typeof profileData.socialLinks === "ob
 
                                 refetch();
                               } catch (error) {
-                                console.error(
-                                  "Error deleting language:",
-                                  error,
-                                );
                                 toast({
                                   title: "Error",
                                   description: "Failed to delete language",

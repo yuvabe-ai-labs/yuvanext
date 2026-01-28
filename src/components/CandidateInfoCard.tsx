@@ -14,21 +14,6 @@ export default function CandidateInfoCard({
 }: CandidateInfoCardProps) {
   const { data, isLoading, error } = useCandidateTasks(applicationId);
 
-  // Debug logging
-  useEffect(() => {
-    if (data?.tasks) {
-      console.log("=== DEBUG: Tasks Data ===");
-      console.log("Total tasks:", data.tasks.length);
-      console.log(
-        "Tasks:",
-        data.tasks.map((t) => ({
-          title: t.taskTitle,
-          status: t.taskStatus,
-        })),
-      );
-    }
-  }, [data?.tasks]);
-
   // Calculate task progress
   const taskProgress = useMemo(() => {
     if (!data || !data.tasks || data.tasks.length === 0) {

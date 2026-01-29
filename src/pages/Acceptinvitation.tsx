@@ -22,6 +22,7 @@ import unitIllustration from "@/assets/unit_illstration.png";
 import { Arrow } from "@/components/ui/custom-icons";
 import z from "zod";
 import { acceptInvitationSchema } from "@/lib/schemas";
+import axiosInstance from "@/config/platform-api";
 
 const API_BASE_URL = `${env.VITE_API_URL}/api`;
 
@@ -67,8 +68,7 @@ const AcceptInvitation = () => {
         return;
       }
       try {
-        const { data } = await axios.get(`${API_BASE_URL}/auth/verify-invitation/${invitationId}`, {
-        });
+        const { data } = await axiosInstance.get(`/auth/verify-invitation/${invitationId}`);
         setInvitationData(data.data);
       } catch (error: any) {
         toast({
@@ -85,7 +85,7 @@ const AcceptInvitation = () => {
 
   const onSubmit = async (values: AcceptInvitationFormValues) => {
     try {
-      await axios.post(`${API_BASE_URL}/auth/accept-invitation`, {
+      await axiosInstance.post(`/auth/accept-invitation`, {
         invitationId,
         password: values.password,
       });

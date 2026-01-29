@@ -24,8 +24,6 @@ import z from "zod";
 import { acceptInvitationSchema } from "@/lib/schemas";
 import axiosInstance from "@/config/platform-api";
 
-const API_BASE_URL = `${env.VITE_API_URL}/api`;
-
 interface InvitationData {
   invitationId: string;
   email: string;

@@ -5,9 +5,11 @@ import {
   getCandidateTasks,
   updateTask,
   getAllTaskProgress,
+  reviewTask,
 } from "@/services/candidateTasks.service";
 import {
   CreateTaskPayload,
+  TaskStatus,
   UpdateTaskPayload,
 } from "@/types/candidateTasks.types";
 
@@ -68,5 +70,28 @@ export const useAllTaskProgress = () => {
   return useQuery({
     queryKey: ["allTaskProgress"],
     queryFn: getAllTaskProgress,
+  });
+};
+
+export const useReviewTask = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      taskId,
+      payload,
+    }: {
+      taskId: string;
+      payload: {
+        status: TaskStatus.REDO | TaskStatus.ACCEPTED;
+        reviewRemarks?: string | null;
+      };
+    }) => reviewTask(taskId, payload),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["candidateTasks"],
+      });
+    },
   });
 };

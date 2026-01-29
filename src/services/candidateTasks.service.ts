@@ -5,6 +5,7 @@ import type {
   Task,
   UpdateTaskPayload,
   InternshipTaskItem,
+  ReviewTaskPayload,
 } from "@/types/candidateTasks.types";
 import { handleApiResponse, handleApiError } from "@/lib/api-handler";
 
@@ -69,5 +70,21 @@ export const getAllTaskProgress = async (): Promise<InternshipTaskItem[]> => {
     );
   } catch (error) {
     return handleApiError(error, "Failed to fetch tasks");
+  }
+};
+
+export const reviewTask = async (
+  taskId: string,
+  payload: ReviewTaskPayload,
+): Promise<Task> => {
+  try {
+    const response = await axiosInstance.post(
+      `/tasks/${taskId}/review`,
+      payload,
+    );
+
+    return handleApiResponse<Task>(response, {} as Task);
+  } catch (error) {
+    return handleApiError(error, "Failed to review task");
   }
 };

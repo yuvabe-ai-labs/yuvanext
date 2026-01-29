@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryState, parseAsString } from "nuqs";
 import { format } from "date-fns";
 import {
   ArrowRight,
@@ -68,7 +69,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Hooks
-import { useInternship, useUpdateInternship } from "@/hooks/useInternships";
+import {
+  useInternship,
+  useUpdateInternship,
+  useDeleteInternship,
+} from "@/hooks/useInternships";
 import { useUnitStats, useUnitApplications } from "@/hooks/useUnitApplications";
 import { useUnitReports } from "@/hooks/useUnitReports";
 import { useHiredApplicants } from "@/hooks/useHiredApplicants";
@@ -79,7 +84,10 @@ import { calculateOverallTaskProgress } from "@/utils/taskProgress";
 import axiosInstance from "@/config/platform-api";
 
 // Types
-import type { Internship } from "@/types/internships.types";
+import type {
+  Internship,
+  UpdateInternshipPayload,
+} from "@/types/internships.types";
 import type {
   CandidateTasksData,
   StudentTask,
@@ -162,7 +170,10 @@ const CandidateTaskProgress = ({
 // --- Main Dashboard Component ---
 const UnitDashboard = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("applications");
+  const [activeTab, setActiveTab] = useQueryState(
+    "tab",
+    parseAsString.withDefault("applications")
+  );
 
   // --- 1. DATA FETCHING (REACT QUERY) ---
   const { data: rawApplications, isLoading: dashboardLoading } =
@@ -175,6 +186,8 @@ const UnitDashboard = () => {
   const { data: internships, isLoading: internshipsLoading } = useInternship();
 
   const updateInternshipMutation = useUpdateInternship();
+
+  const deleteInternshipMutation = useDeleteInternship();
 
   const { data: rawHiredCandidates = [], isLoading: hiredLoading } =
     useHiredApplicants();
@@ -283,21 +296,22 @@ const UnitDashboard = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = () => {
     if (!deletingInternship) return;
 
-    try {
-      setUpdating(deletingInternship.id);
-      await axiosInstance.delete(`/internships/${deletingInternship.id}`);
-      window.location.reload();
-      setShowDeleteDialog(false);
-      setDeletingInternship(null);
-    } catch (err: unknown) {
-      console.error("Error deleting job:", err);
-      alert("Failed to delete job description");
-    } finally {
-      setUpdating(null);
-    }
+    setUpdating(deletingInternship.id);
+
+    deleteInternshipMutation.mutate(deletingInternship.id, {
+      // 1. Success: Close dialog and clear selection
+      onSuccess: () => {
+        setShowDeleteDialog(false);
+        setDeletingInternship(null);
+      },
+      // This ensures your UI never gets stuck in "Deleting..." mode
+      onSettled: () => {
+        setUpdating(null);
+      },
+    });
   };
 
   const handleToggleStatus = async (internship: Internship) => {
@@ -309,7 +323,7 @@ const UnitDashboard = () => {
         setUpdating(internship.id);
         // Explicit cast for mutation payload as it might require full object but API supports partial
         updateInternshipMutation.mutate(
-          { id: internship.id, status: "closed" } as any,
+          { id: internship.id, status: "closed" } as UpdateInternshipPayload,
           {
             onSuccess: () => {
               setUpdating(null);
@@ -328,7 +342,10 @@ const UnitDashboard = () => {
     if (activatingInternship) {
       try {
         updateInternshipMutation.mutate(
-          { id: activatingInternship.id, status: "active" } as any,
+          {
+            id: activatingInternship.id,
+            status: "active",
+          } as UpdateInternshipPayload,
           {
             onSuccess: () => {
               setActivatingInternship(null);
@@ -644,91 +661,106 @@ const UnitDashboard = () => {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                {filteredApplications.slice(0, 9).map((appData) => {
-                  const appStatus = appData.application?.status || "";
-                  const appId = appData.application?.id;
-                  const candidate = appData.candidate;
-                  const internship = appData.internship || { title: "" };
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  {filteredApplications.slice(0, 6).map((appData) => {
+                    const appStatus = appData.application?.status || "";
+                    const appId = appData.application?.id;
+                    const candidate = appData.candidate;
+                    const internship = appData.internship || { title: "" };
 
-                  // Use safeParse with strict types
-                  const skills = safeParse<(string | { name: string })[]>(
-                    candidate.skills,
-                    []
-                  );
-                  const displaySkills = skills
-                    .slice(0, 3)
-                    .map((s) => (typeof s === "string" ? s : s.name));
+                    // Use safeParse with strict types
+                    const skills = safeParse<(string | { name: string })[]>(
+                      candidate.skills,
+                      []
+                    );
+                    const displaySkills = skills
+                      .slice(0, 3)
+                      .map((s) => (typeof s === "string" ? s : s.name));
 
-                  return (
-                    <Card
-                      key={appId}
-                      className="border border-border/50 hover:shadow-lg transition-shadow rounded-3xl"
-                    >
-                      <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5">
-                        <div className="flex items-center gap-3 sm:gap-5">
-                          <div className="relative flex-shrink-0">
-                            <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500">
-                              <AvatarImage
-                                src={candidate.avatarUrl}
-                                alt={candidate.name || "User"}
-                              />
-                              <AvatarFallback className="text-base sm:text-lg font-semibold">
-                                {(candidate.name || "U")
-                                  .charAt(0)
-                                  .toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-base sm:text-lg mb-1 text-gray-900 truncate">
-                              {candidate.name || "Unknown Candidate"}
-                            </h3>
-                            <p className="text-xs sm:text-sm text-muted-foreground mb-2 truncate">
-                              {internship.title}
-                            </p>
-                            <Badge
-                              className={`${getStatusColor(
-                                appStatus
-                              )} text-xs sm:text-sm px-2 sm:px-3 py-1`}
-                            >
-                              {getStatusLabel(appStatus)}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="min-h-7">
-                          <p className="text-sm sm:text-base text-gray-700 leading-relaxed line-clamp-3 mb-2">
-                            {candidate.profileSummary ||
-                              "Passionate about creating user-centered digital experiences."}
-                          </p>
-                          {displaySkills.length > 0 && (
-                            <div className="flex gap-2 overflow-hidden">
-                              {displaySkills.map((skill, i) => (
-                                <Badge
-                                  key={i}
-                                  variant="outline"
-                                  className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                                >
-                                  {skill}
-                                </Badge>
-                              ))}
+                    return (
+                      <Card
+                        key={appId}
+                        className="border border-border/50 hover:shadow-lg transition-shadow rounded-3xl"
+                      >
+                        <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5">
+                          <div className="flex items-center gap-3 sm:gap-5">
+                            <div className="relative flex-shrink-0">
+                              <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500">
+                                <AvatarImage
+                                  src={candidate.avatarUrl}
+                                  alt={candidate.name || "User"}
+                                />
+                                <AvatarFallback className="text-base sm:text-lg font-semibold">
+                                  {(candidate.name || "U")
+                                    .charAt(0)
+                                    .toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
                             </div>
-                          )}
-                        </div>
-                        <div className="border-t border-border/40"></div>
-                        <Button
-                          variant="outline"
-                          size="lg"
-                          className="w-full border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full"
-                          onClick={() => navigate(`/candidate/${appId}`)}
-                        >
-                          View Profile
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-base sm:text-lg mb-1 text-gray-900 truncate">
+                                {candidate.name || "Unknown Candidate"}
+                              </h3>
+                              <p className="text-xs sm:text-sm text-muted-foreground mb-2 truncate">
+                                {internship.title}
+                              </p>
+                              <Badge
+                                className={`${getStatusColor(
+                                  appStatus
+                                )} text-xs sm:text-sm px-2 sm:px-3 py-1`}
+                              >
+                                {getStatusLabel(appStatus)}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="min-h-7">
+                            <p className="text-sm sm:text-base text-gray-700 leading-relaxed line-clamp-3 mb-2">
+                              {candidate.profileSummary ||
+                                "Passionate about creating user-centered digital experiences."}
+                            </p>
+                            {displaySkills.length > 0 && (
+                              <div className="flex gap-2 overflow-hidden">
+                                {displaySkills.map((skill, i) => (
+                                  <Badge
+                                    key={i}
+                                    variant="outline"
+                                    className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                  >
+                                    {skill}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="border-t border-border/40"></div>
+                          <Button
+                            variant="outline"
+                            size="lg"
+                            className="w-full border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full"
+                            onClick={() => navigate(`/candidate/${appId}`)}
+                          >
+                            View Profile
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {/* --- ADDED: View All Button --- */}
+                {filteredApplications.length > 6 && (
+                  <div className="flex justify-center mt-6 sm:mt-8">
+                    <Button
+                      variant="outline"
+                      className="px-6 sm:px-8 rounded-full border-gray-300"
+                      onClick={() => navigate("/all-applications")}
+                    >
+                      View All
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </TabsContent>
 
@@ -1203,7 +1235,6 @@ const UnitDashboard = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Note: EditInternshipDialog might expect strict types, casting to any if interface mismatch occurs until that component is refactored */}
       <EditInternshipDialog
         isOpen={!!editingInternship}
         onClose={handleEditClose}

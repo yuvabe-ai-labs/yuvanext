@@ -2,10 +2,10 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { useStudentTasks } from "@/hooks/useStudentTasks";
+import { useCandidateTasks } from "@/hooks/useCandidateTasks";
 import TaskCalendar from "@/components/TaskCalendar";
 import ViewTaskModal from "@/components/ViewTaskModal";
-import type { StudentTask } from "@/types/studentTasks.types";
+import type { Task } from "@/types/candidateTasks.types";
 import { Badge } from "@/components/ui/badge";
 import CandidateInfoCard from "@/components/CandidateInfoCard";
 import { format } from "date-fns";
@@ -16,16 +16,15 @@ export default function UnitCandidateTasks() {
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
-  const [selectedTask, setSelectedTask] = useState<StudentTask | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
-  // 1. FETCH DATA (Consolidated Hook)
-  const { data, isLoading: tasksLoading } = useStudentTasks(applicationId);
+  const { data: tasksData, isLoading: tasksLoading } =
+    useCandidateTasks(applicationId);
 
-  // 2. EXTRACT TASKS
-  const tasks = data?.tasks || [];
+  const tasks = tasksData?.tasks || [];
 
-  const handleTaskClick = (task: StudentTask) => {
+  const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
     setIsViewModalOpen(true);
   };
@@ -81,7 +80,7 @@ export default function UnitCandidateTasks() {
           {/* LEFT SIDE */}
           <div className="flex flex-col gap-6">
             <button
-              className="mt-6 mb-2 flex items-center gap-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg px-3 py-1.5 bg-white w-fit"
+              className="mt-6 mb-2 flex items-center gap-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg px-3 py-1.5 bg-white w-fit transition-colors"
               onClick={() => navigate(-1)}
             >
               <ArrowLeft className="w-4 h-4" />
@@ -90,7 +89,6 @@ export default function UnitCandidateTasks() {
 
             {/* Candidate Card */}
             <div>
-              {/* Note: This component fetches its own data using the same hook (cached) */}
               <CandidateInfoCard applicationId={applicationId} />
             </div>
 
@@ -126,46 +124,47 @@ export default function UnitCandidateTasks() {
               <div className="space-y-3 overflow-y-auto flex-grow pr-2">
                 {tasks.map((task) => (
                   <div
-                    key={task.id}
+                    key={task.taskId}
                     onClick={() => handleTaskClick(task)}
                     className="bg-white border border-gray-200 rounded-2xl p-4 cursor-pointer transition-all hover:shadow-md"
                   >
                     <div className="flex items-start gap-3 mb-2">
                       <div
                         className="w-4 h-1 rounded-full mt-1.5 flex-shrink-0"
-                        style={{ backgroundColor: task.color }}
+                        style={{ backgroundColor: task.taskColor || "#3B82F6" }}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <h3 className="font-semibold text-gray-900 text-sm mb-1">
-                            {task.title}
+                            {task.taskTitle}
                           </h3>
                           <Badge
                             variant="secondary"
                             className={`${getStatusColor(
-                              task.status
+                              task.taskStatus,
                             )} text-white text-[10px] px-2 py-0.5`}
                           >
-                            {getStatusLabel(task.status)}
+                            {getStatusLabel(task.taskStatus)}
                           </Badge>
                         </div>
 
-                        {task.end_date && (
+                        {task.taskEndDate && (
                           <p className="text-xs text-gray-500 flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full border-2 border-orange-400"></span>
-                            Due on {format(new Date(task.end_date), "do MMMM")}
+                            Due on{" "}
+                            {format(new Date(task.taskEndDate), "do MMMM")}
                           </p>
                         )}
                       </div>
                     </div>
 
-                    {task.description && (
+                    {task.taskDescription && (
                       <p className="text-xs text-gray-600 mb-3 leading-relaxed pl-7 line-clamp-2">
-                        {task.description}
+                        {task.taskDescription}
                       </p>
                     )}
 
-                    {task.submission_link && (
+                    {task.taskSubmissionLink && (
                       <div className="pl-7">
                         <Badge
                           variant="outline"

@@ -1,8 +1,9 @@
 import { Mail, Phone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useStudentTasks } from "@/hooks/useStudentTasks";
+import { useCandidateTasks } from "@/hooks/useCandidateTasks";
 import { calculateOverallTaskProgress } from "@/utils/taskProgress";
+import { useMemo, useEffect } from "react";
 
 interface CandidateInfoCardProps {
   applicationId: string;
@@ -11,8 +12,32 @@ interface CandidateInfoCardProps {
 export default function CandidateInfoCard({
   applicationId,
 }: CandidateInfoCardProps) {
-  // 1. USE NEW HOOK
-  const { data, isLoading, error } = useStudentTasks(applicationId);
+  const { data, isLoading, error } = useCandidateTasks(applicationId);
+
+  // Calculate task progress
+  const taskProgress = useMemo(() => {
+    if (!data || !data.tasks || data.tasks.length === 0) {
+      console.log("No tasks available");
+      return 0;
+    }
+
+    const progress = calculateOverallTaskProgress(data.tasks);
+    console.log("Calculated progress:", progress + "%");
+    return progress;
+  }, [data?.tasks]);
+
+  // Memoize circle calculations
+  const circleMetrics = useMemo(() => {
+    const radius = 48;
+    const circumference = 2 * Math.PI * radius;
+    const progressOffset = circumference * (1 - taskProgress / 100);
+    console.log("Circle metrics:", {
+      progress: taskProgress,
+      circumference,
+      offset: progressOffset,
+    });
+    return { circumference, progressOffset };
+  }, [taskProgress]);
 
   if (isLoading) {
     return (
@@ -39,10 +64,16 @@ export default function CandidateInfoCard({
     );
   }
 
-  // 2. DESTRUCTURE DATA FROM NEW SHAPE
-  const { candidate, internship, tasks } = data;
+  const candidate = {
+    name: data.applicantName,
+    email: data.applicantEmail,
+    phone: data.candidatePhoneNumber,
+    avatarUrl: data.candidateAvatarUrl,
+  };
 
-  const taskProgress = calculateOverallTaskProgress(tasks);
+  const internship = {
+    title: data.internshipName,
+  };
 
   const getInitials = (name: string) => {
     return name
@@ -52,11 +83,6 @@ export default function CandidateInfoCard({
       .toUpperCase()
       .slice(0, 2);
   };
-
-  // Calculate stroke dash for progress circle
-  const radius = 28;
-  const circumference = 2 * Math.PI * radius;
-  const progressOffset = circumference * (1 - taskProgress / 100);
 
   return (
     <Card className="w-full p-10 bg-white shadow-sm border border-gray-200 rounded-3xl">
@@ -101,7 +127,8 @@ export default function CandidateInfoCard({
         {/* Task Progress Circle */}
         <div className="flex flex-col items-center gap-1">
           <div className="relative w-28 h-28">
-            <svg className="transform rotate-90 w-28 h-28">
+            <svg className="transform -rotate-90 w-28 h-28">
+              {/* Background circle */}
               <circle
                 cx="56"
                 cy="56"
@@ -110,6 +137,7 @@ export default function CandidateInfoCard({
                 strokeWidth="10"
                 fill="none"
               />
+              {/* Progress circle */}
               <circle
                 cx="56"
                 cy="56"
@@ -117,8 +145,8 @@ export default function CandidateInfoCard({
                 stroke="#00C271"
                 strokeWidth="10"
                 fill="none"
-                strokeDasharray={circumference} // Fixed: use calculated const
-                strokeDashoffset={progressOffset} // Fixed: use calculated const
+                strokeDasharray={circleMetrics.circumference}
+                strokeDashoffset={circleMetrics.progressOffset}
                 strokeLinecap="round"
                 className="transition-all duration-700 ease-out"
               />

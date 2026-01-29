@@ -82,3 +82,22 @@ export interface ReviewTaskPayload {
   status: TaskStatus.REDO | TaskStatus.ACCEPTED;
   reviewRemarks?: string | null;
 }
+
+export interface ITask {
+  taskId: string;
+  taskStatus: TaskStatus;
+}
+
+export interface InternshipTaskItem {
+  internshipId: string;
+  internshipName: string;
+  internshipCreatedAt: string;
+  internshipClosingDate: string;
+  internshipDuration: string;
+  applicationId: string;
+  applicantId: string;
+  applicantName: string | null;
+  unitName: string;
+  unitAvatarUrl: string | null;
+  tasks: ITask[];
+}

@@ -255,10 +255,10 @@ const InternshipDetail = () => {
                         {internship.jobType === "full_time"
                           ? "Full Time"
                           : internship.jobType === "part_time"
-                          ? "Part Time"
-                          : internship.jobType === "both"
-                          ? "Full Time & Part Time"
-                          : "Not specified"}
+                            ? "Part Time"
+                            : internship.jobType === "both"
+                              ? "Full Time & Part Time"
+                              : "Not specified"}
                       </div>
 
                       {/* Minimum Age */}
@@ -335,10 +335,10 @@ const InternshipDetail = () => {
                         {internship.jobType === "full_time"
                           ? "Full Time"
                           : internship.jobType === "part_time"
-                          ? "Part Time"
-                          : internship.jobType === "both"
-                          ? "Full Time & Part Time"
-                          : "Not specified"}
+                            ? "Part Time"
+                            : internship.jobType === "both"
+                              ? "Full Time & Part Time"
+                              : "Not specified"}
                       </div>
 
                       {/* Minimum Age */}
@@ -392,14 +392,6 @@ const InternshipDetail = () => {
           {/* Status Banner - Shows if saved or applied */}
           {(isSaved || isApplied) && (
             <div className="flex gap-2 mb-4">
-              {isSaved && (
-                <div className="px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg flex items-center gap-2">
-                  <Bookmark className="w-4 h-4 text-teal-600 fill-teal-600" />
-                  <span className="text-sm font-medium text-teal-700">
-                    Saved
-                  </span>
-                </div>
-              )}
               {isApplied && applicationData && (
                 <div className="px-4 py-2 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
                   <CircleCheckBig className="w-4 h-4 text-green-600" />

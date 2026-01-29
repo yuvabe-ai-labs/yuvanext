@@ -6,118 +6,96 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { EducationEntry } from "@/types/profile";
-
-const educationSchema = z
-  .object({
-    degree: z.string().min(1, "Degree is required"),
-    institution: z.string().min(1, "Institution is required"),
-    start_year: z
-      .number({ invalid_type_error: "Start year is required" })
-      .min(1900)
-      .max(new Date().getFullYear()),
-    end_year: z
-      .number()
-      .min(1900)
-      .max(new Date().getFullYear() + 10)
-      .optional()
-      .or(z.nan()), // Handle empty number inputs turning into NaN
-    score: z.string().optional(),
-    is_current: z.boolean().default(false),
-  })
-  .refine(
-    (data) => {
-      // If currently studying, or if end_year/start_year are missing, skip this validation
-      if (data.is_current || !data.end_year || !data.start_year) {
-        return true;
-      }
-      // Validation: End year must be greater than or equal to Start year
-      return data.end_year >= data.start_year;
-    },
-    {
-      message: "End year cannot be before start year",
-      path: ["end_year"], // This ensures the red error shows under the 'End Year' input
-    }
-  );
-// --- CHANGED SECTION END ---
+import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
+import { CandidateEducation } from "@/types/profiles.types";
+import { educationSchema } from "@/lib/schemas";
 
 type EducationFormData = z.infer<typeof educationSchema>;
 
+interface EducationWithId extends CandidateEducation {
+  index?: number;
+}
+
 interface EducationDialogProps {
   children: React.ReactNode;
-  education?: EducationEntry;
-  onSave: (education: Omit<EducationEntry, "id">) => Promise<void>;
+  education?: EducationWithId;
+  onUpdate?: () => void;
 }
 
 export const EducationDialog: React.FC<EducationDialogProps> = ({
   children,
   education,
-  onSave,
+  onUpdate,
 }) => {
   const [open, setOpen] = React.useState(false);
   const { toast } = useToast();
+  const { data: profileData } = useProfile();
+  const { mutateAsync: updateProfile, isPending } = useUpdateProfile();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    watch,
-    setValue,
-    clearErrors, // Added to clear errors when checkbox changes
-  } = useForm<EducationFormData>({
+  const form = useForm<EducationFormData>({
     resolver: zodResolver(educationSchema),
     defaultValues: {
       degree: education?.degree || "",
-      institution: education?.institution || "",
-      start_year: education?.start_year || undefined,
-      end_year: education?.end_year || undefined,
+      institution: education?.institution || education?.school || "",
+      start_year: education?.start_year || "",
+      end_year: education?.end_year || "",
       score: education?.score || "",
       is_current: education?.is_current || false,
     },
   });
 
-  const isCurrent = watch("is_current");
+  const isCurrent = form.watch("is_current");
 
   const onSubmit = async (data: EducationFormData) => {
     try {
-      await onSave({
-        degree: data.degree!,
-        institution: data.institution!,
-        start_year: data.start_year!,
-        end_year: data.is_current ? null : data.end_year || null,
-        score: data.score || null,
-        is_current: data.is_current!,
-      } as Omit<EducationEntry, "id">);
-      toast({
-        title: "Success",
-        description: `Education ${
-          education ? "updated" : "added"
-        } successfully`,
-      });
+      const existingEdu = profileData?.education ?? [];
+      const payload = { ...data };
+
+      let updatedEdu;
+      if (education?.index !== undefined) {
+        updatedEdu = existingEdu.map((e, idx) =>
+          idx === education.index ? payload : e,
+        );
+      } else {
+        updatedEdu = [...existingEdu, payload];
+      }
+
+      await updateProfile({ education: updatedEdu });
+      toast({ title: "Success", description: "Education saved successfully" });
       setOpen(false);
+      form.reset();
+      onUpdate?.();
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save education entry",
+        description: "Failed to save education",
         variant: "destructive",
       });
     }
   };
 
+  // Auto-clear end_year when "Currently studying" is checked
   React.useEffect(() => {
     if (isCurrent) {
-      setValue("end_year", undefined);
-      clearErrors("end_year"); // Clear the date error if they switch to "Currently studying"
+      form.setValue("end_year", "");
+      form.clearErrors("end_year");
     }
-  }, [isCurrent, setValue, clearErrors]);
+  }, [isCurrent, form]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -128,113 +106,131 @@ export const EducationDialog: React.FC<EducationDialogProps> = ({
             {education ? "Edit Education" : "Add Education"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <Label htmlFor="degree">Degree *</Label>
-            <Input
-              id="degree"
-              {...register("degree")}
-              placeholder="e.g. Bachelor of Science"
-              className="rounded-full"
-            />
-            {errors.degree && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.degree.message}
-              </p>
-            )}
-          </div>
 
-          <div>
-            <Label htmlFor="institution">Institution *</Label>
-            <Input
-              id="institution"
-              {...register("institution")}
-              placeholder="e.g. University of Technology"
-              className="rounded-full"
-            />
-            {errors.institution && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.institution.message}
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="start_year">Start Year *</Label>
-              <Input
-                min={1900}
-                max={new Date().getFullYear()}
-                id="start_year"
-                type="number"
-                {...register("start_year", { valueAsNumber: true })}
-                className="rounded-full"
-              />
-              {errors.start_year && (
-                <p className="text-sm text-destructive mt-1">
-                  {errors.start_year.message}
-                </p>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="degree"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Degree *</FormLabel>
+                  <FormControl>
+                    <Input {...field} className="rounded-full" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
+            />
+
+            <FormField
+              control={form.control}
+              name="institution"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Institution *</FormLabel>
+                  <FormControl>
+                    <Input {...field} className="rounded-full" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="start_year"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Year *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        maxLength={4}
+                        onInput={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          e.target.value = e.target.value.replace(/\D/g, "");
+                        }}
+                        className="rounded-full"
+                        placeholder="YYYY"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="end_year"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Year</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        maxLength={4}
+                        disabled={isCurrent}
+                        onInput={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          e.target.value = e.target.value.replace(/\D/g, "");
+                        }}
+                        className="rounded-full"
+                        placeholder="YYYY"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
-            <div>
-              <Label htmlFor="end_year">End Year</Label>
-              <Input
-                min={1900}
-                max={new Date().getFullYear() + 10}
-                id="end_year"
-                type="number"
-                disabled={isCurrent}
-                {...register("end_year", { valueAsNumber: true })}
-                className="rounded-full"
-              />
-              {errors.end_year && (
-                <p className="text-sm text-destructive mt-1">
-                  {errors.end_year.message}
-                </p>
+            <FormField
+              control={form.control}
+              name="is_current"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <FormLabel className="text-sm font-normal cursor-pointer">
+                    Currently studying here
+                  </FormLabel>
+                </FormItem>
               )}
+            />
+
+            <FormField
+              control={form.control}
+              name="score"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Score/Grade</FormLabel>
+                  <FormControl>
+                    <Input {...field} className="rounded-full" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                className="rounded-full"
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isPending} className="rounded-full">
+                {isPending ? "Saving..." : "Save"}
+              </Button>
             </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="is_current"
-              checked={isCurrent}
-              onCheckedChange={(checked) =>
-                setValue("is_current", checked as boolean)
-              }
-            />
-            <Label htmlFor="is_current">Currently studying here</Label>
-          </div>
-
-          <div>
-            <Label htmlFor="score">Score/Grade</Label>
-            <Input
-              id="score"
-              {...register("score")}
-              placeholder="e.g. 3.8 GPA, First Class"
-              className="rounded-full"
-            />
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              className="rounded-full"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-full"
-            >
-              {isSubmitting ? "Saving..." : education ? "Update" : "Add"}
-            </Button>
-          </div>
-        </form>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

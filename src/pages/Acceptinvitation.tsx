@@ -67,8 +67,7 @@ const AcceptInvitation = () => {
         return;
       }
       try {
-        const { data } = await axios.get(`${API_BASE_URL}/auth/verify-invitation`, {
-          params: { id: invitationId }, // Still pass it as a query param to your backend if required
+        const { data } = await axios.get(`${API_BASE_URL}/auth/verify-invitation/${invitationId}`, {
         });
         setInvitationData(data.data);
       } catch (error: any) {

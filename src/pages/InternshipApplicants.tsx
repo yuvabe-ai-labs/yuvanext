@@ -134,7 +134,7 @@ const InternshipApplicants = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate("/unit-dashboard")}
+            onClick={() => navigate(-1)}
             className="gap-2"
           >
             <ChevronLeft className="w-4 h-4" /> Back

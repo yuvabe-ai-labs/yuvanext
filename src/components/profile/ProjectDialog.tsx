@@ -6,121 +6,112 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { ProjectEntry } from "@/types/profile";
+import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
+import { CandidateProject } from "@/types/profiles.types";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
+import { projectSchema } from "@/lib/schemas";
 
-const projectSchema = z
-  .object({
-    title: z.string().min(1, "Title is required"),
-    description: z.string().min(1, "Description is required"),
-    technologies: z
-      .array(z.string())
-      .min(1, "At least one technology is required"),
-    start_date: z.string().min(1, "Start date is required"),
-    end_date: z.string().optional(),
-    project_url: z.string().url().optional().or(z.literal("")),
-    is_current: z.boolean().default(false),
-  })
-  .refine(
-    (data) => {
-      // If currently working, or if dates are missing, skip this validation
-      if (data.is_current || !data.end_date || !data.start_date) {
-        return true;
-      }
-      // Convert strings to Date objects for comparison
-      const start = new Date(data.start_date);
-      const end = new Date(data.end_date);
-      return end >= start;
-    },
-    {
-      message: "End date cannot be before start date",
-      path: ["end_date"], // Attach error to end_date field
-    }
-  );
+type ProjectFormData = Omit<z.infer<typeof projectSchema>, "technologies"> & {
+  technologies: { value: string }[];
+};
 
-type ProjectFormData = z.infer<typeof projectSchema>;
+interface ProjectWithIndex extends CandidateProject {
+  index?: number;
+}
 
 interface ProjectDialogProps {
   children: React.ReactNode;
-  project?: ProjectEntry;
-  onSave: (project: Omit<ProjectEntry, "id">) => Promise<void>;
+  project?: ProjectWithIndex;
+  onUpdate?: () => void;
 }
 
 export const ProjectDialog: React.FC<ProjectDialogProps> = ({
   children,
   project,
-  onSave,
+  onUpdate,
 }) => {
   const [open, setOpen] = React.useState(false);
   const [newTech, setNewTech] = React.useState("");
-  const [technologies, setTechnologies] = React.useState<string[]>(
-    project?.technologies || []
-  );
   const { toast } = useToast();
+  const { data: profileData } = useProfile();
+  const { mutateAsync: updateProfile, isPending } = useUpdateProfile();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    watch,
-    setValue,
-    clearErrors, // Added clearErrors
-  } = useForm<ProjectFormData>({
+  const form = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
-      title: project?.title || "",
+      projectName: project?.title || project?.name || "",
       description: project?.description || "",
-      technologies: project?.technologies || [],
+      technologies: (project?.technologies || []).map((t) => ({ value: t })),
+      completionDate: project?.end_date !== "Present" ? project?.end_date : "",
+      projectUrl: project?.project_url || "",
+      is_current: project?.is_current || project?.end_date === "Present",
       start_date: project?.start_date || "",
-      end_date: project?.end_date || "",
-      project_url: project?.project_url || "",
-      is_current: project?.is_current || false,
     },
   });
 
-  const isCurrent = watch("is_current");
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "technologies",
+  });
+
+  const isCurrent = form.watch("is_current");
 
   const addTechnology = () => {
-    if (newTech.trim() && !technologies.includes(newTech.trim())) {
-      const updatedTech = [...technologies, newTech.trim()];
-      setTechnologies(updatedTech);
-      setValue("technologies", updatedTech);
-      setNewTech("");
+    const trimmed = newTech.trim();
+    if (trimmed) {
+      const currentValues = fields.map((f) => f.value);
+      if (!currentValues.includes(trimmed)) {
+        append({ value: trimmed });
+        setNewTech("");
+      }
     }
-  };
-
-  const removeTechnology = (tech: string) => {
-    const updatedTech = technologies.filter((t) => t !== tech);
-    setTechnologies(updatedTech);
-    setValue("technologies", updatedTech);
   };
 
   const onSubmit = async (data: ProjectFormData) => {
     try {
-      await onSave({
-        title: data.title!,
-        description: data.description!,
-        technologies,
-        start_date: data.start_date!,
-        end_date: data.is_current ? null : data.end_date || null,
-        project_url: data.project_url || null,
-        is_current: data.is_current!,
-      } as Omit<ProjectEntry, "id">);
+      const existingProjects = profileData?.projects ?? [];
+      const projectPayload = {
+        ...data,
+        technologies: data.technologies.map((t) => t.value),
+      };
+
+      let updatedProjects;
+      if (project?.index !== undefined) {
+        updatedProjects = existingProjects.map((p, idx) =>
+          idx === project.index ? projectPayload : p
+        );
+      } else {
+        updatedProjects = [...existingProjects, projectPayload];
+      }
+
+      await updateProfile({ projects: updatedProjects });
+
       toast({
         title: "Success",
         description: `Project ${project ? "updated" : "added"} successfully`,
       });
       setOpen(false);
+      form.reset();
+      setNewTech("");
+      onUpdate?.();
     } catch (error) {
       toast({
         title: "Error",
@@ -132,10 +123,10 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
 
   React.useEffect(() => {
     if (isCurrent) {
-      setValue("end_date", "");
-      clearErrors("end_date"); // Clear error when switching to current
+      form.setValue("completionDate", "");
+      form.clearErrors("completionDate");
     }
-  }, [isCurrent, setValue, clearErrors]);
+  }, [isCurrent, form]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -144,162 +135,156 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
         <DialogHeader>
           <DialogTitle>{project ? "Edit Project" : "Add Project"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <Label htmlFor="title">Project Title *</Label>
-            <Input
-              id="title"
-              {...register("title")}
-              placeholder="e.g. E-commerce Website"
-              className="rounded-full"
+        
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="projectName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Project Title *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. E-commerce Website" className="rounded-full" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {errors.title && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.title.message}
-              </p>
-            )}
-          </div>
 
-          <div>
-            <Label htmlFor="description">Description *</Label>
-            <Textarea
-              id="description"
-              {...register("description")}
-              placeholder="Describe what this project does and your role in it"
-              rows={3}
-              className="rounded-xl"
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description *</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Describe what this project does" 
+                      rows={3} 
+                      className="rounded-xl" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {errors.description && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.description.message}
-              </p>
-            )}
-          </div>
 
-          <div>
-            <Label>Technologies *</Label>
-            <div className="flex space-x-2 mb-2">
-              <Input
-                value={newTech}
-                onChange={(e) => setNewTech(e.target.value)}
-                placeholder="Add technology"
-                onKeyPress={(e) =>
-                  e.key === "Enter" && (e.preventDefault(), addTechnology())
-                }
-                className="rounded-full"
+            <FormItem>
+              <FormLabel>Technologies *</FormLabel>
+              <div className="flex space-x-2 mb-2">
+                <Input
+                  value={newTech}
+                  onChange={(e) => setNewTech(e.target.value)}
+                  placeholder="Add technology"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addTechnology();
+                    }
+                  }}
+                  className="rounded-full"
+                />
+                <Button type="button" onClick={addTechnology} size="sm" className="rounded-full">
+                  Add
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {fields.map((field, index) => (
+                  <Badge key={field.id} variant="secondary" className="flex items-center gap-1">
+                    {field.value}
+                    <X className="w-3 h-3 cursor-pointer" onClick={() => remove(index)} />
+                  </Badge>
+                ))}
+              </div>
+              <FormMessage>{form.formState.errors.technologies?.message}</FormMessage>
+            </FormItem>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="start_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Date *</FormLabel>
+                    <FormControl>
+                      <Input type="date" className="rounded-full" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
+
+              <FormField
+                control={form.control}
+                name="completionDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Date</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="date" 
+                        disabled={isCurrent} 
+                        className="rounded-full" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="is_current"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <Label className="font-normal">Currently working on this project</Label>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="projectUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Project URL</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="https://github.com/..." 
+                      className="rounded-full" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end space-x-2 pt-4">
               <Button
                 type="button"
-                onClick={addTechnology}
-                size="sm"
+                variant="outline"
+                onClick={() => setOpen(false)}
                 className="rounded-full"
               >
-                Add
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isPending} className="rounded-full">
+                {isPending ? "Saving..." : project ? "Update" : "Add"}
               </Button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {technologies.map((tech) => (
-                <Badge
-                  key={tech}
-                  variant="secondary"
-                  className="flex items-center gap-1"
-                >
-                  {tech}
-                  <X
-                    className="w-3 h-3 cursor-pointer"
-                    onClick={() => removeTechnology(tech)}
-                  />
-                </Badge>
-              ))}
-            </div>
-            {errors.technologies && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.technologies.message}
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="start_date">Start Date *</Label>
-              <Input
-                id="start_date"
-                type="date"
-                {...register("start_date")}
-                className="rounded-full"
-              />
-              {errors.start_date && (
-                <p className="text-sm text-destructive mt-1">
-                  {errors.start_date.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="end_date">End Date</Label>
-              <Input
-                id="end_date"
-                type="date"
-                disabled={isCurrent}
-                {...register("end_date")}
-                className="rounded-full"
-              />
-              {/* Added Error Message Display Below */}
-              {errors.end_date && (
-                <p className="text-sm text-destructive mt-1">
-                  {errors.end_date.message}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="is_current"
-              checked={isCurrent}
-              onCheckedChange={(checked) =>
-                setValue("is_current", checked as boolean)
-              }
-            />
-            <Label htmlFor="is_current">
-              Currently working on this project
-            </Label>
-          </div>
-
-          <div>
-            <Label htmlFor="project_url">Project URL</Label>
-            <Input
-              className="rounded-full"
-              id="project_url"
-              type="url"
-              {...register("project_url")}
-              placeholder="https://github.com/username/project"
-            />
-            {errors.project_url && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.project_url.message}
-              </p>
-            )}
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              className="rounded-full"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-full"
-            >
-              {isSubmitting ? "Saving..." : project ? "Update" : "Add"}
-            </Button>
-          </div>
-        </form>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

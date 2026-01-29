@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 // Types
 import type { ImageType } from "@/types/profiles.types";
 
-type EntityType = "student" | "unit";
+type EntityType = "candidate" | "unit";
 
 interface ImageUploadDialogProps {
   isOpen: boolean;

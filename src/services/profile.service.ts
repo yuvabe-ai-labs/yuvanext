@@ -25,7 +25,7 @@ export const getUnitProfile = async (): Promise<Profile> => {
 
 // 2. Update Unit Profile
 export const updateUnitProfile = async (
-  updates: Partial<Profile>
+  updates: Partial<Profile>,
 ): Promise<Profile> => {
   try {
     // Send partial updates; backend handles merging
@@ -38,15 +38,15 @@ export const updateUnitProfile = async (
 
 // Get Candidate Profile by Application ID
 export const getCandidateProfile = async (
-  applicationId: string
+  applicationId: string,
 ): Promise<CandidateProfileData> => {
   try {
     const response = await axiosInstance.get(
-      `/unit/applications/${applicationId}`
+      `/unit/applications/${applicationId}`,
     );
     return handleApiResponse<CandidateProfileData>(
       response,
-      {} as CandidateProfileData
+      {} as CandidateProfileData,
     );
   } catch (error) {
     return handleApiError(error, "Failed to fetch candidate profile");
@@ -54,19 +54,19 @@ export const getCandidateProfile = async (
 };
 
 export const updateApplicationStatus = async (
-  payload: UpdateApplicationStatusPayload
+  payload: UpdateApplicationStatusPayload,
 ): Promise<UpdateApplicationStatusResponse> => {
   try {
     // Endpoint: PUT /api/unit/applications/status
     const response = await axiosInstance.put(
       "/unit/applications/status",
-      payload
+      payload,
     );
 
     // Return typed response with a safe fallback
     return handleApiResponse<UpdateApplicationStatusResponse>(
       response,
-      {} as UpdateApplicationStatusResponse
+      {} as UpdateApplicationStatusResponse,
     );
   } catch (error) {
     return handleApiError(error, "Failed to update application status");
@@ -85,7 +85,7 @@ export const getProfile = async (): Promise<Profile> => {
 };
 
 export const updateProfile = async (
-  payload: UpdateProfilePayload
+  payload: UpdateProfilePayload,
 ): Promise<Profile> => {
   try {
     const response = await axiosInstance.put("/profile", payload);
@@ -96,7 +96,7 @@ export const updateProfile = async (
 };
 
 export const uploadAvatar = async (
-  file: File
+  file: File,
 ): Promise<{ avatarUrl: string }> => {
   try {
     const formData = new FormData();
@@ -106,7 +106,6 @@ export const uploadAvatar = async (
       headers: { "Content-Type": "multipart/form-data" },
     });
 
-    // Response data structure: { data: { avatarUrl: "..." } }
     return handleApiResponse<{ avatarUrl: string }>(response, {
       avatarUrl: "",
     });
@@ -115,6 +114,7 @@ export const uploadAvatar = async (
   }
 };
 
+// Delete Avatar
 export const deleteAvatar = async (): Promise<void> => {
   try {
     const response = await axiosInstance.delete("/profile/avatar");
@@ -127,7 +127,7 @@ export const deleteAvatar = async (): Promise<void> => {
 // --- BANNER ENDPOINTS ---
 
 export const uploadBanner = async (
-  file: File
+  file: File,
 ): Promise<{ bannerUrl: string }> => {
   try {
     const formData = new FormData();
@@ -157,7 +157,7 @@ export const deleteBanner = async (): Promise<void> => {
 // --- GALLERY ENDPOINTS ---
 
 export const uploadGalleryImage = async (
-  file: File
+  file: File,
 ): Promise<{ galleryImages: string[] }> => {
   try {
     const formData = new FormData();
@@ -176,12 +176,12 @@ export const uploadGalleryImage = async (
 };
 
 export const deleteGalleryImage = async (
-  imageUrl: string
+  imageUrl: string,
 ): Promise<{ galleryImages: string[] }> => {
   try {
     // Query param: ?imageUrl=...
     const response = await axiosInstance.delete(
-      `/profile/gallery?imageUrl=${encodeURIComponent(imageUrl)}`
+      `/profile/gallery?imageUrl=${encodeURIComponent(imageUrl)}`,
     );
     return handleApiResponse<{ galleryImages: string[] }>(response, {
       galleryImages: [],
@@ -194,7 +194,7 @@ export const deleteGalleryImage = async (
 // --- TESTIMONIAL / GLIMPSE VIDEO ENDPOINTS ---
 
 export const uploadTestimonial = async (
-  file: File
+  file: File,
 ): Promise<{ galleryVideos: string[] }> => {
   try {
     const formData = new FormData();
@@ -205,7 +205,7 @@ export const uploadTestimonial = async (
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },
-      }
+      },
     );
 
     return handleApiResponse<{ galleryVideos: string[] }>(response, {
@@ -217,11 +217,11 @@ export const uploadTestimonial = async (
 };
 
 export const deleteTestimonial = async (
-  videoUrl: string
+  videoUrl: string,
 ): Promise<{ galleryVideos: string[] }> => {
   try {
     const response = await axiosInstance.delete(
-      `/profile/testimonial?videoUrl=${encodeURIComponent(videoUrl)}`
+      `/profile/testimonial?videoUrl=${encodeURIComponent(videoUrl)}`,
     );
     return handleApiResponse<{ galleryVideos: string[] }>(response, {
       galleryVideos: [],

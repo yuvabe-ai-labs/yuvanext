@@ -7,8 +7,8 @@ import { Mail, Phone, MapPin, Clock } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { useUnitById } from "@/hooks/useUnits";
 import { useSession } from "@/lib/auth-client";
-import ProfileSummaryDialog from "@/components/ProfileSummaryDialog";
 import ApplicationSuccessDialog from "@/components/ApplicationSuccessDialog";
+import ProfileSummaryDialog from "@/components/ProfileSummaryDialog";
 import type { Internship } from "@/types/internships.types";
 import {
   FacebookIcon,

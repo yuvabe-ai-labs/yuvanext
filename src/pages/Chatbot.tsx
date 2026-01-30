@@ -117,7 +117,7 @@ const Chatbot = () => {
     } else {
       setMessages(updatedMessages);
     }
-  }, [chatMessages]);
+  }, [chatMessages, initialGreetingSent, messages]);
 
   const startChat = async () => {
     setShowChat(true);

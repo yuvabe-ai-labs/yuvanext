@@ -23,6 +23,12 @@ export interface SocialLink {
   [platform: string]: string;
 }
 
+export interface Link {
+  id?: string;
+  platform: string;
+  url: string;
+}
+
 export interface Project {
   id?: string;
   projectName: string;

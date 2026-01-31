@@ -9,7 +9,7 @@ import { Arrow } from "@/components/ui/custom-icons";
 import unitIllustration from "@/assets/unit_illstration.png";
 
 const SignIn = () => {
-  const { role } = useParams<{ role: string }>(); // This is the role from URL, e.g., /auth/unit/signin
+  const { role } = useParams<{ role: string }>();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -45,8 +45,6 @@ const SignIn = () => {
         errorMessage =
           "Please check your email and verify your account before signing in.";
         errorTitle = "Verification Required";
-      } else if (error.status === 429) {
-        errorMessage = "Too many login attempts. Please try again later.";
       }
 
       toast({
@@ -54,42 +52,31 @@ const SignIn = () => {
         description: errorMessage,
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully signed in.",
-      });
+    } else if (data) {
+      const userRole = data.user.role;
 
-      const userRole = data?.user?.role;
+      if (userRole !== role) {
+        await authClient.signOut();
 
-      if (userRole === "unit") {
-        navigate("/unit-dashboard");
+        toast({
+          title: "Sign in failed",
+          description: `This sign-in page is for ${role}s only. Please use the correct sign-in page for your account type.`,
+          variant: "destructive",
+        });
       } else {
-        navigate("/dashboard");
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully signed in.",
+        });
+
+        if (userRole === "unit") {
+          navigate("/unit-dashboard");
+        } else {
+          navigate("/dashboard");
+        }
       }
     }
 
-    setLoading(false);
-  };
-
-  const handleOAuthSignIn = async (provider: "google" | "apple") => {
-    setLoading(true);
-    if (role) localStorage.setItem("pendingRole", role);
-
-    const { data, error } = await authClient.signIn.social({
-      provider: provider,
-      callbackURL: "/dashboard",
-    });
-
-    if (error) {
-      localStorage.removeItem("pendingRole");
-      toast({
-        title: "Sign in failed",
-        description:
-          error.message || "Authentication failed. Please try again.",
-        variant: "destructive",
-      });
-    }
     setLoading(false);
   };
 

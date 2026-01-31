@@ -29,6 +29,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/auth-client";
 import type { Internship } from "@/types/internships.types";
+import Navbar from "@/components/Navbar";
 
 const RecommendedInternships = () => {
   const { toast } = useToast();
@@ -187,6 +188,7 @@ const RecommendedInternships = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Navbar />
       <div className="container px-4 sm:px-6 lg:px-[5.5rem]">
         <div className="flex flex-col h-[calc(100vh-4rem)] lg:flex-row">
           {/* Left Sidebar - Fixed Header + Scrollable List */}

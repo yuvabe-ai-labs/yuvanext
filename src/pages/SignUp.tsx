@@ -18,19 +18,8 @@ const SignUp = () => {
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
   const isUnitRole = role === "unit";
-
-  const form = useForm<SignUpValues>({
-    resolver: zodResolver(signUpSchema),
-    defaultValues: {
-      fullName: "",
-      email: "",
-      password: "",
-      companyWebsite: "",
-    },
-  });
-
-  const watchPassword = form.watch("password");
 
   // 3. Initialize React Hook Form
   const {
@@ -107,6 +96,7 @@ const SignUp = () => {
         navigate(`/auth/${role || "student"}/signin`);
       }, 2000);
     }
+
     setLoading(false);
   };
 
@@ -177,6 +167,7 @@ const SignUp = () => {
         </div>
       </div>
 
+      {/* Right Side - Form */}
       <div className="flex-1 flex items-center justify-center bg-white px-4 sm:px-6">
         <div className="w-full max-w-[474px]">
           <div className="bg-white rounded-[15px] px-6 sm:px-12 md:px-[40px] py-8 sm:py-12 w-full">
@@ -372,23 +363,22 @@ const SignUp = () => {
                 )}
               </div>
 
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full h-[35px] rounded-lg flex items-center justify-center text-[14px] font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
-                  style={{
-                    backgroundColor: "#76A9FA",
-                    fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
-                  }}
-                >
-                  {loading ? "Creating account..." : "Sign up"}
-                </Button>
-              </form>
-            </Form>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full h-[35px] rounded-lg flex items-center justify-center text-[14px] font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
+                style={{
+                  backgroundColor: "#76A9FA",
+                  fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
+                }}
+              >
+                {loading ? "Creating account..." : "Sign up"}
+              </button>
+            </form>
 
             <div className="text-center mt-6">
               <span
-                className="text-[13px]"
+                className="text-[13px] leading-4"
                 style={{
                   color: "#9CA3AF",
                   fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",

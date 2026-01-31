@@ -7,29 +7,39 @@ import signinLogo from "@/assets/signinLogo.svg";
 import { Eye, EyeOff } from "lucide-react";
 import { Arrow } from "@/components/ui/custom-icons";
 import unitIllustration from "@/assets/unit_illstration.png";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { SignInFormValues, signInSchema } from "@/lib/authentication";
 
 const SignIn = () => {
-  const { role } = useParams<{ role: string }>(); // This is the role from URL, e.g., /auth/unit/signin
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
+  const { role } = useParams<{ role: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [keepLoggedIn, setKeepLoggedIn] = useState(false);
 
-  const illustrationText =
-    role === "unit"
-      ? "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role’s requirements."
-      : "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
+  // 3. Initialize React Hook Form
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<SignInFormValues>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // 4. Submit Handler
+  const onSubmit = async (data: SignInFormValues) => {
     setLoading(true);
 
-    const { data, error } = await authClient.signIn.email({
-      email: email,
-      password: password,
+    const { data: authData, error } = await authClient.signIn.email({
+      email: data.email,
+      password: data.password,
       rememberMe: keepLoggedIn,
     });
 
@@ -60,7 +70,7 @@ const SignIn = () => {
         description: "You have successfully signed in.",
       });
 
-      const userRole = data?.user?.role;
+      const userRole = authData?.user?.role;
 
       if (userRole === "unit") {
         navigate("/unit-dashboard");
@@ -72,26 +82,11 @@ const SignIn = () => {
     setLoading(false);
   };
 
-  const handleOAuthSignIn = async (provider: "google" | "apple") => {
-    setLoading(true);
-    if (role) localStorage.setItem("pendingRole", role);
-
-    const { data, error } = await authClient.signIn.social({
-      provider: provider,
-      callbackURL: "/dashboard",
-    });
-
-    if (error) {
-      localStorage.removeItem("pendingRole");
-      toast({
-        title: "Sign in failed",
-        description:
-          error.message || "Authentication failed. Please try again.",
-        variant: "destructive",
-      });
-    }
-    setLoading(false);
-  };
+  // Helper for UI
+  const illustrationText =
+    role === "unit"
+      ? "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role’s requirements."
+      : "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
 
   return (
     <div className="min-h-screen bg-white flex">
@@ -163,7 +158,9 @@ const SignIn = () => {
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Form Connected to RHF */}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {/* Email */}
               <div>
                 <label
                   htmlFor="email"
@@ -172,20 +169,28 @@ const SignIn = () => {
                 >
                   Email Address *
                 </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
+                <div
+                  className={`border rounded-lg h-8 px-4 py-4 flex items-center ${
+                    errors.email ? "border-red-500" : "border-[#D1D5DB]"
+                  }`}
+                >
                   <input
                     id="email"
                     type="email"
                     placeholder="Enter email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    {...register("email")}
                     className="w-full text-[13px] outline-none bg-transparent placeholder-[#D1D5DB]"
-                    required
                     disabled={loading}
                   />
                 </div>
+                {errors.email && (
+                  <p className="text-red-500 text-[10px] mt-1">
+                    {errors.email.message}
+                  </p>
+                )}
               </div>
 
+              {/* Password */}
               <div>
                 <label
                   htmlFor="password"
@@ -194,15 +199,17 @@ const SignIn = () => {
                 >
                   Password *
                 </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center gap-2">
+                <div
+                  className={`border rounded-lg h-8 px-4 py-4 flex items-center gap-2 ${
+                    errors.password ? "border-red-500" : "border-[#D1D5DB]"
+                  }`}
+                >
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    {...register("password")}
                     className="w-full text-[13px] outline-none bg-transparent placeholder-[#D1D5DB]"
-                    required
                     disabled={loading}
                   />
                   <button
@@ -214,8 +221,14 @@ const SignIn = () => {
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
+                {errors.password && (
+                  <p className="text-red-500 text-[10px] mt-1">
+                    {errors.password.message}
+                  </p>
+                )}
               </div>
 
+              {/* Keep Logged In & Forgot Password */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <input

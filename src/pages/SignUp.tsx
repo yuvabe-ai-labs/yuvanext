@@ -7,25 +7,40 @@ import { Arrow } from "@/components/ui/custom-icons";
 import signupIllustrate from "@/assets/signinillustion.png";
 import signinLogo from "@/assets/signinLogo.svg";
 import unitIllustration from "@/assets/unit_illstration.png";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { SignUpFormValues, signUpSchema } from "@/lib/authentication";
 
 const SignUp = () => {
   const { role } = useParams<{ role: string }>();
-  const [fullName, setFullName] = useState("");
-  const [companyWebsite, setCompanyWebsite] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const isUnitRole = role === "unit";
 
-  const illustrationText = isUnitRole
-    ? "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role's requirements."
-    : "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
+  // 3. Initialize React Hook Form
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm<SignUpFormValues>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      password: "",
+      companyWebsite: "",
+    },
+  });
 
-  // Password validation rules
+  // Watch password for the visual checklist
+  const passwordValue = watch("password") || "";
+
+  // Password validation rules (Kept for visual UI checklist)
   const passwordRules = [
     { test: (p: string) => /[a-z]/.test(p), label: "one lowercase character" },
     { test: (p: string) => /[A-Z]/.test(p), label: "one uppercase character" },
@@ -37,50 +52,23 @@ const SignUp = () => {
     { test: (p: string) => p.length >= 8, label: "8 character minimum" },
   ];
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate password
-    const isPasswordValid = passwordRules.every((rule) => rule.test(password));
-    if (!isPasswordValid) {
-      toast({
-        title: "Password requirements not met",
-        description: "Please ensure your password meets all requirements.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (isUnitRole && companyWebsite) {
-      try {
-        new URL(companyWebsite);
-      } catch {
-        toast({
-          title: "Invalid website URL",
-          description: "Please enter a valid URL (e.g., https://example.com)",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
+  // 4. Form Submit Handler (Only runs if Zod validation passes)
+  const onSubmit = async (data: SignUpFormValues) => {
     setLoading(true);
 
-    // 2. USE BETTER AUTH SIGN UP
-    const { data, error } = await authClient.signUp.email({
-      email: email,
-      password: password,
-      name: fullName,
+    const { error } = await authClient.signUp.email({
+      email: data.email,
+      password: data.password,
+      name: data.fullName,
+      callbackURL: `${import.meta.env.VITE_FRONTEND_URL}/chatbot`,
       metadata: {
         role: role,
-        companyWebsite: isUnitRole ? companyWebsite : undefined,
+        companyWebsite: isUnitRole ? data.companyWebsite : undefined,
       },
     });
 
     if (error) {
-      // Check for specific error messages (Better Auth API structure)
       if (error.status === 409) {
-        // Status 409: Conflict (User already exists)
         toast({
           title: "Account already exists",
           description:
@@ -88,14 +76,12 @@ const SignUp = () => {
           variant: "destructive",
         });
       } else if (error.status === 429) {
-        // Status 429: Rate Limit
         toast({
           title: "Too many attempts",
           description: "Please wait a moment before trying again.",
           variant: "destructive",
         });
       } else {
-        // Fallback for 500 or 400
         toast({
           title: "Sign up failed",
           description: error.message || "An unknown error occurred.",
@@ -109,7 +95,6 @@ const SignUp = () => {
           "Please check your email to verify your account then sign in to continue.",
       });
 
-      // Redirect to sign-in page after successful signup
       setTimeout(() => {
         navigate(`/auth/${role || "student"}/signin`);
       }, 2000);
@@ -118,17 +103,18 @@ const SignUp = () => {
     setLoading(false);
   };
 
-  // 3. UPDATED OAUTH HANDLER (Though currently unused in your JSX)
-  const handleOAuthSignUp = async (provider: "google" | "apple") => {
-    if (role) {
-      localStorage.setItem("pendingRole", role);
-    }
-
-    await authClient.signIn.social({
-      provider: provider,
-      callbackURL: `/auth/${role || "student"}/signin`, // Optional: where to go after auth
+  // Helper to show validation errors via Toast (Optional UX enhancement)
+  const onError = () => {
+    toast({
+      title: "Validation Error",
+      description: "Please check the form for errors.",
+      variant: "destructive",
     });
   };
+
+  const illustrationText = isUnitRole
+    ? "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role's requirements."
+    : "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
 
   return (
     <div className="min-h-screen bg-white flex">
@@ -199,7 +185,11 @@ const SignUp = () => {
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Form connected to RHF */}
+            <form
+              onSubmit={handleSubmit(onSubmit, onError)}
+              className="space-y-6"
+            >
               {/* Full Name */}
               <div>
                 <label
@@ -212,22 +202,29 @@ const SignUp = () => {
                 >
                   {isUnitRole ? "Company Name *" : "Full Name *"}
                 </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
+                <div
+                  className={`border rounded-lg h-8 px-4 py-4 flex items-center ${
+                    errors.fullName ? "border-red-500" : "border-[#D1D5DB]"
+                  }`}
+                >
                   <input
                     id="fullName"
                     type="text"
                     placeholder={
                       isUnitRole ? "Enter company name" : "Enter name"
                     }
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    {...register("fullName")}
                     className="w-full text-[13px] leading-[11px] outline-none bg-transparent placeholder-[#9CA3AF]"
                     style={{
                       fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                     }}
-                    required
                   />
                 </div>
+                {errors.fullName && (
+                  <p className="text-red-500 text-[10px] mt-1">
+                    {errors.fullName.message}
+                  </p>
+                )}
               </div>
 
               {/* Company Website */}
@@ -243,19 +240,29 @@ const SignUp = () => {
                   >
                     Company Website
                   </label>
-                  <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
+                  <div
+                    className={`border rounded-lg h-8 px-4 py-4 flex items-center ${
+                      errors.companyWebsite
+                        ? "border-red-500"
+                        : "border-[#D1D5DB]"
+                    }`}
+                  >
                     <input
                       id="companyWebsite"
                       type="url"
                       placeholder="https://example.com"
-                      value={companyWebsite}
-                      onChange={(e) => setCompanyWebsite(e.target.value)}
+                      {...register("companyWebsite")}
                       className="w-full text-[13px] leading-[11px] outline-none bg-transparent placeholder-[#9CA3AF]"
                       style={{
                         fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                       }}
                     />
                   </div>
+                  {errors.companyWebsite && (
+                    <p className="text-red-500 text-[10px] mt-1">
+                      {errors.companyWebsite.message}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -271,18 +278,25 @@ const SignUp = () => {
                 >
                   Email Address *
                 </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
+                <div
+                  className={`border rounded-lg h-8 px-4 py-4 flex items-center ${
+                    errors.email ? "border-red-500" : "border-[#D1D5DB]"
+                  }`}
+                >
                   <input
                     id="email"
                     type="email"
                     placeholder="Enter email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    {...register("email")}
                     className="w-full text-[13px] leading-[11px] outline-none bg-transparent placeholder-[#9CA3AF]"
                     style={{ fontFamily: "'Lato', sans-serif" }}
-                    required
                   />
                 </div>
+                {errors.email && (
+                  <p className="text-red-500 text-[10px] mt-1">
+                    {errors.email.message}
+                  </p>
+                )}
               </div>
 
               {/* Password */}
@@ -294,15 +308,17 @@ const SignUp = () => {
                 >
                   Password *
                 </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center gap-2">
+                <div
+                  className={`border rounded-lg h-8 px-4 py-4 flex items-center gap-2 ${
+                    errors.password ? "border-red-500" : "border-[#D1D5DB]"
+                  }`}
+                >
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    {...register("password")}
                     className="w-full text-[13px] outline-none bg-transparent placeholder-[#9CA3AF]"
-                    required
                   />
                   <button
                     type="button"
@@ -312,11 +328,11 @@ const SignUp = () => {
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
-                {/* Password strength checklist (2 columns) */}
-                {password && (
+                {/* Password strength checklist (Using watched value) */}
+                {passwordValue && (
                   <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
                     {passwordRules.map((rule, index) => {
-                      const passed = rule.test(password);
+                      const passed = rule.test(passwordValue);
                       return (
                         <li
                           key={index}
@@ -334,6 +350,12 @@ const SignUp = () => {
                       );
                     })}
                   </ul>
+                )}
+                {/* Fallback Zod error message if pattern fails but user submits */}
+                {errors.password && (
+                  <p className="text-red-500 text-[10px] mt-1">
+                    {errors.password.message}
+                  </p>
                 )}
               </div>
 

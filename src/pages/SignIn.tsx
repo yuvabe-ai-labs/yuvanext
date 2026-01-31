@@ -92,33 +92,45 @@ const SignIn = () => {
     <div className="min-h-screen bg-white flex">
       {/* Left Side - Illustration */}
       <div className="hidden lg:flex w-[41%] h-screen relative p-4">
-        <div className="w-full h-full rounded-3xl overflow-hidden relative">
+        <div className="w-full h-full rounded-3xl overflow-hidden relative flex flex-col items-center justify-center">
+          {/* Background Image */}
           <img
             src={signupIllustrate}
             alt="Signin Illustration"
-            className="w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover"
           />
 
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-8">
-            <img src={signinLogo} alt="Sign in Logo" className="w-32 h-auto" />
+          {/* Content Overlay */}
+          <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-6 px-8 w-full h-full">
+            {/* Logo */}
+            <img
+              src={signinLogo}
+              alt="Sign in Logo"
+              className="w-32 h-auto shrink-0"
+            />
 
             {role === "unit" && (
-              <div className="relative flex items-center justify-center p-6">
-                <Arrow className="absolute w-[650px] h-[650px] text-white opacity-95 bottom-10" />
+              <div className="relative flex items-center justify-center p-2 w-full shrink-1">
+                {/* FIX 1: Responsive Arrow sizing */}
+                <Arrow className="absolute w-[80%] h-auto max-h-[50vh] text-white opacity-95 bottom-0" />
+
+                {/* FIX 2: Responsive Image height (max-h-[40vh]) */}
                 <img
                   src={unitIllustration}
                   alt="Unit Illustration"
-                  className="relative z-10 w-[450px] h-[450px] object-contain"
+                  className="relative z-10 w-auto h-auto max-h-[30vh] lg:max-h-[40vh] object-contain"
                 />
               </div>
             )}
 
-            <p className="text-white text-base font-medium max-w-xl leading-relaxed">
+            {/* Text */}
+            <p className="text-white text-base font-medium max-w-xl leading-relaxed shrink-0">
               {illustrationText}
             </p>
           </div>
 
-          <div className="absolute bottom-4 left-0 right-0 flex justify-between px-6 text-white/80 text-xs">
+          {/* Footer Link */}
+          <div className="absolute bottom-4 left-0 right-0 flex justify-between px-6 text-white/80 text-xs z-20">
             <a
               href="https://www.yuvanext.com/privacy-policy"
               target="_blank"

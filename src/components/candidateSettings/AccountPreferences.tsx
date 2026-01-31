@@ -106,8 +106,7 @@ export default function AccountPreferences() {
           deactivateMutation.mutate(undefined, {
             onSuccess: () => {
               setShowDeactivateModal(false);
-              // FIX: Redirect to the Unit Sign-In page (or your specific role page)
-              navigate("/auth/unit/signin");
+              navigate("/");
             },
           })
         }
@@ -121,8 +120,7 @@ export default function AccountPreferences() {
           deleteMutation.mutate(undefined, {
             onSuccess: () => {
               setShowDeleteModal(false);
-              // FIX: Redirect to the Unit Sign-In page
-              navigate("/auth/unit/signin");
+              navigate("/");
             },
           })
         }

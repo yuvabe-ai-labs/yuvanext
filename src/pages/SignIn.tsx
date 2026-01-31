@@ -7,30 +7,54 @@ import signinLogo from "@/assets/signinLogo.svg";
 import { Eye, EyeOff } from "lucide-react";
 import { Arrow } from "@/components/ui/custom-icons";
 import unitIllustration from "@/assets/unit_illstration.png";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+} from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
+
+const signInSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+  keepLoggedIn: z.boolean().default(false),
+});
+
+type SignInValues = z.infer<typeof signInSchema>;
 
 const SignIn = () => {
   const { role } = useParams<{ role: string }>();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
-  const [keepLoggedIn, setKeepLoggedIn] = useState(false);
+
+  const form = useForm<SignInValues>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      keepLoggedIn: false,
+    },
+  });
 
   const illustrationText =
     role === "unit"
       ? "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role’s requirements."
       : "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (values: SignInValues) => {
     setLoading(true);
 
     const { data, error } = await authClient.signIn.email({
-      email: email,
-      password: password,
-      rememberMe: keepLoggedIn,
+      email: values.email,
+      password: values.password,
+      rememberMe: values.keepLoggedIn,
     });
 
     if (error) {
@@ -150,95 +174,124 @@ const SignIn = () => {
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label
-                  htmlFor="email"
-                  className="block text-[14px] mb-2"
-                  style={{ color: "#4B5563" }}
-                >
-                  Email Address *
-                </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
-                  <input
-                    id="email"
-                    type="email"
-                    placeholder="Enter email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full text-[13px] outline-none bg-transparent placeholder-[#D1D5DB]"
-                    required
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-[14px] mb-2"
-                  style={{ color: "#4B5563" }}
-                >
-                  Password *
-                </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center gap-2">
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full text-[13px] outline-none bg-transparent placeholder-[#D1D5DB]"
-                    required
-                    disabled={loading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-[#9CA3AF] hover:text-[#4B5563] transition-colors disabled:opacity-50"
-                    disabled={loading}
-                  >
-                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <input
-                    id="keepLoggedIn"
-                    type="checkbox"
-                    checked={keepLoggedIn}
-                    onChange={(e) => setKeepLoggedIn(e.target.checked)}
-                    className="w-3 h-3 rounded border-[#D1D5DB] text-[#76A9FA] focus:ring-[#76A9FA] focus:ring-1"
-                    disabled={loading}
-                  />
-                  <label
-                    htmlFor="keepLoggedIn"
-                    className="text-[13px] cursor-pointer"
-                    style={{ color: "#4B5563" }}
-                  >
-                    Keep me logged in
-                  </label>
-                </div>
-                <Link
-                  to="/forgot-password"
-                  className="text-[13px] hover:underline"
-                  style={{ color: "#3F83F8" }}
-                >
-                  Forgot Password?
-                </Link>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-[35px] rounded-lg flex items-center justify-center text-[14px] font-medium text-white hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: "#76A9FA" }}
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-6"
               >
-                {loading ? "Signing in..." : "Sign In"}
-              </button>
-            </form>
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem className="space-y-0">
+                      <label
+                        htmlFor="email"
+                        className="block text-[14px] mb-2"
+                        style={{ color: "#4B5563" }}
+                      >
+                        Email Address *
+                      </label>
+                      <FormControl>
+                        <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
+                          <input
+                            {...field}
+                            id="email"
+                            type="email"
+                            placeholder="Enter email address"
+                            className="w-full text-[13px] outline-none bg-transparent placeholder-[#D1D5DB]"
+                            disabled={loading}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage className="text-[10px] mt-1" />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem className="space-y-0">
+                      <label
+                        htmlFor="password"
+                        className="block text-[14px] mb-2"
+                        style={{ color: "#4B5563" }}
+                      >
+                        Password *
+                      </label>
+                      <FormControl>
+                        <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center gap-2">
+                          <input
+                            {...field}
+                            id="password"
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Enter your password"
+                            className="w-full text-[13px] outline-none bg-transparent placeholder-[#D1D5DB]"
+                            disabled={loading}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="text-[#9CA3AF] hover:text-[#4B5563] transition-colors disabled:opacity-50"
+                            disabled={loading}
+                          >
+                            {showPassword ? (
+                              <EyeOff size={14} />
+                            ) : (
+                              <Eye size={14} />
+                            )}
+                          </button>
+                        </div>
+                      </FormControl>
+                      <FormMessage className="text-[10px] mt-1" />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex items-center justify-between">
+                  <FormField
+                    control={form.control}
+                    name="keepLoggedIn"
+                    render={({ field }) => (
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="keepLoggedIn"
+                          type="checkbox"
+                          checked={field.value}
+                          onChange={field.onChange}
+                          className="w-3 h-3 rounded border-[#D1D5DB] text-[#76A9FA] focus:ring-[#76A9FA] focus:ring-1"
+                          disabled={loading}
+                        />
+                        <label
+                          htmlFor="keepLoggedIn"
+                          className="text-[13px] cursor-pointer"
+                          style={{ color: "#4B5563" }}
+                        >
+                          Keep me logged in
+                        </label>
+                      </div>
+                    )}
+                  />
+                  <Link
+                    to="/forgot-password"
+                    className="text-[13px] hover:underline"
+                    style={{ color: "#3F83F8" }}
+                  >
+                    Forgot Password?
+                  </Link>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-[35px] rounded-lg flex items-center justify-center text-[14px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: "#76A9FA" }}
+                >
+                  {loading ? "Signing in..." : "Sign In"}
+                </Button>
+              </form>
+            </Form>
 
             <div className="text-center mt-6">
               <span className="text-[13px]" style={{ color: "#9CA3AF" }}>

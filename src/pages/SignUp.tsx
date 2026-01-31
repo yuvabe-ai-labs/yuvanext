@@ -7,25 +7,57 @@ import { Arrow } from "@/components/ui/custom-icons";
 import signupIllustrate from "@/assets/signinillustion.png";
 import signinLogo from "@/assets/signinLogo.svg";
 import unitIllustration from "@/assets/unit_illstration.png";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+} from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
+
+const signUpSchema = z.object({
+  fullName: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email address"),
+  password: z
+    .string()
+    .min(8, "8 character minimum")
+    .regex(/[a-z]/, "one lowercase character")
+    .regex(/[A-Z]/, "one uppercase character")
+    .regex(/\d/, "one number")
+    .regex(/[!@#$%^&*(),.?":{}|<>]/, "one special character"),
+  companyWebsite: z.string().url("Invalid URL").optional().or(z.literal("")),
+});
+
+type SignUpValues = z.infer<typeof signUpSchema>;
 
 const SignUp = () => {
   const { role } = useParams<{ role: string }>();
-  const [fullName, setFullName] = useState("");
-  const [companyWebsite, setCompanyWebsite] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
-
   const isUnitRole = role === "unit";
+
+  const form = useForm<SignUpValues>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      password: "",
+      companyWebsite: "",
+    },
+  });
+
+  const watchPassword = form.watch("password");
 
   const illustrationText = isUnitRole
     ? "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role's requirements."
     : "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
 
-  // Password validation rules
   const passwordRules = [
     { test: (p: string) => /[a-z]/.test(p), label: "one lowercase character" },
     { test: (p: string) => /[A-Z]/.test(p), label: "one uppercase character" },
@@ -37,97 +69,33 @@ const SignUp = () => {
     { test: (p: string) => p.length >= 8, label: "8 character minimum" },
   ];
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate password
-    const isPasswordValid = passwordRules.every((rule) => rule.test(password));
-    if (!isPasswordValid) {
-      toast({
-        title: "Password requirements not met",
-        description: "Please ensure your password meets all requirements.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (isUnitRole && companyWebsite) {
-      try {
-        new URL(companyWebsite);
-      } catch {
-        toast({
-          title: "Invalid website URL",
-          description: "Please enter a valid URL (e.g., https://example.com)",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
+  const onSubmit = async (values: SignUpValues) => {
     setLoading(true);
-
-    // 2. USE BETTER AUTH SIGN UP
     const { data, error } = await authClient.signUp.email({
-      email: email,
-      password: password,
-      name: fullName,
+      email: values.email,
+      password: values.password,
+      name: values.fullName,
       metadata: {
-        role: role,
-        companyWebsite: isUnitRole ? companyWebsite : undefined,
+        role,
+        companyWebsite: isUnitRole ? values.companyWebsite : undefined,
       },
     });
 
     if (error) {
-      // Check for specific error messages (Better Auth API structure)
-      if (error.status === 409) {
-        // Status 409: Conflict (User already exists)
-        toast({
-          title: "Account already exists",
-          description:
-            "This email is already registered. Please sign in instead.",
-          variant: "destructive",
-        });
-      } else if (error.status === 429) {
-        // Status 429: Rate Limit
-        toast({
-          title: "Too many attempts",
-          description: "Please wait a moment before trying again.",
-          variant: "destructive",
-        });
-      } else {
-        // Fallback for 500 or 400
-        toast({
-          title: "Sign up failed",
-          description: error.message || "An unknown error occurred.",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Sign up failed",
+        description: error.message || "An unknown error occurred.",
+        variant: "destructive",
+      });
     } else {
       toast({
         title: "Account created successfully!",
         description:
           "Please check your email to verify your account then sign in to continue.",
       });
-
-      // Redirect to sign-in page after successful signup
-      setTimeout(() => {
-        navigate(`/auth/${role || "student"}/signin`);
-      }, 2000);
+      setTimeout(() => navigate(`/auth/${role || "student"}/signin`), 2000);
     }
-
     setLoading(false);
-  };
-
-  // 3. UPDATED OAUTH HANDLER (Though currently unused in your JSX)
-  const handleOAuthSignUp = async (provider: "google" | "apple") => {
-    if (role) {
-      localStorage.setItem("pendingRole", role);
-    }
-
-    await authClient.signIn.social({
-      provider: provider,
-      callbackURL: `/auth/${role || "student"}/signin`, // Optional: where to go after auth
-    });
   };
 
   return (
@@ -141,11 +109,10 @@ const SignUp = () => {
             className="w-full h-full object-cover"
           />
 
-          {/* Center content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-8">
             <img src={signinLogo} alt="Sign in Logo" className="w-32 h-auto" />
 
-            {isUnitRole && (
+            {role === "unit" && (
               <div className="relative flex items-center justify-center p-6">
                 <Arrow className="absolute w-[650px] h-[650px] text-white opacity-95 bottom-10" />
                 <img
@@ -174,7 +141,6 @@ const SignUp = () => {
         </div>
       </div>
 
-      {/* Right Side - Form */}
       <div className="flex-1 flex items-center justify-center bg-white px-4 sm:px-6">
         <div className="w-full max-w-[474px]">
           <div className="bg-white rounded-[15px] px-6 sm:px-12 md:px-[40px] py-8 sm:py-12 w-full">
@@ -199,160 +165,198 @@ const SignUp = () => {
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Full Name */}
-              <div>
-                <label
-                  htmlFor="fullName"
-                  className="block text-[14px] leading-[11px] mb-2"
-                  style={{
-                    color: "#4B5563",
-                    fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
-                  }}
-                >
-                  {isUnitRole ? "Company Name *" : "Full Name *"}
-                </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
-                  <input
-                    id="fullName"
-                    type="text"
-                    placeholder={
-                      isUnitRole ? "Enter company name" : "Enter name"
-                    }
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full text-[13px] leading-[11px] outline-none bg-transparent placeholder-[#9CA3AF]"
-                    style={{
-                      fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
-                    }}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Company Website */}
-              {isUnitRole && (
-                <div>
-                  <label
-                    htmlFor="companyWebsite"
-                    className="block text-[14px] leading-[11px] mb-2"
-                    style={{
-                      color: "#4B5563",
-                      fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
-                    }}
-                  >
-                    Company Website
-                  </label>
-                  <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
-                    <input
-                      id="companyWebsite"
-                      type="url"
-                      placeholder="https://example.com"
-                      value={companyWebsite}
-                      onChange={(e) => setCompanyWebsite(e.target.value)}
-                      className="w-full text-[13px] leading-[11px] outline-none bg-transparent placeholder-[#9CA3AF]"
-                      style={{
-                        fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Email */}
-              <div>
-                <label
-                  htmlFor="email"
-                  className="block text-[14px] leading-[11px] mb-2"
-                  style={{
-                    color: "#4B5563",
-                    fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
-                  }}
-                >
-                  Email Address *
-                </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
-                  <input
-                    id="email"
-                    type="email"
-                    placeholder="Enter email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full text-[13px] leading-[11px] outline-none bg-transparent placeholder-[#9CA3AF]"
-                    style={{ fontFamily: "'Lato', sans-serif" }}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-[12px] mb-2"
-                  style={{ color: "#4B5563" }}
-                >
-                  Password *
-                </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center gap-2">
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full text-[13px] outline-none bg-transparent placeholder-[#9CA3AF]"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-[#9CA3AF] hover:text-[#4B5563] transition-colors"
-                  >
-                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
-                {/* Password strength checklist (2 columns) */}
-                {password && (
-                  <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
-                    {passwordRules.map((rule, index) => {
-                      const passed = rule.test(password);
-                      return (
-                        <li
-                          key={index}
-                          className={`flex items-center gap-1 ${
-                            passed ? "text-green-600" : "text-gray-400"
-                          }`}
-                        >
-                          {passed ? (
-                            <CheckCircle size={12} className="text-green-600" />
-                          ) : (
-                            <span className="w-[12px] h-[12px] border border-gray-300 rounded-full" />
-                          )}
-                          <span>{rule.label}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-[35px] rounded-lg flex items-center justify-center text-[14px] font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
-                style={{
-                  backgroundColor: "#76A9FA",
-                  fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
-                }}
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-6"
               >
-                {loading ? "Creating account..." : "Sign up"}
-              </button>
-            </form>
+                <FormField
+                  control={form.control}
+                  name="fullName"
+                  render={({ field }) => (
+                    <FormItem className="space-y-0">
+                      <label
+                        htmlFor="fullName"
+                        className="block text-[14px] leading-[11px] mb-2"
+                        style={{
+                          color: "#4B5563",
+                          fontFamily:
+                            "'Neue Haas Grotesk Text Pro', sans-serif",
+                        }}
+                      >
+                        {isUnitRole ? "Company Name *" : "Full Name *"}
+                      </label>
+                      <FormControl>
+                        <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
+                          <input
+                            {...field}
+                            id="fullName"
+                            placeholder={
+                              isUnitRole ? "Enter company name" : "Enter name"
+                            }
+                            className="w-full text-[13px] outline-none bg-transparent placeholder-[#9CA3AF]"
+                            style={{
+                              fontFamily:
+                                "'Neue Haas Grotesk Text Pro', sans-serif",
+                            }}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage className="text-[10px] mt-1" />
+                    </FormItem>
+                  )}
+                />
+
+                {isUnitRole && (
+                  <FormField
+                    control={form.control}
+                    name="companyWebsite"
+                    render={({ field }) => (
+                      <FormItem className="space-y-0">
+                        <label
+                          htmlFor="companyWebsite"
+                          className="block text-[14px] leading-[11px] mb-2"
+                          style={{
+                            color: "#4B5563",
+                            fontFamily:
+                              "'Neue Haas Grotesk Text Pro', sans-serif",
+                          }}
+                        >
+                          Company Website
+                        </label>
+                        <FormControl>
+                          <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
+                            <input
+                              {...field}
+                              id="companyWebsite"
+                              type="url"
+                              placeholder="https://example.com"
+                              className="w-full text-[13px] outline-none bg-transparent placeholder-[#9CA3AF]"
+                              style={{
+                                fontFamily:
+                                  "'Neue Haas Grotesk Text Pro', sans-serif",
+                              }}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage className="text-[10px] mt-1" />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem className="space-y-0">
+                      <label
+                        htmlFor="email"
+                        className="block text-[14px] leading-[11px] mb-2"
+                        style={{
+                          color: "#4B5563",
+                          fontFamily:
+                            "'Neue Haas Grotesk Text Pro', sans-serif",
+                        }}
+                      >
+                        Email Address *
+                      </label>
+                      <FormControl>
+                        <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
+                          <input
+                            {...field}
+                            id="email"
+                            type="email"
+                            placeholder="Enter email address"
+                            className="w-full text-[13px] outline-none bg-transparent placeholder-[#9CA3AF]"
+                            style={{ fontFamily: "'Lato', sans-serif" }}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage className="text-[10px] mt-1" />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem className="space-y-0">
+                      <label
+                        htmlFor="password"
+                        className="block text-[12px] mb-2"
+                        style={{ color: "#4B5563" }}
+                      >
+                        Password *
+                      </label>
+                      <FormControl>
+                        <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center gap-2">
+                          <input
+                            {...field}
+                            id="password"
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Enter your password"
+                            className="w-full text-[13px] outline-none bg-transparent placeholder-[#9CA3AF]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="text-[#9CA3AF] hover:text-[#4B5563] transition-colors"
+                          >
+                            {showPassword ? (
+                              <EyeOff size={14} />
+                            ) : (
+                              <Eye size={14} />
+                            )}
+                          </button>
+                        </div>
+                      </FormControl>
+                      {watchPassword && (
+                        <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
+                          {passwordRules.map((rule, index) => {
+                            const passed = rule.test(watchPassword);
+                            return (
+                              <li
+                                key={index}
+                                className={`flex items-center gap-1 ${passed ? "text-green-600" : "text-gray-400"}`}
+                              >
+                                {passed ? (
+                                  <CheckCircle
+                                    size={12}
+                                    className="text-green-600"
+                                  />
+                                ) : (
+                                  <span className="w-[12px] h-[12px] border border-gray-300 rounded-full" />
+                                )}
+                                <span>{rule.label}</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      <FormMessage className="text-[10px] mt-1" />
+                    </FormItem>
+                  )}
+                />
+
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-[35px] rounded-lg flex items-center justify-center text-[14px] font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
+                  style={{
+                    backgroundColor: "#76A9FA",
+                    fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
+                  }}
+                >
+                  {loading ? "Creating account..." : "Sign up"}
+                </Button>
+              </form>
+            </Form>
 
             <div className="text-center mt-6">
               <span
-                className="text-[13px] leading-4"
+                className="text-[13px]"
                 style={{
                   color: "#9CA3AF",
                   fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
@@ -361,7 +365,7 @@ const SignUp = () => {
                 Already have an account?{" "}
                 <Link
                   to={`/auth/${role}/signin`}
-                  className="text-[14px] leading-4 font-medium hover:underline"
+                  className="text-[14px] font-medium hover:underline"
                   style={{
                     color: "#3F83F8",
                     fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",

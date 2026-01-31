@@ -3,7 +3,6 @@ import { formatDistanceToNow } from "date-fns";
 import {
   AppliedInternshipStatus,
   InternshipApplicationStatus,
-  UnitDecision,
 } from "@/types/internships.types";
 
 interface ApplicationStatusCardProps {
@@ -19,8 +18,9 @@ export default function ApplicationStatusCard({
   const MAIN_FLOW = ["applied", "shortlisted", "interviewed", "hired"];
   const currentStepIndex = MAIN_FLOW.indexOf(application.status);
 
-  const isRejected = application.unitOfferDecision === UnitDecision.REJECT;
-  const isSelected = application.unitOfferDecision === UnitDecision.SELECT;
+  const isRejected =
+    application.status === InternshipApplicationStatus.NOT_SHORTLISTED;
+  const isSelected = application.status === InternshipApplicationStatus.HIRED;
 
   const statusColor = isRejected ? "bg-red-500" : "bg-blue-500";
   const statusTextColor = isRejected ? "text-red-500" : "text-blue-500";

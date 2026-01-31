@@ -23,6 +23,12 @@ export interface SocialLink {
   [platform: string]: string;
 }
 
+export interface Link {
+  id?: string;
+  platform: string;
+  url: string;
+}
+
 export interface Project {
   id?: string;
   projectName: string;
@@ -134,7 +140,7 @@ export interface Profile {
   course: CandidateCourse[];
   internship: CandidateInternship[];
   projects: CandidateProject[];
-  socialLinks: SocialLink[];
+  socialLinks: Link[];
   profileScore: number;
   createdAt: string;
   updatedAt: string;
@@ -170,7 +176,7 @@ export interface UpdateProfilePayload {
   course?: CandidateCourse[];
   internship?: CandidateInternship[];
   projects?: Project[];
-  socialLinks?: SocialLink[];
+  socialLinks?: Link[];
   galleryImages?: string[];
 }
 
@@ -209,7 +215,7 @@ export interface CandidateProfileData {
     interests: string[];
     education: CandidateEducation[];
     course: CandidateCourse[];
-    socialLinks: SocialLink[] | null;
+    socialLinks: Link[] | null;
     internship: CandidateInternship[];
     projects: CandidateProject[];
     language?: Language[]; // Added for consistency

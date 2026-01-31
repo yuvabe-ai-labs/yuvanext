@@ -4,49 +4,73 @@ import { streamChatbotMessage } from "./chatbot.api";
 interface ChatMessage {
   role: "user" | "bot";
   content: string;
+  question?: string;
+  options?: string[] | null;
+  fieldType?: string;
 }
 
 export function useChatbotStream() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [streamingText, setStreamingText] = useState("");
+  const [streamingMessage, setStreamingMessage] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
 
   const sendMessage = async (message: string) => {
     setLoading(true);
-    setStreamingText("");
-
+    setStreamingMessage("");
     setMessages((prev) => [...prev, { role: "user", content: message }]);
 
     try {
-      await streamChatbotMessage(message, ({ type, data }) => {
+      let lastStructuredData: any = null;
+
+      await streamChatbotMessage(message, async ({ type, data }) => {
         if (type === "chunk") {
-          setStreamingText((prev) => prev + data.text);
+          const textChunk = typeof data === "string" ? data : data.text || "";
+          setStreamingMessage((prev) => prev + textChunk);
+        }
+
+        if (type === "structured") {
+          lastStructuredData = data;
+          if (data.message) {
+            const fullText =
+              data.message + (data.question ? "\n\n" + data.question : "");
+            setStreamingMessage(fullText);
+          }
         }
 
         if (type === "complete") {
-          setMessages((prev) => [
-            ...prev,
-            { role: "bot", content: data.fullResponse },
-          ]);
-          setStreamingText("");
-          setOnboardingCompleted(data.onboardingCompleted);
+          if (lastStructuredData) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "bot",
+                content: lastStructuredData.message || "",
+                question: lastStructuredData.question || "",
+                options: lastStructuredData.options || null,
+                fieldType: lastStructuredData.fieldType || "text",
+              },
+            ]);
+            setOnboardingCompleted(data.onboardingCompleted || false);
+          }
+
+          setStreamingMessage("");
+          setLoading(false);
         }
 
         if (type === "error") {
-          console.error("Chatbot error:", data);
+          setStreamingMessage("");
+          setLoading(false);
         }
       });
     } catch (err) {
-      console.error("Streaming failed:", err);
-    } finally {
+      setStreamingMessage("");
       setLoading(false);
     }
   };
 
   return {
     messages,
-    streamingText,
+    streamingMessage,
     loading,
     onboardingCompleted,
     sendMessage,

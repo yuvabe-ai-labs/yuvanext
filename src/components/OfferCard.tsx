@@ -3,10 +3,10 @@ import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import type { AppliedInternshipStatus } from "@/types/internships.types";
 import { CandidateDecision } from "@/types/internships.types";
-import { useStudentTasks } from "@/hooks/useStudentTasks";
 import { useUpdateCandidateDecision } from "@/hooks/useInternships";
-import { calculateOverallTaskProgress } from "@/utils/taskProgress";
 import { useState } from "react";
+import { useCandidateTasks } from "@/hooks/useCandidateTasks";
+import { TaskStatus } from "@/types/candidateTasks.types";
 
 interface OfferCardProps {
   application: AppliedInternshipStatus;
@@ -17,16 +17,18 @@ export default function OfferCard({ application }: OfferCardProps) {
   const navigate = useNavigate();
   const updateDecision = useUpdateCandidateDecision();
 
-  const { data: tasksData } = useStudentTasks(application.id);
-  const tasks = tasksData?.data || [];
-  const taskProgress = calculateOverallTaskProgress(tasks);
+  const isAccepted =
+    application.candidateOfferDecision === CandidateDecision.ACCEPT;
+  const { data: tasksData } = useCandidateTasks(
+    isAccepted ? application.id : "",
+  );
 
   const formattedAppliedDate = application.createdAt
     ? format(new Date(application.createdAt), "MMM dd, yyyy")
     : "Unknown";
 
   const handleDecision = async (
-    decision: CandidateDecision.ACCEPT | CandidateDecision.REJECT
+    decision: CandidateDecision.ACCEPT | CandidateDecision.REJECT,
   ) => {
     setIsProcessing(true);
     try {
@@ -44,30 +46,27 @@ export default function OfferCard({ application }: OfferCardProps) {
   const isPending =
     application.candidateOfferDecision === CandidateDecision.PENDING ||
     application.candidateOfferDecision === null;
-  const isAccepted =
-    application.candidateOfferDecision === CandidateDecision.ACCEPT;
 
   const handleViewTasks = () => {
     navigate(`/my-tasks/${application.id}`);
   };
 
-  // Get internship start and end dates
-  const getInternshipDates = () => {
-    if (tasks.length === 0) return { startDate: null, endDate: null };
+  // Calculate task progress
+  const calculateProgress = () => {
+    if (!tasksData?.tasks || tasksData.tasks.length === 0) {
+      return { percentage: 0, completed: 0, total: 0 };
+    }
 
-    const dates = tasks
-      .filter((task) => task.start_date && task.end_date)
-      .flatMap((task) => [new Date(task.start_date), new Date(task.end_date)]);
+    const total = tasksData.tasks.length;
+    const completed = tasksData.tasks.filter(
+      (task) => task.taskStatus === TaskStatus.ACCEPTED,
+    ).length;
+    const percentage = Math.round((completed / total) * 100);
 
-    if (dates.length === 0) return { startDate: null, endDate: null };
-
-    const startDate = new Date(Math.min(...dates.map((d) => d.getTime())));
-    const endDate = new Date(Math.max(...dates.map((d) => d.getTime())));
-
-    return { startDate, endDate };
+    return { percentage, completed, total };
   };
 
-  const { startDate, endDate } = getInternshipDates();
+  const progress = isAccepted ? calculateProgress() : null;
 
   return (
     <div className="w-full bg-white border border-gray-300 shadow rounded-3xl px-7 py-6 mb-4 hover:shadow-md transition-shadow">
@@ -106,6 +105,36 @@ export default function OfferCard({ application }: OfferCardProps) {
           </button>
         )}
       </div>
+
+      {/* Task Progress Bar for Accepted Internships */}
+      {isAccepted && progress && (
+        <div className="mb-5">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-gray-700">
+              Task Progress
+            </span>
+            <span className="text-sm font-semibold text-gray-800">
+              {progress.completed}/{progress.total} tasks completed
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-6 overflow-hidden">
+            <div
+              className="bg-gradient-to-r from-blue-500 to-blue-600 h-4 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progress.percentage}%` }}
+            />
+          </div>
+          <div className="flex justify-between items-center mt-1">
+            <span className="text-xs text-gray-500">
+              {progress.percentage}% Complete
+            </span>
+            {progress.percentage === 100 && (
+              <span className="text-xs font-medium text-green-600">
+                ✓ All tasks completed!
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Details */}
       {!isAccepted && (

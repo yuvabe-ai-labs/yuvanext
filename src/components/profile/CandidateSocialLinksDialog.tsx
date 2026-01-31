@@ -25,7 +25,7 @@ import {
 } from "@/lib/unitDialogSchemas";
 import { Link } from "@/types/profiles.types";
 
-interface UnitSocialLinksDialogProps {
+interface CandidateSocialLinksDialogProps {
   onSave: (links: Link[]) => void;
   currentLinks: Link[];
   children: React.ReactNode;
@@ -42,11 +42,9 @@ const PLATFORM_OPTIONS = [
   { value: "website", label: "Website" },
 ];
 
-export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
-  onSave,
-  currentLinks,
-  children,
-}) => {
+export const CandidateSocialLinksDialog: React.FC<
+  CandidateSocialLinksDialogProps
+> = ({ onSave, currentLinks, children }) => {
   const [open, setOpen] = useState(false);
 
   // Initialize Hook Form

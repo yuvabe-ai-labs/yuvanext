@@ -18,7 +18,15 @@ const SignIn = () => {
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [keepLoggedIn, setKeepLoggedIn] = useState(false);
+
+  const form = useForm<SignInValues>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      keepLoggedIn: false,
+    },
+  });
 
   // 3. Initialize React Hook Form
   const {
@@ -55,8 +63,6 @@ const SignIn = () => {
         errorMessage =
           "Please check your email and verify your account before signing in.";
         errorTitle = "Verification Required";
-      } else if (error.status === 429) {
-        errorMessage = "Too many login attempts. Please try again later.";
       }
 
       toast({
@@ -72,10 +78,11 @@ const SignIn = () => {
 
       const userRole = authData?.user?.role;
 
-      if (userRole === "unit") {
-        navigate("/unit-dashboard");
-      } else {
-        navigate("/dashboard");
+        if (userRole === "unit") {
+          navigate("/unit-dashboard");
+        } else {
+          navigate("/dashboard");
+        }
       }
     }
 
@@ -268,15 +275,16 @@ const SignIn = () => {
                 </Link>
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-[35px] rounded-lg flex items-center justify-center text-[14px] font-medium text-white hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: "#76A9FA" }}
-              >
-                {loading ? "Signing in..." : "Sign In"}
-              </button>
-            </form>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-[35px] rounded-lg flex items-center justify-center text-[14px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: "#76A9FA" }}
+                >
+                  {loading ? "Signing in..." : "Sign In"}
+                </Button>
+              </form>
+            </Form>
 
             <div className="text-center mt-6">
               <span className="text-[13px]" style={{ color: "#9CA3AF" }}>

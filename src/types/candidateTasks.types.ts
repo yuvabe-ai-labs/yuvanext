@@ -17,15 +17,15 @@ export interface CreateTaskPayload {
 }
 
 export interface UpdateTaskPayload {
-  taskTitle?: string;
-  taskDescription?: string | null;
-  taskStartDate?: string | null;
-  taskEndDate?: string | null;
-  taskStartTime?: string | null;
-  taskEndTime?: string | null;
-  taskColor?: string | null;
-  taskStatus?: TaskStatus;
-  taskSubmissionLink?: string | null;
+  title?: string;
+  description?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  color?: string | null;
+  status?: TaskStatus;
+  submissionLink?: string | null;
 }
 
 export interface Task {
@@ -40,6 +40,9 @@ export interface Task {
   taskEndTime: string | null;
   taskColor: string | null;
   taskSubmissionLink: string | null;
+  taskSubmittedAt: string | null;
+  taskReviewRemarks: string | null;
+  taskReviewedAt: string | null;
 }
 
 export interface ApplicationTasks {
@@ -54,4 +57,47 @@ export interface ApplicationTasks {
   internshipCreatedAt: string;
   internshipClosingDate: string | null;
   tasks: Task[];
+}
+
+export interface ITask {
+  taskId: string;
+  taskStatus: TaskStatus;
+}
+
+export interface InternshipTaskItem {
+  internshipId: string;
+  internshipName: string;
+  internshipCreatedAt: string;
+  internshipClosingDate: string;
+  internshipDuration: string;
+  applicationId: string;
+  applicantId: string;
+  applicantName: string | null;
+  unitName: string;
+  unitAvatarUrl: string | null;
+  tasks: ITask[];
+}
+
+export interface ReviewTaskPayload {
+  status: TaskStatus.REDO | TaskStatus.ACCEPTED;
+  reviewRemarks?: string | null;
+}
+
+export interface ITask {
+  taskId: string;
+  taskStatus: TaskStatus;
+}
+
+export interface InternshipTaskItem {
+  internshipId: string;
+  internshipName: string;
+  internshipCreatedAt: string;
+  internshipClosingDate: string;
+  internshipDuration: string;
+  applicationId: string;
+  applicantId: string;
+  applicantName: string | null;
+  unitName: string;
+  unitAvatarUrl: string | null;
+  tasks: ITask[];
 }

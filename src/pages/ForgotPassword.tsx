@@ -22,9 +22,7 @@ const ForgotPassword = () => {
     try {
       const { data, error: authError } = await authClient.requestPasswordReset({
         email: email,
-        redirectTo: `${
-          import.meta.env.VITE_BETTER_AUTH_REDIRECT_URL
-        }/reset-password`,
+        redirectTo: `${import.meta.env.VITE_FRONTEND_URL}/reset-password`,
       });
 
       if (authError) {

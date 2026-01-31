@@ -3,6 +3,8 @@ export interface UnitDashboardStats {
   totalInternships: number;
   totalInterviews: number;
   hiredThisMonth: number;
+  totalActiveInternships: number;
+  totalHired: number;
   period?: {
     month: string;
     year: number;

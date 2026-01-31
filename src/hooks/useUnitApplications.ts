@@ -10,6 +10,8 @@ export const useUnitStats = () => {
       totalInternships: data.totalInternships,
       totalInterviews: data.totalInterviews,
       hiredThisMonth: data.hiredThisMonth,
+      totalActiveInternships: data.totalActiveInternships,
+      totalHired: data.totalHired,
     }),
   });
 };

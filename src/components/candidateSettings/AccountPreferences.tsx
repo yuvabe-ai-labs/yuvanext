@@ -6,11 +6,11 @@ import PreferenceItem from "./PreferenceItem";
 import DemographicForm from "./DemographicForm";
 import VerificationUpload from "./VerificationUpload";
 import SkeletonBox from "./SkeletonBox";
-import { DeactivateModal, DeleteModal } from "./ActionModals"; // Import Modals
+import { DeactivateModal, DeleteModal } from "./ActionModals";
 
 // Hooks
 import { useUnitProfile } from "@/hooks/useUnitProfile";
-import { useDeactivateAccount, useDeleteAccount } from "@/hooks/useSettings"; // Import new hook
+import { useDeactivateAccount, useDeleteAccount } from "@/hooks/useSettings";
 
 export default function AccountPreferences() {
   const [activeSubView, setActiveSubView] = useState<string | null>(null);
@@ -104,7 +104,10 @@ export default function AccountPreferences() {
         onClose={() => setShowDeactivateModal(false)}
         onConfirm={() =>
           deactivateMutation.mutate(undefined, {
-            onSuccess: () => setShowDeactivateModal(false),
+            onSuccess: () => {
+              setShowDeactivateModal(false);
+              navigate("/");
+            },
           })
         }
         isLoading={deactivateMutation.isPending}
@@ -113,7 +116,14 @@ export default function AccountPreferences() {
       <DeleteModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
-        onConfirm={() => deleteMutation.mutate()}
+        onConfirm={() =>
+          deleteMutation.mutate(undefined, {
+            onSuccess: () => {
+              setShowDeleteModal(false);
+              navigate("/");
+            },
+          })
+        }
         isLoading={deleteMutation.isPending}
       />
     </div>

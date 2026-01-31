@@ -193,11 +193,7 @@ const UnitDashboard = () => {
     useHiredApplicants();
   const hiredCandidates = rawHiredCandidates as HiredCandidateDTO[];
 
-  const {
-    weeklyData,
-    stats: reportStats,
-    loading: reportsLoading,
-  } = useUnitReports();
+  const { weeklyData, loading: reportsLoading } = useUnitReports();
 
   // --- 2. LOCAL STATE ---
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -373,14 +369,14 @@ const UnitDashboard = () => {
     switch (status) {
       case "shortlisted":
         return "bg-green-500 text-white hover:bg-green-500";
-      case "rejected":
+      case "not_shortlisted": // MATCHES BACKEND
         return "bg-red-500 text-white hover:bg-red-500";
       case "interviewed":
         return "bg-blue-500 text-white hover:bg-blue-500";
       case "hired":
         return "bg-green-500 text-white hover:bg-green-500";
       default:
-        return "bg-gray-500 text-white hover:bg-gray-500";
+        return "bg-green-500 text-white hover:bg-green-500";
     }
   };
 
@@ -388,10 +384,10 @@ const UnitDashboard = () => {
     switch (status) {
       case "shortlisted":
         return "Shortlisted";
-      case "rejected":
+      case "not_shortlisted":
         return "Not Shortlisted";
       case "interviewed":
-        return "Interviewed";
+        return "Interview Scheduled";
       case "hired":
         return "Hired";
       default:
@@ -412,8 +408,8 @@ const UnitDashboard = () => {
     if (filterStatuses.length === 1) {
       const labels: Record<string, string> = {
         shortlisted: "Shortlisted",
-        interviewed: "Interviewed",
-        rejected: "Rejected",
+        interviewed: "Interview Scheduled",
+        not_shortlisted: "Not Shortlisted",
         hired: "Hired",
         applied: "Applied",
       };
@@ -611,8 +607,8 @@ const UnitDashboard = () => {
                   {[
                     "applied",
                     "shortlisted",
-                    "interviewed",
-                    "rejected",
+                    "interview scheduled",
+                    "not_shortlisted",
                     "hired",
                   ].map((status) => (
                     <DropdownMenuItem
@@ -627,7 +623,11 @@ const UnitDashboard = () => {
                         readOnly
                         className="h-4 w-4 rounded border-gray-300 accent-blue-600"
                       />
-                      <span className="capitalize">{status}</span>
+                      <span className="capitalize">
+                        {status === "not_shortlisted"
+                          ? "Not Shortlisted"
+                          : status}
+                      </span>
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
@@ -748,7 +748,6 @@ const UnitDashboard = () => {
                   })}
                 </div>
 
-                {/* --- ADDED: View All Button --- */}
                 {filteredApplications.length > 6 && (
                   <div className="flex justify-center mt-6 sm:mt-8">
                     <Button
@@ -769,6 +768,7 @@ const UnitDashboard = () => {
             value="job-descriptions"
             className="px-0 sm:px-4 lg:px-10 py-2"
           >
+            {/* ... (Job descriptions content unchanged) ... */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <h2 className="text-xl sm:text-2xl font-semibold">
                 Job Descriptions
@@ -958,6 +958,7 @@ const UnitDashboard = () => {
             value="candidates"
             className="space-y-6 px-0 sm:px-4 lg:px-10"
           >
+            {/* ... (Candidates content unchanged) ... */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <h2 className="text-xl sm:text-2xl font-semibold">
                 Hired Candidates ({filteredHiredCandidates.length})
@@ -1054,6 +1055,7 @@ const UnitDashboard = () => {
 
           {/* TAB 4: REPORTS */}
           <TabsContent value="reports" className="px-0 sm:px-4 lg:px-10 py-2">
+            {/* ... (Reports content unchanged) ... */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <h2 className="text-xl sm:text-2xl font-semibold">
                 Reports for this Month
@@ -1159,7 +1161,7 @@ const UnitDashboard = () => {
                         <Skeleton className="h-6 sm:h-8 w-12 sm:w-16 my-1" />
                       ) : (
                         <p className="text-xl sm:text-2xl font-bold">
-                          {reportStats.totalApplications}
+                          {stats.totalApplications}
                         </p>
                       )}
                     </div>
@@ -1179,7 +1181,7 @@ const UnitDashboard = () => {
                         <Skeleton className="h-6 sm:h-8 w-12 sm:w-16 my-1" />
                       ) : (
                         <p className="text-xl sm:text-2xl font-bold">
-                          {reportStats.hiredCandidates}
+                          {stats.totalHired}
                         </p>
                       )}
                     </div>
@@ -1199,7 +1201,7 @@ const UnitDashboard = () => {
                         <Skeleton className="h-6 sm:h-8 w-12 sm:w-16 my-1" />
                       ) : (
                         <p className="text-xl sm:text-2xl font-bold">
-                          {reportStats.activeInternships}
+                          {stats.totalActiveInternships}
                         </p>
                       )}
                     </div>

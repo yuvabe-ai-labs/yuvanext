@@ -116,7 +116,7 @@ const CandidateTaskProgress = ({
 }) => {
   const { data: tasksData } = useStudentTasks(applicationId);
   // Cast based on the expected return type from the hook
-  const tasks = (tasksData?.tasks || []) as StudentTask[];
+  const tasks = tasksData?.tasks || [];
   const taskProgress = calculateOverallTaskProgress(tasks);
 
   // Get internship start and end dates
@@ -124,8 +124,11 @@ const CandidateTaskProgress = ({
     if (tasks.length === 0) return { startDate: null, endDate: null };
 
     const dates = tasks
-      .filter((task) => task.start_date && task.end_date)
-      .flatMap((task) => [new Date(task.start_date), new Date(task.end_date)]);
+      .filter((task) => task.taskStartDate && task.taskEndDate)
+      .flatMap((task) => [
+        new Date(task.taskStartDate),
+        new Date(task.taskEndDate),
+      ]);
 
     if (dates.length === 0) return { startDate: null, endDate: null };
 
@@ -387,7 +390,7 @@ const UnitDashboard = () => {
       case "not_shortlisted":
         return "Not Shortlisted";
       case "interviewed":
-        return "Interview Scheduled";
+        return "interviewed";
       case "hired":
         return "Hired";
       default:
@@ -408,7 +411,7 @@ const UnitDashboard = () => {
     if (filterStatuses.length === 1) {
       const labels: Record<string, string> = {
         shortlisted: "Shortlisted",
-        interviewed: "Interview Scheduled",
+        interviewed: "interviewed",
         not_shortlisted: "Not Shortlisted",
         hired: "Hired",
         applied: "Applied",
@@ -493,9 +496,7 @@ const UnitDashboard = () => {
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs sm:text-sm font-medium">
-                    Interview Scheduled
-                  </p>
+                  <p className="text-xs sm:text-sm font-medium">interviewed</p>
                   {dashboardLoading ? (
                     <Skeleton className="h-8 sm:h-10 w-12 sm:w-16 my-1" />
                   ) : (
@@ -607,7 +608,7 @@ const UnitDashboard = () => {
                   {[
                     "applied",
                     "shortlisted",
-                    "interview scheduled",
+                    "interviewed",
                     "not_shortlisted",
                     "hired",
                   ].map((status) => (

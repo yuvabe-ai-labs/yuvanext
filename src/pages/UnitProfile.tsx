@@ -117,11 +117,12 @@ const UnitProfile = () => {
   };
 
   // 2. Remove Social Link (Filter Array)
-  const handleRemoveSocialLink = (idToDelete: string) => {
-    const currentLinks = profile?.socialLinks || [];
-    // Filter out the link with the matching ID (or platform if ID is missing)
-    const updatedLinks = currentLinks.filter((l) => l.id !== idToDelete);
-
+  const handleRemoveSocialLink = (identifier: string) => {
+    const currentLinks = (profile?.socialLinks || []) as SocialLink[];
+    const updatedLinks = currentLinks.filter((l) => {
+      const itemIdentifier = l.id || l.platform;
+      return itemIdentifier !== identifier;
+    });
     performOptimisticUpdate({ socialLinks: updatedLinks });
   };
 
@@ -594,7 +595,6 @@ const UnitProfile = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          // Fix: Use link.id which is safe with array structure
                           onClick={() =>
                             handleRemoveSocialLink(link.id || link.platform)
                           }

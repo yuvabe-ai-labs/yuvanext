@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -23,11 +23,11 @@ import {
   socialLinkSchema,
   SocialLinksFormValues,
 } from "@/lib/unitDialogSchemas";
-import { Link } from "@/types/profiles.types";
+import { SocialLink } from "@/types/profiles.types";
 
 interface UnitSocialLinksDialogProps {
-  onSave: (links: Link[]) => void;
-  currentLinks: Link[];
+  onSave: (links: SocialLink[]) => void;
+  currentLinks: SocialLink[];
   children: React.ReactNode;
 }
 
@@ -49,32 +49,33 @@ export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
 
-  // Initialize Hook Form
   const {
     control,
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<SocialLinksFormValues>({
     resolver: zodResolver(socialLinkSchema),
     defaultValues: {
       links: currentLinks || [],
     },
-    // Sync with props when dialog re-opens
-    values: {
-      links: currentLinks || [],
-    },
   });
 
-  // Use Field Array for Dynamic List
+  useEffect(() => {
+    if (open) {
+      reset({ links: currentLinks || [] });
+    }
+  }, [open, currentLinks, reset]);
+
   const { fields, append, remove } = useFieldArray({
     control,
     name: "links",
   });
 
   const onSubmit = (data: SocialLinksFormValues) => {
-    // Map to Link[] type (matching API structure)
-    const formattedLinks: Link[] = data.links.map((link) => ({
+    const formattedLinks: SocialLink[] = data.links.map((link) => ({
+      id: link.id,
       platform: link.platform,
       url: link.url,
     }));
@@ -82,9 +83,6 @@ export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
     onSave(formattedLinks);
     setOpen(false);
   };
-
-  const getPlatformLabel = (value: string) =>
-    PLATFORM_OPTIONS.find((opt) => opt.value === value)?.label || value;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -98,7 +96,6 @@ export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mt-2">
-          {/* List of Links */}
           <div className="space-y-4">
             {fields.map((field, index) => (
               <div
@@ -167,7 +164,6 @@ export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
             ))}
           </div>
 
-          {/* Empty State */}
           {fields.length === 0 && (
             <div className="text-center py-8 border-2 border-dashed rounded-xl text-muted-foreground text-sm">
               No social links added yet.
@@ -178,7 +174,13 @@ export const UnitSocialLinksDialog: React.FC<UnitSocialLinksDialogProps> = ({
           <Button
             type="button"
             variant="outline"
-            onClick={() => append({ platform: "", url: "" })}
+            onClick={() =>
+              append({
+                platform: "",
+                url: "",
+                id: `temp-${Date.now()}`,
+              })
+            }
             className="w-full border-dashed gap-2"
           >
             <Plus className="w-4 h-4" /> Add Social Link

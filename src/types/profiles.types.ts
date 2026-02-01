@@ -17,10 +17,10 @@ export enum MaritalStatus {
   PREFER_NOT_TO_SAY = "prefer_not_to_say",
 }
 
-// --- Shared Sub-Types ---
-
 export interface SocialLink {
-  [platform: string]: string;
+  id?: string;
+  platform: string;
+  url: string;
 }
 
 export interface Link {

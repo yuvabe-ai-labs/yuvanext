@@ -331,7 +331,7 @@ const CandidateProfile = () => {
         <div className="flex items-center justify-between mb-6">
           <Button
             variant="ghost"
-            onClick={() => navigate("/unit-dashboard")}
+            onClick={() => navigate(-1)}
             className="gap-2 flex items-center"
           >
             <ArrowLeft className="w-4 h-4" /> Back

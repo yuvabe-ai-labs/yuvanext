@@ -8,13 +8,13 @@ export enum UserRole {
 export enum Gender {
   MALE = "male",
   FEMALE = "female",
-  PREFER_NOT_SAY = "prefer_not_to_say",
+  OTHER = "other",
 }
 
 export enum MaritalStatus {
   SINGLE = "single",
   MARRIED = "married",
-  PREFER_NOT_TO_SAY = "prefer_not_to_say",
+  PREFER_NOT_TO_SAY = "prefer not to say",
 }
 
 export interface SocialLink {
@@ -64,13 +64,16 @@ export interface CandidateProject {
   id?: string;
   title?: string;
   name?: string;
-  client_name?: string;
+  clientName?: string;
   description?: string;
   start_date?: string;
   end_date?: string;
   is_current?: boolean;
   technologies?: string[];
   project_url?: string;
+  projectName?: string;
+  status?: string;
+  completionDate: string;
 }
 
 export interface CandidateCourse {

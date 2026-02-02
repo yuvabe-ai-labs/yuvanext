@@ -90,7 +90,7 @@ const Chatbot = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingMessage]);
+  }, [messages.length, streamingMessage]);
 
   useEffect(() => {
     if (onboardingCompleted) {
@@ -117,7 +117,7 @@ const Chatbot = () => {
     } else {
       setMessages(updatedMessages);
     }
-  }, [chatMessages, initialGreetingSent, messages]);
+  }, [chatMessages, initialGreetingSent]);
 
   const startChat = async () => {
     setShowChat(true);
@@ -156,26 +156,30 @@ const Chatbot = () => {
     }
   };
 
-  const getQuestionType = (options?: string[] | null) => {
-    if (!options || options.length === 0) return "single";
+  const getQuestionType = (message: Message) => {
+    if (!message.options || message.options.length === 0) return "single";
+
+    if (message.fieldType === "multiselect") return "multi";
+
+    // Fallback keyword check
     const multiSelectKeywords = [
       "select all",
       "choose multiple",
       "pick all",
       "multiple",
     ];
-    const hasMultiKeyword = options.some((opt) =>
+    const hasMultiKeyword = message.options.some((opt) =>
       multiSelectKeywords.some((keyword) =>
         opt.toLowerCase().includes(keyword),
       ),
     );
-    return hasMultiKeyword || options.length > 7 ? "multi" : "single";
+    return hasMultiKeyword || message.options.length > 7 ? "multi" : "single";
   };
 
   useEffect(() => {
     const lastMsg = messages[messages.length - 1];
     if (lastMsg?.role === "assistant" && lastMsg?.options) {
-      const questionType = getQuestionType(lastMsg.options);
+      const questionType = getQuestionType(lastMsg);
       setIsMultiSelect(questionType === "multi");
       setSelectedOptions([]);
     }
@@ -422,10 +426,9 @@ const Chatbot = () => {
 
         <div
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto mb-4 px-2 flex flex-col scrollbar-none"
+          className="flex-1 scrollbar-none overflow-y-auto mb-4 px-2 flex flex-col select-text"
         >
-          <div className="flex-1"></div>
-          <div className="space-y-4">
+          <div className="space-y-4 mt-auto">
             {messages.map((message, index) => (
               <div
                 key={message.id}
@@ -445,15 +448,15 @@ const Chatbot = () => {
                   )}
                   <div className="flex flex-col w-full">
                     <Card
-                      className={`p-3 rounded-3xl border ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-transparent border-blue-500 text-blue-600"}`}
+                      className={`p-3 rounded-3xl border select-text ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-transparent border-blue-500 text-blue-600"}`}
                     >
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                      <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                         {renderMessageContent(message.content)}
-                      </p>
+                      </div>
                       {message.question && (
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words mt-2">
+                        <div className="text-sm leading-relaxed whitespace-pre-wrap break-words mt-2">
                           {renderMessageContent(message.question)}
-                        </p>
+                        </div>
                       )}
                     </Card>
 
@@ -483,11 +486,11 @@ const Chatbot = () => {
                     />
                   </div>
                   <div className="flex flex-col w-full">
-                    <Card className="p-3 rounded-3xl border bg-transparent border-blue-500 text-blue-600">
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                    <Card className="p-3 rounded-3xl border bg-transparent border-blue-500 text-blue-600 select-text">
+                      <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                         {renderMessageContent(streamingMessage)}
                         <span className="inline-block w-1.5 h-4 bg-blue-600 ml-1 animate-pulse align-middle"></span>
-                      </p>
+                      </div>
                     </Card>
                   </div>
                 </div>
@@ -521,7 +524,7 @@ const Chatbot = () => {
               </div>
             )}
           </div>
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} className="h-2" />
         </div>
 
         <div className="mt-4">

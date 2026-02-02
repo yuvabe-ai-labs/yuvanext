@@ -84,7 +84,6 @@ export default function ViewTaskModal({
         taskId: task.taskId,
         payload: {
           status: TaskStatus.ACCEPTED,
-          reviewRemarks: data.remarks?.trim() || null,
         },
       });
 

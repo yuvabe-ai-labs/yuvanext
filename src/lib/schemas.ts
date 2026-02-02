@@ -85,13 +85,12 @@ export const updateTaskSchema = z
     note: z.string().min(1, "Note is required").trim(),
     submissionLink: z
       .string()
-      .transform((val) => val.trim())
-      .refine(
-        (val) => val === "" || /^https?:\/\/.+/.test(val),
+      .trim()
+      .min(1, "Submission link is required")
+      .regex(
+        /^https?:\/\/.+/,
         "Please enter a valid URL starting with http:// or https://",
-      )
-      .optional()
-      .or(z.literal("")),
+      ),
   })
   .refine(
     (data) => {
@@ -100,10 +99,7 @@ export const updateTaskSchema = z
       }
       return true;
     },
-    {
-      message: "Due date cannot be before start date",
-      path: ["endDate"],
-    },
+    { message: "Due date cannot be before start date", path: ["endDate"] },
   );
 
 export const courseSchema = z.object({
@@ -111,7 +107,7 @@ export const courseSchema = z.object({
   provider: z.string().min(1, "Provider is required"),
   completion_date: z.string().min(1, "Completion date is required"),
   certificate_url: z.string().url().optional().or(z.literal("")),
-}); 
+});
 
 export const educationSchema = z
   .object({
@@ -155,7 +151,7 @@ export const internshipSchema = z
     {
       message: "End date is required for completed internships",
       path: ["end_date"],
-    }
+    },
   )
   .refine(
     (data) => {
@@ -165,7 +161,7 @@ export const internshipSchema = z
     {
       message: "End date must be after the start date",
       path: ["end_date"],
-    }
+    },
   );
 
 export const personalDetailsSchema = z.object({
@@ -175,18 +171,34 @@ export const personalDetailsSchema = z.object({
   phone: z.string().optional().or(z.literal("")),
   location: z.string().optional().or(z.literal("")),
   gender: z.nativeEnum(Gender).optional(),
-  marital_status: z.nativeEnum(MaritalStatus).optional(),
+  marital_status: z
+    .nativeEnum(MaritalStatus, {
+      errorMap: (issue, _ctx) => {
+        switch (issue.code) {
+          case "invalid_enum_value":
+          case "invalid_type":
+            return { message: "Please select a marital status" };
+          default:
+            return { message: "Invalid selection" };
+        }
+      },
+    })
+    .optional(),
   birth_date: z.string().optional(),
   birth_month: z.string().optional(),
   birth_year: z.string().optional(),
   is_differently_abled: z.boolean().optional(),
   has_career_break: z.boolean().optional(),
-  language: z.array(z.object({
-    name: z.string().min(1, "Please select a language"),
-    read: z.boolean(),
-    write: z.boolean(),
-    speak: z.boolean(),
-  })).default([]),
+  language: z
+    .array(
+      z.object({
+        name: z.string().min(1, "Please select a language"),
+        read: z.boolean(),
+        write: z.boolean(),
+        speak: z.boolean(),
+      }),
+    )
+    .default([]),
 });
 
 export const summarySchema = z.object({
@@ -200,7 +212,9 @@ export const projectSchema = z
   .object({
     title: z.string().min(1, "Title is required"),
     description: z.string().min(1, "Description is required"),
-    technologies: z.array(z.object({ value: z.string().min(1) })).min(1, "At least one technology is required"),
+    technologies: z
+      .array(z.object({ value: z.string().min(1) }))
+      .min(1, "At least one technology is required"),
     start_date: z.string().min(1, "Start date is required"), // Start date is now a dependency
     completionDate: z.string().optional().or(z.literal("")),
     projectUrl: z.string().url().optional().or(z.literal("")),
@@ -208,25 +222,29 @@ export const projectSchema = z
   })
   .refine(
     (data) => {
-      if (!data.is_current && (!data.completionDate || data.completionDate === "")) {
+      if (
+        !data.is_current &&
+        (!data.completionDate || data.completionDate === "")
+      ) {
         return false;
       }
       return true;
     },
     {
       message: "End date is required if project is completed",
-      path: ["completionDate"], 
-    }
+      path: ["completionDate"],
+    },
   )
   .refine(
     (data) => {
-      if (data.is_current || !data.completionDate || !data.start_date) return true;
+      if (data.is_current || !data.completionDate || !data.start_date)
+        return true;
       return new Date(data.completionDate) >= new Date(data.start_date);
     },
     {
       message: "End date cannot be before start date",
       path: ["completionDate"],
-    }
+    },
   );
 
 export const acceptInvitationSchema = z.object({
@@ -236,7 +254,10 @@ export const acceptInvitationSchema = z.object({
     .regex(/[a-z]/, "Password must contain at least one lowercase character")
     .regex(/[A-Z]/, "Password must contain at least one uppercase character")
     .regex(/\d/, "Password must contain at least one number")
-    .regex(/[!@#$%^&*(),.?":{}|<>]/, "Password must contain at least one special character"),
+    .regex(
+      /[!@#$%^&*(),.?":{}|<>]/,
+      "Password must contain at least one special character",
+    ),
 });
 
 export const interestsSchema = z.object({

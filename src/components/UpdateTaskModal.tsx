@@ -81,9 +81,8 @@ export default function UpdateTaskModal({
 
   const onSubmit = async (data: UpdateTaskFormData) => {
     try {
-      const newStatus = data.submissionLink?.trim()
-        ? TaskStatus.SUBMITTED
-        : task.taskStatus;
+      // Since it's now required, we can assume it will be present and valid
+      const newStatus = TaskStatus.SUBMITTED;
 
       const payload: UpdateTaskPayload = {
         title: task.taskTitle,
@@ -93,7 +92,7 @@ export default function UpdateTaskModal({
         endTime: data.endTime,
         color: data.color,
         description: data.note,
-        submissionLink: data.submissionLink?.trim() || null,
+        submissionLink: data.submissionLink.trim(),
         status: newStatus,
       };
 
@@ -102,11 +101,7 @@ export default function UpdateTaskModal({
         payload,
       });
 
-      toast.success(
-        newStatus === TaskStatus.SUBMITTED
-          ? "Task submitted successfully!"
-          : "Task updated successfully",
-      );
+      toast.success("Task submitted successfully!");
       onClose();
     } catch (error) {
       toast.error("Failed to update task. Please try again.");
@@ -326,7 +321,9 @@ export default function UpdateTaskModal({
                 name="submissionLink"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Submission Link (Optional)</FormLabel>
+                    <FormLabel>
+                      Submission Link <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Input
                         type="url"

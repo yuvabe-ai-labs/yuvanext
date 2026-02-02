@@ -139,7 +139,7 @@ const Dashboard = () => {
                             key={internship.id}
                             className={`${colors[idx % colors.length]} flex-shrink-0 w-[85%] md:w-[calc(40%-16px)] snap-start shadow-sm hover:shadow-md transition-shadow cursor-pointer rounded-xl`}
                             onClick={() =>
-                              navigate(`/internships/${internship.id}`)
+                              navigate(`/recommended-internships?id=${internship.id}`)
                             }
                           >
                             <CardHeader className="pb-2.5">

@@ -65,12 +65,41 @@ const SignIn = () => {
         variant: "destructive",
       });
     } else {
+      // --- LOGIC CHANGE STARTS HERE ---
+      const userRole = authData?.user?.role;
+      const currentRouteRole = role; // Comes from useParams
+
+      // Scenario 1: User is on the UNIT login page, but logged in as a CANDIDATE
+      if (currentRouteRole === "unit" && userRole !== "unit") {
+        await authClient.signOut(); // Important: Kill the session immediately
+        toast({
+          title: "Access Denied",
+          description:
+            "This is the Unit login portal. Please use the Candidate login.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Scenario 2: User is on the CANDIDATE login page, but logged in as a UNIT
+      if (currentRouteRole !== "unit" && userRole === "unit") {
+        await authClient.signOut(); // Important: Kill the session immediately
+        toast({
+          title: "Access Denied",
+          description:
+            "You are a Unit account. Please sign in via the Unit portal.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // If checks pass, proceed with success logic
       toast({
         title: "Welcome back!",
         description: "You have successfully signed in.",
       });
-
-      const userRole = authData?.user?.role;
 
       if (userRole === "unit") {
         navigate("/unit-dashboard");

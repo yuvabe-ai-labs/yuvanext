@@ -357,9 +357,9 @@ const AllApplications = () => {
                           {/* Avatar with colored ring based on match score */}
                           <div className="relative flex-shrink-0">
                             <Avatar
-                              className={`w-20 h-20 ring-4 ${getMatchColor(
-                                matchScore
-                              )}`}
+                              className={`w-20 h-20 ring-4 
+                                ring-green-500
+                              `}
                             >
                               <AvatarImage
                                 src={candidate?.avatarUrl || undefined}

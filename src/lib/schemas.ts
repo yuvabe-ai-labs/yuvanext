@@ -198,9 +198,9 @@ export const summarySchema = z.object({
 
 export const projectSchema = z
   .object({
-    projectName: z.string().min(1, "Title is required"),
+    title: z.string().min(1, "Title is required"),
     description: z.string().min(1, "Description is required"),
-    technologies: z.array(z.string()).min(1, "At least one technology is required"),
+    technologies: z.array(z.object({ value: z.string().min(1) })).min(1, "At least one technology is required"),
     start_date: z.string().min(1, "Start date is required"), // Start date is now a dependency
     completionDate: z.string().optional().or(z.literal("")),
     projectUrl: z.string().url().optional().or(z.literal("")),

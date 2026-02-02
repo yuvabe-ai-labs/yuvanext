@@ -7,29 +7,39 @@ import signinLogo from "@/assets/signinLogo.svg";
 import { Eye, EyeOff } from "lucide-react";
 import { Arrow } from "@/components/ui/custom-icons";
 import unitIllustration from "@/assets/unit_illstration.png";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { SignInFormValues, signInSchema } from "@/lib/authentication";
 
 const SignIn = () => {
-  const { role } = useParams<{ role: string }>(); // This is the role from URL, e.g., /auth/unit/signin
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
+  const { role } = useParams<{ role: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [keepLoggedIn, setKeepLoggedIn] = useState(false);
 
-  const illustrationText =
-    role === "unit"
-      ? "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role’s requirements."
-      : "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
+  // 3. Initialize React Hook Form
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<SignInFormValues>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // 4. Submit Handler
+  const onSubmit = async (data: SignInFormValues) => {
     setLoading(true);
 
-    const { data, error } = await authClient.signIn.email({
-      email: email,
-      password: password,
+    const { data: authData, error } = await authClient.signIn.email({
+      email: data.email,
+      password: data.password,
       rememberMe: keepLoggedIn,
     });
 
@@ -60,7 +70,7 @@ const SignIn = () => {
         description: "You have successfully signed in.",
       });
 
-      const userRole = data?.user?.role;
+      const userRole = authData?.user?.role;
 
       if (userRole === "unit") {
         navigate("/unit-dashboard");
@@ -72,58 +82,55 @@ const SignIn = () => {
     setLoading(false);
   };
 
-  const handleOAuthSignIn = async (provider: "google" | "apple") => {
-    setLoading(true);
-    if (role) localStorage.setItem("pendingRole", role);
-
-    const { data, error } = await authClient.signIn.social({
-      provider: provider,
-      callbackURL: "/dashboard",
-    });
-
-    if (error) {
-      localStorage.removeItem("pendingRole");
-      toast({
-        title: "Sign in failed",
-        description:
-          error.message || "Authentication failed. Please try again.",
-        variant: "destructive",
-      });
-    }
-    setLoading(false);
-  };
+  // Helper for UI
+  const illustrationText =
+    role === "unit"
+      ? "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role’s requirements."
+      : "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
 
   return (
     <div className="min-h-screen bg-white flex">
       {/* Left Side - Illustration */}
       <div className="hidden lg:flex w-[41%] h-screen relative p-4">
-        <div className="w-full h-full rounded-3xl overflow-hidden relative">
+        <div className="w-full h-full rounded-3xl overflow-hidden relative flex flex-col items-center justify-center">
+          {/* Background Image */}
           <img
             src={signupIllustrate}
             alt="Signin Illustration"
-            className="w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover"
           />
 
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-8">
-            <img src={signinLogo} alt="Sign in Logo" className="w-32 h-auto" />
+          {/* Content Overlay */}
+          <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-6 px-8 w-full h-full">
+            {/* Logo */}
+            <img
+              src={signinLogo}
+              alt="Sign in Logo"
+              className="w-32 h-auto shrink-0"
+            />
 
             {role === "unit" && (
-              <div className="relative flex items-center justify-center p-6">
-                <Arrow className="absolute w-[650px] h-[650px] text-white opacity-95 bottom-10" />
+              <div className="relative flex items-center justify-center p-2 w-full shrink-1">
+                {/* FIX 1: Responsive Arrow sizing */}
+                <Arrow className="absolute w-[80%] h-auto max-h-[50vh] text-white opacity-95 bottom-0" />
+
+                {/* FIX 2: Responsive Image height (max-h-[40vh]) */}
                 <img
                   src={unitIllustration}
                   alt="Unit Illustration"
-                  className="relative z-10 w-[450px] h-[450px] object-contain"
+                  className="relative z-10 w-auto h-auto max-h-[30vh] lg:max-h-[40vh] object-contain"
                 />
               </div>
             )}
 
-            <p className="text-white text-base font-medium max-w-xl leading-relaxed">
+            {/* Text */}
+            <p className="text-white text-base font-medium max-w-xl leading-relaxed shrink-0">
               {illustrationText}
             </p>
           </div>
 
-          <div className="absolute bottom-4 left-0 right-0 flex justify-between px-6 text-white/80 text-xs">
+          {/* Footer Link */}
+          <div className="absolute bottom-4 left-0 right-0 flex justify-between px-6 text-white/80 text-xs z-20">
             <a
               href="https://www.yuvanext.com/privacy-policy"
               target="_blank"
@@ -163,7 +170,9 @@ const SignIn = () => {
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Form Connected to RHF */}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {/* Email */}
               <div>
                 <label
                   htmlFor="email"
@@ -172,20 +181,28 @@ const SignIn = () => {
                 >
                   Email Address *
                 </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
+                <div
+                  className={`border rounded-lg h-8 px-4 py-4 flex items-center ${
+                    errors.email ? "border-red-500" : "border-[#D1D5DB]"
+                  }`}
+                >
                   <input
                     id="email"
                     type="email"
                     placeholder="Enter email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    {...register("email")}
                     className="w-full text-[13px] outline-none bg-transparent placeholder-[#D1D5DB]"
-                    required
                     disabled={loading}
                   />
                 </div>
+                {errors.email && (
+                  <p className="text-red-500 text-[10px] mt-1">
+                    {errors.email.message}
+                  </p>
+                )}
               </div>
 
+              {/* Password */}
               <div>
                 <label
                   htmlFor="password"
@@ -194,15 +211,17 @@ const SignIn = () => {
                 >
                   Password *
                 </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center gap-2">
+                <div
+                  className={`border rounded-lg h-8 px-4 py-4 flex items-center gap-2 ${
+                    errors.password ? "border-red-500" : "border-[#D1D5DB]"
+                  }`}
+                >
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    {...register("password")}
                     className="w-full text-[13px] outline-none bg-transparent placeholder-[#D1D5DB]"
-                    required
                     disabled={loading}
                   />
                   <button
@@ -214,8 +233,14 @@ const SignIn = () => {
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
+                {errors.password && (
+                  <p className="text-red-500 text-[10px] mt-1">
+                    {errors.password.message}
+                  </p>
+                )}
               </div>
 
+              {/* Keep Logged In & Forgot Password */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <input

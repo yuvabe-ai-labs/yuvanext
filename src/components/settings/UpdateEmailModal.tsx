@@ -73,9 +73,7 @@ export default function UpdateEmailModal({
       // The email will NOT change until the link in that email is clicked.
       const { error: changeError } = await authClient.changeEmail({
         newEmail: data.newEmail,
-        callbackURL: `${
-          import.meta.env.VITE_BETTER_AUTH_REDIRECT_URL
-        }/settings`,
+        callbackURL: `${import.meta.env.VITE_FRONTEND_URL}/settings`,
       });
 
       if (changeError) {

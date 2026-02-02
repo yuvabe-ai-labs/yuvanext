@@ -22,18 +22,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 // RHF Imports
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import axiosInstance from "@/config/platform-api";
 import { useToast } from "@/hooks/use-toast";
 import { X, Sparkles, ChevronDown, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
-// Schema & Hooks
+// 1. IMPORT HOOKS
+import { useUpdateInternship } from "@/hooks/useInternships";
+import { useGenerateContent } from "@/hooks/useAI"; // Added this
+import type { Internship } from "@/types/internships.types";
+import { AISectionType } from "@/types/ai.types"; // Added this
+
+// Schema
 import {
   internshipSchema,
   type InternshipFormValues,
 } from "@/lib/EditInternshipDialogSchema";
-import { useUpdateInternship } from "@/hooks/useInternships";
-import type { Internship } from "@/types/internships.types";
 
 interface EditInternshipDialogProps {
   isOpen: boolean;
@@ -69,12 +72,14 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
   internship,
 }) => {
   const { toast } = useToast();
+
+  // Hooks
   const updateInternshipMutation = useUpdateInternship();
+  const generateContentMutation = useGenerateContent(); // Use the correct AI hook
 
   const [aiLoading, setAiLoading] = useState<string | null>(null);
-  const [conversationHistory, setConversationHistory] = useState<
-    { role: string; content: string }[]
-  >([]);
+
+  // Removed conversationHistory state as it's not needed for the new endpoint
 
   // Date Picker Local State (UI Only)
   const [selectedDate, setSelectedDate] = useState("");
@@ -174,11 +179,9 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
   // --- POPULATE FORM ---
   useEffect(() => {
     if (internship && isOpen) {
-      // Helper to handle array vs string
       const joinArray = (val: string[] | string | undefined) =>
         Array.isArray(val) ? val.join("\n") : val || "";
 
-      // Handle Language Transformation (Backend string[] vs Frontend object[])
       let languageReqs = [
         { language: "", read: false, write: false, speak: false },
       ];
@@ -188,7 +191,6 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
         internship.language.length > 0
       ) {
         if (typeof internship.language[0] === "string") {
-          // Legacy: ["English", "Tamil"]
           languageReqs = internship.language.map((lang) => ({
             language: lang,
             read: true,
@@ -196,12 +198,10 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
             speak: true,
           }));
         } else {
-          // Modern: Object structure
           languageReqs = internship.language;
         }
       }
 
-      // Handle Date
       const closingDateVal = internship.closingDate;
       if (closingDateVal) {
         const deadline = new Date(closingDateVal);
@@ -287,7 +287,6 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
           onClose();
         },
         onError: (error: unknown) => {
-          // Type guard for error response
           const err = error as {
             response?: {
               data?: {
@@ -310,81 +309,75 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
     );
   };
 
-  // --- AI ASSIST ---
+  // --- AI ASSIST (FIXED) ---
+  // Using the logic from CreateInternshipDialog that calls useGenerateContent
   const handleAIAssist = async (fieldName: keyof InternshipFormValues) => {
+    if (!jobTitle) {
+      toast({ title: "Please enter a Job Role first", variant: "destructive" });
+      return;
+    }
+
     setAiLoading(fieldName as string);
 
+    let section: AISectionType | null = null;
+
+    // Map form fields to API section types
+    switch (fieldName) {
+      case "description":
+        section = "about";
+        break;
+      case "responsibilities":
+        section = "key_responsibilities";
+        break;
+      case "benefits":
+        section = "what_you_will_get";
+        break;
+      case "skills_required":
+        section = "skills_required";
+        break;
+    }
+
+    if (!section) {
+      setAiLoading(null);
+      return;
+    }
+
     try {
-      const currentValue = watch(fieldName) as string;
-      const jobTitle = watch("title") || "this position";
-      let prompt = "";
-
-      // Prompt Logic
-      switch (fieldName) {
-        case "description":
-          prompt = `Write a single, concise, professional paragraph describing a ${jobTitle} internship. Avoid introductions. Focus on the role.`;
-          break;
-        case "responsibilities":
-          prompt = `Write 5-7 key responsibilities for a ${jobTitle} internship. One per line.`;
-          break;
-        case "benefits":
-          prompt = `List 4-6 post-internship benefits for ${jobTitle}. One per line.`;
-          break;
-        case "skills_required":
-          prompt = `List 5-8 essential skills for ${jobTitle}. One per line.`;
-          break;
-        default:
-          prompt = `Improve this text: ${currentValue}`;
-      }
-
-      const updatedHistory = [
-        ...conversationHistory,
-        { role: "user", content: prompt },
-      ];
-      setConversationHistory(updatedHistory);
-
-      const { data: aiResponse } = await axiosInstance.post("/chatbot", {
-        message: prompt,
-        history: updatedHistory,
-        userRole: "jd_generation",
+      // Call the correct AI endpoint via hook
+      const result = await generateContentMutation.mutateAsync({
+        title: jobTitle,
+        sections: [section],
       });
 
-      if (aiResponse?.response) {
-        let cleanResponse = aiResponse.response
-          .replace(/\*\*/g, "")
-          .replace(/^#+\s/gm, "")
-          .replace(/^(here('|'|'s)|sure|of course|okay|let'?s).*\n/i, "")
-          .trim();
+      let contentToSet = "";
 
-        if (fieldName === "description") {
-          cleanResponse = cleanResponse.split(/\n\s*\n/)[0].trim();
-        }
-        if (
-          ["responsibilities", "benefits", "skills_required"].includes(
-            fieldName
-          )
-        ) {
-          cleanResponse = cleanResponse
-            .split(/\n+/)
-            .map((line: string) => line.replace(/^[-•\d.]\s*/, "").trim())
-            .filter((l: string) => l.length > 0)
-            .join("\n");
-        }
+      // Parse the structured response
+      if (section === "about" && result.about) {
+        contentToSet = result.about;
+      } else if (
+        section === "key_responsibilities" &&
+        result.key_responsibilities
+      ) {
+        contentToSet = result.key_responsibilities
+          .map((item) => `• ${item}`)
+          .join("\n");
+      } else if (section === "what_you_will_get" && result.what_you_will_get) {
+        contentToSet = result.what_you_will_get
+          .map((item) => `• ${item}`)
+          .join("\n");
+      } else if (section === "skills_required" && result.skills_required) {
+        contentToSet = result.skills_required.join("\n");
+      }
 
-        // We know these fields are strings in our schema
-        setValue(fieldName, cleanResponse, { shouldValidate: true });
-
-        setConversationHistory((prev) => [
-          ...prev,
-          { role: "ai", content: cleanResponse },
-        ]);
+      if (contentToSet) {
+        setValue(fieldName, contentToSet, { shouldValidate: true });
         toast({ title: "AI Suggestion Applied" });
       }
     } catch (error) {
-      console.error("AI Assist error:", error);
+      console.error("AI Generation failed:", error);
       toast({
-        title: "AI Assist Failed",
-        description: "Please try again.",
+        title: "AI Generation Failed",
+        description: "Could not generate content. Please try again.",
         variant: "destructive",
       });
     } finally {

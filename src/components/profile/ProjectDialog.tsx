@@ -57,7 +57,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
   const form = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
-      projectName: project?.title || project?.name || "",
+      title: project?.title ||"",
       description: project?.description || "",
       technologies: (project?.technologies || []).map((t) => ({ value: t })),
       completionDate: project?.end_date !== "Present" ? project?.end_date : "",
@@ -140,7 +140,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="projectName"
+              name="title"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Project Title *</FormLabel>

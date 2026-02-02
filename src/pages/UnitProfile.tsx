@@ -49,7 +49,7 @@ import { type ProjectFormValues } from "@/lib/unitDialogSchemas";
 const UnitProfile = () => {
   const { data: session } = useSession();
   const user = session?.user;
-  const queryClient = useQueryClient(); // Initialize Query Client
+  const queryClient = useQueryClient();
 
   // 3. USE REACT QUERY HOOKS WITH TYPE
   const { data: profileData, isLoading, refetch } = useUnitProfile();
@@ -110,35 +110,20 @@ const UnitProfile = () => {
     performOptimisticUpdate({ projects: updatedProjects });
   };
 
-  // 1. Update Social Links (Convert Array -> Object for Backend)
+  // 1. Update Social Links (Pass Array Directly)
   const handleUpdateSocialLinks = (links: SocialLink[]) => {
-    // Convert the array back to the Object format the backend expects
-    // e.g. [{platform: 'linkedin', url: '...'}] -> { linkedin: '...' }
-    const socialLinksRecord = links.reduce((acc, curr) => {
-      if (curr.platform && curr.url) {
-        acc[curr.platform] = curr.url;
-      }
-      return acc;
-    }, {} as Record<string, string>);
-
-    performOptimisticUpdate({ socialLinks: socialLinksRecord });
+    // The backend now expects an array, so we just pass it through!
+    performOptimisticUpdate({ socialLinks: links });
   };
 
-  // 2. Remove Social Link (Handle Object Key Deletion)
-  const handleRemoveSocialLink = (platformId: string) => {
-    // Get current raw data (Object)
-    const currentLinksRecord = (profile?.socialLinks ||
-      {}) as unknown as Record<string, string>;
-
-    // Create new object without the deleted key
-    const updatedPayload = Object.keys(currentLinksRecord)
-      .filter((key) => key !== platformId)
-      .reduce((acc, key) => {
-        acc[key] = currentLinksRecord[key];
-        return acc;
-      }, {});
-
-    performOptimisticUpdate({ socialLinks: updatedPayload });
+  // 2. Remove Social Link (Filter Array)
+  const handleRemoveSocialLink = (identifier: string) => {
+    const currentLinks = (profile?.socialLinks || []) as SocialLink[];
+    const updatedLinks = currentLinks.filter((l) => {
+      const itemIdentifier = l.id || l.platform;
+      return itemIdentifier !== identifier;
+    });
+    performOptimisticUpdate({ socialLinks: updatedLinks });
   };
 
   const handleImageSuccess = () => {
@@ -151,25 +136,9 @@ const UnitProfile = () => {
   const glimpseUrl = profile?.galleryVideos || null;
   const profileScore = profile?.profileScore || 0;
 
-  // --- FIX: Parse Social Links (Object -> Array for UI) ---
-  const rawSocialLinks = profile?.socialLinks;
-  let socialLinks: SocialLink[] = [];
-
-  if (rawSocialLinks) {
-    // If backend returns Object: { linkedin: "url", facebook: "url" }
-    if (typeof rawSocialLinks === "object" && !Array.isArray(rawSocialLinks)) {
-      socialLinks = Object.entries(rawSocialLinks).map(([key, value]) => ({
-        id: key, // Use platform name as ID for deletion
-        platform: key,
-        url: String(value),
-      }));
-    }
-    // If backend happens to return Array (fallback)
-    else if (Array.isArray(rawSocialLinks)) {
-      socialLinks = rawSocialLinks;
-    }
-  }
-  // -------------------------------------------------------
+  // --- FIX: Direct Array Access (No Object Conversion Needed) ---
+  const socialLinks = profile?.socialLinks || [];
+  // -------------------------------------------------------------
 
   if (isLoading) {
     return (
@@ -626,8 +595,9 @@ const UnitProfile = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          // Use link.id which is mapped to platform name in our parsing logic
-                          onClick={() => handleRemoveSocialLink(link.id)}
+                          onClick={() =>
+                            handleRemoveSocialLink(link.id || link.platform)
+                          }
                           className="text-muted-foreground hover:text-destructive sm:justify-self-end self-end"
                         >
                           <Trash2 className="w-4 h-4" />

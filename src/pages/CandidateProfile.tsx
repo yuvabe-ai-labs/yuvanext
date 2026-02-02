@@ -70,6 +70,18 @@ const safeParse = <T,>(data: any, fallback: T): T => {
   }
 };
 
+// 1. Define Social Icons Map (Optimization)
+const SOCIAL_ICONS: Record<string, any> = {
+  linkedin: Linkedin,
+  instagram: Instagram,
+  facebook: Facebook,
+  twitter: Twitter,
+  x: Twitter,
+  youtube: Youtube,
+  dribbble: Dribbble,
+  behance: Palette,
+};
+
 const CandidateProfile = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -236,11 +248,20 @@ const CandidateProfile = () => {
     []
   );
 
-  // FIX: Robustly parse links (handling stringified JSON from DB)
-  const links = safeParse<SocialLink[]>(candidate.socialLinks, []);
+  const rawLinks = safeParse<SocialLink[]>(candidate.socialLinks, []);
+  const links = Array.isArray(rawLinks) ? rawLinks : [];
 
   const matchScore = application.profileScore || 0;
   const dialogContent = pendingStatus ? getDialogContent(pendingStatus) : null;
+
+  // 2. Updated Helper function for social icons
+  const getSocialIcon = (platformStr: string, urlStr: string) => {
+    const textToCheck = `${platformStr || ""} ${urlStr || ""}`.toLowerCase();
+    const matchedKey = Object.keys(SOCIAL_ICONS).find((key) =>
+      textToCheck.includes(key)
+    );
+    return matchedKey ? SOCIAL_ICONS[matchedKey] : Globe;
+  };
 
   const handleGeneratePDF = async () => {
     if (!profileRef.current) return;
@@ -252,6 +273,8 @@ const CandidateProfile = () => {
         scale: 1.2,
         useCORS: true,
         allowTaint: true,
+        // 3. FIX: Ignore elements with the 'hide-on-pdf' class
+        ignoreElements: (element) => element.classList.contains("hide-on-pdf"),
       });
       const imgData = canvas.toDataURL("image/jpeg", 2.8);
       const pdf = new jsPDF("p", "mm", "a4");
@@ -299,29 +322,6 @@ const CandidateProfile = () => {
     }
   };
 
-  // Helper for icon resolution
-  const getSocialIcon = (platformStr: string) => {
-    const p = (platformStr || "").toLowerCase();
-
-    switch (p) {
-      case "linkedin":
-        return Linkedin;
-      case "instagram":
-        return Instagram;
-      case "facebook":
-        return Facebook;
-      case "twitter":
-        return Twitter;
-      case "youtube":
-        return Youtube;
-      case "dribbble":
-        return Dribbble;
-      case "behance":
-        return Palette;
-    }
-    return Globe;
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -331,7 +331,7 @@ const CandidateProfile = () => {
         <div className="flex items-center justify-between mb-6">
           <Button
             variant="ghost"
-            onClick={() => navigate("/unit-dashboard")}
+            onClick={() => navigate(-1)}
             className="gap-2 flex items-center"
           >
             <ArrowLeft className="w-4 h-4" /> Back
@@ -416,7 +416,8 @@ const CandidateProfile = () => {
                     )}
                   </div>
 
-                  <div className={`flex items-center gap-3 `}>
+                  {/* 4. FIX: Added 'hide-on-pdf' class to this container */}
+                  <div className="flex items-center gap-3 hide-on-pdf">
                     <Button
                       onClick={handleGeneratePDF}
                       disabled={isPdfLoading}
@@ -807,12 +808,11 @@ const CandidateProfile = () => {
                 <CardContent className="p-6">
                   <h3 className="text-2xl font-bold mb-4">Links</h3>
                   <div className="flex flex-wrap gap-3 items-center">
-                    {/* FIX: Corrected ternary logic to show links if array is NOT empty */}
                     {links.length > 0 ? (
                       links.map((link, idx) => {
                         const platform = link.platform || "";
                         const url = link.url || "";
-                        const Icon = getSocialIcon(platform);
+                        const Icon = getSocialIcon(platform, url);
 
                         return (
                           <Button

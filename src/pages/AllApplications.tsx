@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,9 +21,7 @@ import { UnitApplication } from "@/types/unit.types";
 const AllApplications = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredApplications, setFilteredApplications] = useState<
-    UnitApplication[]
-  >([]);
+  // REMOVED: filteredApplications state (caused the loop)
   const [displayCount, setDisplayCount] = useState(6);
   const [filters, setFilters] = useState({
     exact: false,
@@ -33,13 +31,17 @@ const AllApplications = () => {
   });
   const observerTarget = useRef(null);
 
-  // --- FIX: Correct Hook Usage based on UnitDashboard ---
   const {
     data: rawApplications,
     isLoading: loading,
     error,
   } = useUnitApplications();
-  const applications = (rawApplications || []) as UnitApplication[];
+
+  // Memoize the raw applications list to ensure stability
+  const applications = useMemo(
+    () => (rawApplications || []) as UnitApplication[],
+    [rawApplications]
+  );
 
   // Safe parse function
   const safeParse = (data, fallback) => {
@@ -51,9 +53,9 @@ const AllApplications = () => {
     }
   };
 
-  // Filter applications based on search query and match score filters
-  useEffect(() => {
-    if (!applications) return;
+  // --- FIX: REPLACED USEEFFECT WITH USEMEMO TO STOP LOOP ---
+  const filteredApplications = useMemo(() => {
+    if (!applications) return [];
 
     let filtered = applications;
 
@@ -89,10 +91,13 @@ const AllApplications = () => {
       });
     }
 
-    setFilteredApplications(filtered);
-    // Reset display count when filters change to ensure infinite scroll works correctly from top
-    setDisplayCount(6);
+    return filtered;
   }, [applications, searchQuery, filters]);
+
+  // Reset display count when filters change (Separate effect, no loop risk)
+  useEffect(() => {
+    setDisplayCount(6);
+  }, [searchQuery, filters]);
 
   // Infinite scroll
   const handleObserver = useCallback(
@@ -136,14 +141,22 @@ const AllApplications = () => {
     return diffDays;
   };
 
+  // --- FIX: UPDATED STATUS BADGE LOGIC ---
   const getStatusBadge = (status: string) => {
+    // Normalize status key: lowercase and replace spaces with underscores if needed
+    const normalizedStatus = (status || "").toLowerCase().replace(" ", "_");
+
     const statusConfig: Record<string, { label: string; className: string }> = {
       shortlisted: {
         label: "Shortlisted",
         className: "bg-green-100 text-green-700",
       },
       applied: { label: "Applied", className: "bg-orange-100 text-orange-700" },
-      rejected: { label: "Rejected", className: "bg-red-100 text-red-700" },
+      // Added handling for not_shortlisted / not shortlisted
+      not_shortlisted: {
+        label: "Not Shortlisted",
+        className: "bg-red-100 text-red-700",
+      },
       interviewed: {
         label: "Interviewed",
         className: "bg-blue-100 text-blue-700",
@@ -151,7 +164,12 @@ const AllApplications = () => {
       hired: { label: "Hired", className: "bg-purple-100 text-purple-700" },
     };
 
-    const config = statusConfig[status] || statusConfig.applied;
+    // Check for exact key match, or normalized match, or fallback to applied
+    const config =
+      statusConfig[status] ||
+      statusConfig[normalizedStatus] ||
+      statusConfig.applied;
+
     return (
       <Badge className={`text-xs ${config.className}`}>{config.label}</Badge>
     );

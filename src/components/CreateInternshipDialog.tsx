@@ -19,20 +19,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-// FIX: Imported useFieldArray
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { X, Sparkles, ChevronDown, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
-// 1. IMPORT HOOKS
 import { useCreateInternship } from "@/hooks/useInternships";
 import { useGenerateContent } from "@/hooks/useAI";
 import { authClient } from "@/lib/auth-client";
 import { AISectionType } from "@/types/ai.types";
 
-// 2. IMPORT SCHEMAS & TYPES
 import {
   createInternshipSchema,
   type InternshipFormValues,
@@ -78,13 +75,17 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
 
   const [aiLoadingField, setAiLoadingField] = useState<string | null>(null);
 
-  // Removed redundant useState for isPaidState, use watch() instead if needed for UI logic
+  // Date Picker Logic State
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
 
   const {
     control,
     handleSubmit,
     watch,
     setValue,
+    reset, // Added reset here
     formState: { errors, isValid },
   } = useForm<InternshipFormValues>({
     resolver: zodResolver(createInternshipSchema),
@@ -107,11 +108,37 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
     },
   });
 
-  // FIX: useFieldArray for dynamic language fields
   const { fields, append, remove } = useFieldArray({
     control,
     name: "language_requirements",
   });
+
+  // FIX 1: Reset form and manual states when Dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      // Reset react-hook-form fields to default
+      reset({
+        title: "",
+        duration: "",
+        isPaid: false,
+        payment: "",
+        description: "",
+        responsibilities: "",
+        benefits: "",
+        skills_required: "",
+        language_requirements: [
+          { language: "", read: false, write: false, speak: false },
+        ],
+        application_deadline: undefined,
+        min_age_required: undefined,
+        job_type: "full_time",
+      });
+      // Reset manual date states
+      setSelectedDate("");
+      setSelectedMonth("");
+      setSelectedYear("");
+    }
+  }, [isOpen, reset]);
 
   const jobTitle = watch("title");
   const isJobRoleFilled = jobTitle && jobTitle.trim().length > 0;
@@ -191,9 +218,7 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
       .filter((r) => r.trim());
     const benefitsArray = data.benefits.split("\n").filter((b) => b.trim());
 
-    // Simply map from form data
     const languageArray = data.language_requirements.map((l) => l.language);
-
     const paymentValue = data.isPaid && data.payment ? data.payment : "Unpaid";
 
     createInternshipMutation.mutate(
@@ -221,11 +246,7 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
     );
   };
 
-  // Date Picker Logic
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("");
-  const [selectedYear, setSelectedYear] = useState("");
-
+  // Date Picker Helpers
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
@@ -713,7 +734,6 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
                 Language Proficiency <span className="text-destructive">*</span>
               </Label>
 
-              {/* FIX: Map over 'fields' from useFieldArray */}
               {fields.map((field, index) => (
                 <div key={field.id} className="flex items-center gap-4">
                   {/* Language Selection */}
@@ -739,6 +759,8 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
                     )}
                   />
 
+                  {/* FIX 2: Added onClick to labels and cursor-pointer to toggle checkbox via text */}
+
                   {/* Read Checkbox */}
                   <Controller
                     control={control}
@@ -749,7 +771,12 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
                           checked={cbField.value}
                           onCheckedChange={cbField.onChange}
                         />
-                        <label className="text-sm font-normal">Read</label>
+                        <label
+                          className="text-sm font-normal cursor-pointer select-none"
+                          onClick={() => cbField.onChange(!cbField.value)}
+                        >
+                          Read
+                        </label>
                       </div>
                     )}
                   />
@@ -764,7 +791,12 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
                           checked={cbField.value}
                           onCheckedChange={cbField.onChange}
                         />
-                        <label className="text-sm font-normal">Write</label>
+                        <label
+                          className="text-sm font-normal cursor-pointer select-none"
+                          onClick={() => cbField.onChange(!cbField.value)}
+                        >
+                          Write
+                        </label>
                       </div>
                     )}
                   />
@@ -779,18 +811,23 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
                           checked={cbField.value}
                           onCheckedChange={cbField.onChange}
                         />
-                        <label className="text-sm font-normal">Speak</label>
+                        <label
+                          className="text-sm font-normal cursor-pointer select-none"
+                          onClick={() => cbField.onChange(!cbField.value)}
+                        >
+                          Speak
+                        </label>
                       </div>
                     )}
                   />
 
-                  {/* Remove Button (Only if more than 1) */}
+                  {/* Remove Button */}
                   {fields.length > 1 && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => remove(index)} // Use remove from useFieldArray
+                      onClick={() => remove(index)}
                     >
                       <X className="w-4 h-4" />
                     </Button>
@@ -801,7 +838,6 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
               <Button
                 type="button"
                 variant="link"
-                // Use append from useFieldArray
                 onClick={() =>
                   append({
                     language: "",

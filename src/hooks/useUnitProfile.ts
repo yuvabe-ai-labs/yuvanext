@@ -142,12 +142,6 @@ export const useGalleryOperations = (
       }
 
       const newGalleryImages = [...currentImages, ...uploadedUrls];
-
-      // Update Profile Record with the new list
-      await updateProfileMutation.mutateAsync({
-        galleryImages: newGalleryImages,
-      });
-
       return newGalleryImages;
     },
     onSuccess: () => {

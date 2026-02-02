@@ -58,7 +58,7 @@ const Profile = () => {
   const GENDER_LABELS: Record<Gender, string> = {
   [Gender.MALE]: "Male",
   [Gender.FEMALE]: "Female",
-  [Gender.PREFER_NOT_SAY]: "Prefer not to say",
+  [Gender.OTHER]: "Other",
 };
 
 const MARITAL_STATUS_LABELS: Record<MaritalStatus, string> = {

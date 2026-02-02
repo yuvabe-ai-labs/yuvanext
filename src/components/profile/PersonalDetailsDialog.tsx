@@ -258,7 +258,7 @@ export const PersonalDetailsDialog = ({
                         {[
                           { value: Gender.MALE, label: "Male" },
                           { value: Gender.FEMALE, label: "Female" },
-                          { value: Gender.PREFER_NOT_SAY, label: "Prefer not to say" },
+                          { value: Gender.OTHER, label: "Other" },
                         ].map((item) => (
                           <div key={item.value} className="flex items-center">
                             <RadioGroupItem value={item.value} id={`gender-${item.value}`} className="peer sr-only" />

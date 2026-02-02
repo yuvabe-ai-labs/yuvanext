@@ -7,6 +7,7 @@ import { useUpdateCandidateDecision } from "@/hooks/useInternships";
 import { useState } from "react";
 import { useCandidateTasks } from "@/hooks/useCandidateTasks";
 import { TaskStatus } from "@/types/candidateTasks.types";
+import { getOverallTaskBreakdown } from "@/utils/taskProgress";
 
 interface OfferCardProps {
   application: AppliedInternshipStatus;
@@ -51,19 +52,15 @@ export default function OfferCard({ application }: OfferCardProps) {
     navigate(`/my-tasks/${application.id}`);
   };
 
-  // Calculate task progress
+  // Calculate task progress using the weighted breakdown utility
   const calculateProgress = () => {
-    if (!tasksData?.tasks || tasksData.tasks.length === 0) {
-      return { percentage: 0, completed: 0, total: 0 };
-    }
-
-    const total = tasksData.tasks.length;
-    const completed = tasksData.tasks.filter(
-      (task) => task.taskStatus === TaskStatus.ACCEPTED,
-    ).length;
-    const percentage = Math.round((completed / total) * 100);
-
-    return { percentage, completed, total };
+    const breakdown = getOverallTaskBreakdown(tasksData?.tasks || []);
+    
+    return { 
+      percentage: breakdown.progressPercentage, 
+      completed: breakdown.completed, 
+      total: breakdown.total 
+    };
   };
 
   const progress = isAccepted ? calculateProgress() : null;
@@ -119,7 +116,8 @@ export default function OfferCard({ application }: OfferCardProps) {
           </div>
           <div className="w-full bg-gray-200 rounded-full h-6 overflow-hidden">
             <div
-              className="bg-gradient-to-r from-blue-500 to-blue-600 h-4 rounded-full transition-all duration-500 ease-out"
+              className=" bg-green-500
+ h-6 rounded-full transition-all duration-500 ease-out"
               style={{ width: `${progress.percentage}%` }}
             />
           </div>

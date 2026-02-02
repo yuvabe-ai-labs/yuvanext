@@ -37,10 +37,13 @@ import {
   CandidateInternship,
   CandidateProject,
   Link,
+  Gender,
+  MaritalStatus,
 } from "@/types/profiles.types";
 import { ImageUploadDialog } from "@/components/ImageUploadDialog";
 import { useAvatarOperations } from "@/hooks/useUnitProfile";
 import { CandidateSocialLinksDialog } from "@/components/profile/CandidateSocialLinksDialog";
+import { parseISO } from "date-fns";
 
 const Profile = () => {
   const { data: session } = useSession();
@@ -51,6 +54,18 @@ const Profile = () => {
   const { uploadAvatar, deleteAvatar } = useAvatarOperations();
 
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+
+  const GENDER_LABELS: Record<Gender, string> = {
+  [Gender.MALE]: "Male",
+  [Gender.FEMALE]: "Female",
+  [Gender.OTHER]: "Other",
+};
+
+const MARITAL_STATUS_LABELS: Record<MaritalStatus, string> = {
+  [MaritalStatus.SINGLE]: "Single",
+  [MaritalStatus.MARRIED]: "Married",
+  [MaritalStatus.PREFER_NOT_TO_SAY]: "Prefer not to say",
+};
 
   const handleImageSuccess = () => {
     refetch?.();
@@ -675,8 +690,13 @@ const Profile = () => {
                     <p className="text-sm text-muted-foreground mb-1">
                       Personal
                     </p>
-                    <p className="font-medium">{`${profileData?.gender || "Not specified"}, ${profileData?.maritalStatus || "Single/ Unmarried"}`}</p>
-                  </div>
+                    <p className="font-medium">
+                        {/* Map the enum to a label, or fallback to "Not specified" */}
+                        {profileData?.gender ? GENDER_LABELS[profileData.gender as Gender] : "Not specified"}
+                        {", "}
+                        {profileData?.maritalStatus ? MARITAL_STATUS_LABELS[profileData.maritalStatus as MaritalStatus] : "Single"}
+                      </p>             
+                      </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">
                       Career Break
@@ -691,10 +711,7 @@ const Profile = () => {
                     </p>
                     <p className="font-medium">
                       {profileData?.dateOfBirth
-                        ? format(
-                            new Date(profileData.dateOfBirth),
-                            "dd MMM yyyy",
-                          )
+                        ? format(parseISO(profileData.dateOfBirth), "dd MMM yyyy")
                         : "Not provided"}
                     </p>
                   </div>

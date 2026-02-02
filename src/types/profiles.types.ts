@@ -64,13 +64,16 @@ export interface CandidateProject {
   id?: string;
   title?: string;
   name?: string;
-  client_name?: string;
+  clientName?: string;
   description?: string;
   start_date?: string;
   end_date?: string;
   is_current?: boolean;
   technologies?: string[];
   project_url?: string;
+  projectName?: string;
+  status?: string;
+  completionDate: string;
 }
 
 export interface CandidateCourse {

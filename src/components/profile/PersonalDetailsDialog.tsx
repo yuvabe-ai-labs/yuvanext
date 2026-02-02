@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -67,32 +67,52 @@ export const PersonalDetailsDialog = ({
   const { refetch } = useProfile();
   const { toast } = useToast();
 
-  const nameParts = profile?.name?.split(" ") ?? [""];
-  const dateOfBirthObj = profile?.dateOfBirth ? new Date(profile.dateOfBirth) : null;
-
   const form = useForm<PersonalDetailsForm>({
     resolver: zodResolver(personalDetailsSchema),
     defaultValues: {
-      first_name: nameParts[0] || "",
-      last_name: nameParts.slice(1).join(" ") || "",
-      email: profile?.email ?? "",
-      phone: profile?.phone ?? "",
-      location: profile?.location ?? "",
-      gender: profile?.gender as Gender,
-      marital_status: profile?.maritalStatus as MaritalStatus,
-      birth_date: dateOfBirthObj ? String(dateOfBirthObj.getDate()) : "",
-      birth_month: dateOfBirthObj ? String(dateOfBirthObj.getMonth() + 1) : "",
-      birth_year: dateOfBirthObj ? String(dateOfBirthObj.getFullYear()) : "",
-      is_differently_abled: profile?.isDifferentlyAbled ?? false,
-      has_career_break: profile?.hasCareerBreak ?? false,
-      language: (profile?.language ?? []).map(l => ({
-        name: l.name,
-        read: l.read || false,
-        write: l.write || false,
-        speak: l.speak || false,
-      })),
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone: "",
+      location: "",
+      gender: Gender.MALE,
+      marital_status: MaritalStatus.SINGLE,
+      birth_date: "",
+      birth_month: "",
+      birth_year: "",
+      is_differently_abled: false,
+      has_career_break: false,
+      language: [],
     },
   });
+
+  useEffect(() => {
+    if (open && profile) {
+      const nameParts = profile.name?.split(" ") ?? [""];
+      const dateOfBirthObj = profile.dateOfBirth ? new Date(profile.dateOfBirth) : null;
+      
+      form.reset({
+        first_name: nameParts[0] || "",
+        last_name: nameParts.slice(1).join(" ") || "",
+        email: profile.email ?? "",
+        phone: profile.phone ?? "",
+        location: profile.location ?? "",
+        gender: profile.gender as Gender,
+        marital_status: profile.maritalStatus as MaritalStatus,
+        birth_date: dateOfBirthObj ? String(dateOfBirthObj.getDate()) : "",
+        birth_month: dateOfBirthObj ? String(dateOfBirthObj.getMonth() + 1) : "",
+        birth_year: dateOfBirthObj ? String(dateOfBirthObj.getFullYear()) : "",
+        is_differently_abled: profile.isDifferentlyAbled ?? false,
+        has_career_break: profile.hasCareerBreak ?? false,
+        language: (profile.language ?? []).map(l => ({
+          name: l.name,
+          read: !!l.read,
+          write: !!l.write,
+          speak: !!l.speak,
+        })),
+      });
+    }
+  }, [open, profile, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -101,8 +121,6 @@ export const PersonalDetailsDialog = ({
 
   const onSubmit = async (data: PersonalDetailsForm) => {
     try {
-      await refetch();
-
       const fullName = `${data.first_name} ${data.last_name || ""}`.trim();
       let dateOfBirth: string | null = null;
       
@@ -128,10 +146,10 @@ export const PersonalDetailsDialog = ({
       };
 
       await updateProfileMutation(payload);
-
-      toast({ title: "Success", description: "Personal details updated successfully" });
+      await refetch();
       onUpdate();
       setOpen(false);
+      toast({ title: "Success", description: "Personal details updated successfully" });
     } catch (error) {
       toast({ title: "Error", description: "Failed to update", variant: "destructive" });
     }
@@ -140,17 +158,19 @@ export const PersonalDetailsDialog = ({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="text-2xl">Personal Details</DialogTitle>
+      <DialogContent className="sm:max-w-[700px] h-[90vh] overflow-hidden flex flex-col rounded-3xl p-0">
+        <DialogHeader className="p-6 pb-2">
+          <DialogTitle className="text-2xl font-bold">Personal Details</DialogTitle>
           <p className="text-sm text-muted-foreground">
             This information is important for employers to know you better
           </p>
         </DialogHeader>
 
         <Form {...form}>
-          <ScrollArea className="flex-1 overflow-y-auto pr-4 mt-2 scrollbar-none">
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 p-1">
+          {/* Use flex-1 to make the ScrollArea take up all remaining space between Header and Footer */}
+          <ScrollArea className="flex-1 w-full">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 px-6 py-4">
+              {/* Name Fields */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -158,9 +178,7 @@ export const PersonalDetailsDialog = ({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>First Name</FormLabel>
-                      <FormControl>
-                        <Input className="rounded-full" placeholder="Enter Name" {...field} />
-                      </FormControl>
+                      <FormControl><Input className="rounded-full" placeholder="Enter Name" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -171,15 +189,14 @@ export const PersonalDetailsDialog = ({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Last Name</FormLabel>
-                      <FormControl>
-                        <Input className="rounded-full" placeholder="Enter Name" {...field} />
-                      </FormControl>
+                      <FormControl><Input className="rounded-full" placeholder="Enter Name" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
 
+              {/* Email & Phone */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -187,9 +204,7 @@ export const PersonalDetailsDialog = ({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Email address</FormLabel>
-                      <FormControl>
-                        <Input className="rounded-full" type="email" placeholder="email@gmail.com" {...field} />
-                      </FormControl>
+                      <FormControl><Input className="rounded-full" type="email" placeholder="email@gmail.com" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -200,22 +215,21 @@ export const PersonalDetailsDialog = ({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Contact details</FormLabel>
-                      <FormControl>
-                        <Input className="rounded-full" placeholder="+91 98765 43210" {...field} />
-                      </FormControl>
+                      <FormControl><Input className="rounded-full" placeholder="+91 98765 43210" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
 
+              {/* Location */}
               <FormField
                 control={form.control}
                 name="location"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Location</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="rounded-full">
                           <SelectValue placeholder="Select Location" />
@@ -232,6 +246,7 @@ export const PersonalDetailsDialog = ({
                 )}
               />
 
+              {/* Gender */}
               <FormField
                 control={form.control}
                 name="gender"
@@ -239,11 +254,7 @@ export const PersonalDetailsDialog = ({
                   <FormItem className="space-y-3">
                     <FormLabel>Gender</FormLabel>
                     <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex gap-3 mt-2"
-                      >
+                      <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-3 mt-2">
                         {[
                           { value: Gender.MALE, label: "Male" },
                           { value: Gender.FEMALE, label: "Female" },
@@ -253,7 +264,7 @@ export const PersonalDetailsDialog = ({
                             <RadioGroupItem value={item.value} id={`gender-${item.value}`} className="peer sr-only" />
                             <Label
                               htmlFor={`gender-${item.value}`}
-                              className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm"
+                              className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
                             >
                               {item.label}
                             </Label>
@@ -268,6 +279,7 @@ export const PersonalDetailsDialog = ({
 
               <div className="pt-4 border-t"><h3 className="font-semibold mb-2">More Information</h3></div>
 
+              {/* Marital Status */}
               <FormField
                 control={form.control}
                 name="marital_status"
@@ -275,17 +287,13 @@ export const PersonalDetailsDialog = ({
                   <FormItem className="space-y-3">
                     <FormLabel>Marital status</FormLabel>
                     <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex flex-wrap gap-3 mt-2"
-                      >
+                      <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap gap-3 mt-2">
                         {MARITAL_STATUS_OPTIONS.map((status) => (
                           <div key={status.value} className="flex items-center">
                             <RadioGroupItem value={status.value} id={`marital-${status.value}`} className="peer sr-only" />
                             <Label
                               htmlFor={`marital-${status.value}`}
-                              className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm"
+                              className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
                             >
                               {status.label}
                             </Label>
@@ -298,6 +306,7 @@ export const PersonalDetailsDialog = ({
                 )}
               />
 
+              {/* Date of Birth */}
               <div className="space-y-2">
                 <Label>Date Of Birth</Label>
                 <div className="grid grid-cols-3 gap-3">
@@ -305,140 +314,187 @@ export const PersonalDetailsDialog = ({
                     control={form.control}
                     name="birth_date"
                     render={({ field }) => (
-                      <FormItem>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="rounded-full">
-                              <SelectValue placeholder="Date" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {Array.from({ length: 31 }, (_, i) => String(i + 1)).map(d => (
-                              <SelectItem key={d} value={d}>{d}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger className="rounded-full"><SelectValue placeholder="Date" /></SelectTrigger></FormControl>
+                        <SelectContent>{Array.from({ length: 31 }, (_, i) => String(i + 1)).map(d => (<SelectItem key={d} value={d}>{d}</SelectItem>))}</SelectContent>
+                      </Select>
                     )}
                   />
                   <FormField
                     control={form.control}
                     name="birth_month"
                     render={({ field }) => (
-                      <FormItem>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="rounded-full">
-                              <SelectValue placeholder="Month" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (
-                              <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger className="rounded-full"><SelectValue placeholder="Month" /></SelectTrigger></FormControl>
+                        <SelectContent>{["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (<SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>))}</SelectContent>
+                      </Select>
                     )}
                   />
                   <FormField
                     control={form.control}
                     name="birth_year"
                     render={({ field }) => (
-                      <FormItem>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="rounded-full">
-                              <SelectValue placeholder="Year" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {Array.from({ length: 100 }, (_, i) => String(new Date().getFullYear() - i)).map(y => (
-                              <SelectItem key={y} value={y}>{y}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger className="rounded-full"><SelectValue placeholder="Year" /></SelectTrigger></FormControl>
+                        <SelectContent>{Array.from({ length: 100 }, (_, i) => String(new Date().getFullYear() - i)).map(y => (<SelectItem key={y} value={y}>{y}</SelectItem>))}</SelectContent>
+                      </Select>
                     )}
                   />
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="is_differently_abled"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>Are you differently abled?</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={(val) => field.onChange(val === "true")}
+                        value={field.value?.toString()}
+                        className="flex gap-3"
+                      >
+                        {[
+                          { value: "true", label: "Yes" },
+                          { value: "false", label: "No" },
+                        ].map((item) => (
+                          <div key={item.value} className="flex items-center">
+                            <RadioGroupItem value={item.value} id={`abled-${item.value}`} className="peer sr-only" />
+                            <Label
+                              htmlFor={`abled-${item.value}`}
+                              className="px-6 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
+                            >
+                              {item.label}
+                            </Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="has_career_break"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>Have you taken a career break?</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={(val) => field.onChange(val === "true")}
+                        value={field.value?.toString()}
+                        className="flex gap-3"
+                      >
+                        {[
+                          { value: "true", label: "Yes" },
+                          { value: "false", label: "No" },
+                        ].map((item) => (
+                          <div key={item.value} className="flex items-center">
+                            <RadioGroupItem value={item.value} id={`break-${item.value}`} className="peer sr-only" />
+                            <Label
+                              htmlFor={`break-${item.value}`}
+                              className="px-6 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
+                            >
+                              {item.label}
+                            </Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+              {/* Language Section */}
               <div className="space-y-4">
-                <Label>Language Proficiency</Label>
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3 border rounded-xl bg-muted/30">
-                    <div className="flex-1 w-full">
-                      <FormField
-                        control={form.control}
-                        name={`language.${index}.name`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger className="rounded-full bg-background">
-                                  <SelectValue placeholder="Select Language" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {AVAILABLE_LANGUAGES.map(lang => (
-                                  <SelectItem key={lang} value={lang}>{lang}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <div className="flex gap-4 sm:gap-6">
-                      {["read", "write", "speak"].map((mode) => (
+                <Label className="block mb-2">Language Proficiency</Label>
+                
+                <div className="space-y-4">
+                  {fields.map((field, index) => (
+                    <div key={field.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3 border rounded-xl bg-muted/30">
+                      <div className="flex-1 w-full">
                         <FormField
-                          key={mode}
                           control={form.control}
-                          name={`language.${index}.${mode}` as any}
+                          name={`language.${index}.name`}
                           render={({ field }) => (
-                            <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                              <FormLabel className="text-xs font-normal capitalize cursor-pointer">
-                                {mode}
-                              </FormLabel>
+                            <FormItem>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger className="rounded-full bg-background">
+                                    <SelectValue placeholder="Select Language" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {AVAILABLE_LANGUAGES.map(lang => (
+                                    <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
                             </FormItem>
                           )}
                         />
-                      ))}
+                      </div>
+                      <div className="flex gap-4 sm:gap-6">
+                        {["read", "write", "speak"].map((mode) => (
+                          <FormField
+                            key={mode}
+                            control={form.control}
+                            name={`language.${index}.${mode}` as any}
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                                <FormLabel className="text-xs font-normal capitalize cursor-pointer">
+                                  {mode}
+                                </FormLabel>
+                              </FormItem>
+                            )}
+                          />
+                        ))}
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        className="rounded-full hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => remove(index)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
                     </div>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon" 
-                      className="rounded-full hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => remove(index)}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => append({ name: "", read: false, write: false, speak: false })} 
-                  className="rounded-full"
-                >
-                  + Add language
-                </Button>
+                  ))}
+                </div>
+
+                <div className="mt-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => append({ name: "", read: false, write: false, speak: false })} 
+                    className="rounded-full"
+                  >
+                    + Add language
+                  </Button>
+                </div>
+
                 {form.formState.errors.language && !Array.isArray(form.formState.errors.language) && (
                   <p className="text-sm text-destructive">{form.formState.errors.language.message}</p>
                 )}
               </div>
 
-              <div className="flex justify-end space-x-2 pt-4">
+              {/* Footer Actions */}
+              <div className="flex justify-end space-x-2 pt-4 pb-2">
                 <Button type="button" variant="outline" onClick={() => setOpen(false)} className="rounded-full">Cancel</Button>
                 <Button type="submit" disabled={isPending} className="rounded-full">
                   {isPending ? "Saving..." : "Save"}

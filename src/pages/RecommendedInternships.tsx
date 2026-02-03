@@ -89,7 +89,7 @@ const RecommendedInternships = () => {
     if (internships.length > 0 && !selectedInternship) {
       setSelectedInternship(internships[0].id);
     }
-  }, [internships, searchParams, selectedInternship]);
+  }, [ searchParams, ]);
 
   // Scroll to top when internship selection changes
   useEffect(() => {

@@ -169,7 +169,7 @@ export const personalDetailsSchema = z.object({
   last_name: z.string().optional().or(z.literal("")),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional().or(z.literal("")),
-  location: z.string().optional().or(z.literal("")),
+  location: z.string().min(1, "Location is required"),
   gender: z.nativeEnum(Gender).optional(),
   marital_status: z
     .nativeEnum(MaritalStatus, {

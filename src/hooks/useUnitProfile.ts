@@ -9,7 +9,8 @@ import {
   deleteAvatar,
   uploadBanner,
   deleteBanner,
-  uploadTestimonial,
+  presignTestimonial,
+  completeTestimonial,
   deleteTestimonial,
   uploadGalleryImage,
 } from "@/services/profile.service";
@@ -123,7 +124,7 @@ export const useBannerOperations = () => {
 // --- Gallery Hooks (The Complex Version for Multi-Upload) ---
 export const useGalleryOperations = (
   currentImages: string[],
-  userId: string
+  userId: string,
 ) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -195,7 +196,28 @@ export const useTestimonialOperations = () => {
   const { toast } = useToast();
 
   const uploadMutation = useMutation({
-    mutationFn: uploadTestimonial,
+    mutationFn: async (file: File) => {
+      // 1) Request a presigned URL from server
+      const presign = await presignTestimonial(file.name, 3600);
+
+      // 2) Upload directly to S3 using PUT
+      const putResp = await fetch(presign.uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type || "application/octet-stream",
+        },
+        body: file,
+      });
+
+      if (!putResp.ok) {
+        throw new Error(`Upload failed with status ${putResp.status}`);
+      }
+
+      // 3) Finalize upload on server
+      const finalizeResp = await completeTestimonial(presign.key);
+
+      return finalizeResp;
+    },
     onSuccess: () => {
       toast({ title: "Success", description: "Video uploaded successfully" });
       queryClient.invalidateQueries({ queryKey: ["unitProfile"] });

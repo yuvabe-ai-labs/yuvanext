@@ -230,3 +230,45 @@ export const deleteTestimonial = async (
     return handleApiError(error, "Failed to delete video");
   }
 };
+
+// --- Presign & Complete for Testimonial Uploads (S3) ---
+export const presignTestimonial = async (
+  fileName: string,
+  expiresIn = 3600,
+): Promise<{
+  uploadUrl: string;
+  key: string;
+  fileUrl: string;
+  expiresIn: number;
+}> => {
+  try {
+    const response = await axiosInstance.post("/profile/testimonial/presign", {
+      fileName,
+      expiresIn,
+    });
+
+    return handleApiResponse<{
+      uploadUrl: string;
+      key: string;
+      fileUrl: string;
+      expiresIn: number;
+    }>(response, { uploadUrl: "", key: "", fileUrl: "", expiresIn });
+  } catch (error) {
+    return handleApiError(error, "Failed to get presigned url");
+  }
+};
+
+export const completeTestimonial = async (
+  key: string,
+): Promise<{ galleryVideos: string[] }> => {
+  try {
+    const response = await axiosInstance.post("/profile/testimonial/complete", {
+      key,
+    });
+    return handleApiResponse<{ galleryVideos: string[] }>(response, {
+      galleryVideos: [],
+    });
+  } catch (error) {
+    return handleApiError(error, "Failed to finalize testimonial upload");
+  }
+};

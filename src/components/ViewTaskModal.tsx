@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { X, Calendar } from "lucide-react";
+import { X, Calendar, ExternalLink } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -84,6 +84,7 @@ export default function ViewTaskModal({
         taskId: task.taskId,
         payload: {
           status: TaskStatus.ACCEPTED,
+          reviewRemarks: data.remarks?.trim() || null,
         },
       });
 
@@ -97,7 +98,7 @@ export default function ViewTaskModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md p-6">
+      <DialogContent className="max-w-md p-6 rounded-2xl">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -118,7 +119,7 @@ export default function ViewTaskModal({
                   <Input
                     value={task.taskStartDate || "Not set"}
                     disabled
-                    className="bg-gray-50 pl-10"
+                    className="bg-gray-50 pl-10 rounded-xl"
                   />
                   <Calendar className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 </div>
@@ -132,34 +133,46 @@ export default function ViewTaskModal({
                   <Input
                     value={task.taskEndDate || "Not set"}
                     disabled
-                    className="bg-gray-50 pl-10"
+                    className="bg-gray-50 pl-10 rounded-xl"
                   />
                   <Calendar className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 </div>
               </div>
             </div>
 
-            {/* Submission Link */}
+            {/* Submission Link (Fixed Layout Issue) */}
             <div className="space-y-2">
               <label className="text-sm text-gray-700 font-medium">
                 Submission link
               </label>
-              {task.taskSubmissionLink ? (
-                <a
-                  href={task.taskSubmissionLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-full px-3 py-2 text-sm bg-gray-50 border border-gray-300 rounded-md text-indigo-600 hover:text-indigo-800 hover:underline truncate"
-                >
-                  {task.taskSubmissionLink}
-                </a>
-              ) : (
-                <Input
-                  value="No Link available"
-                  disabled
-                  className="bg-gray-50"
-                />
-              )}
+              <div className="relative">
+                {task.taskSubmissionLink ? (
+                  <>
+                    <Input
+                      value={task.taskSubmissionLink}
+                      readOnly
+                      className="bg-gray-50 pr-10 rounded-xl text-indigo-600 underline cursor-pointer truncate"
+                      onClick={() =>
+                        window.open(task.taskSubmissionLink, "_blank")
+                      }
+                    />
+                    <a
+                      href={task.taskSubmissionLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600 transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </>
+                ) : (
+                  <Input
+                    value="No Link available"
+                    disabled
+                    className="bg-gray-50 rounded-xl text-gray-500"
+                  />
+                )}
+              </div>
             </div>
 
             {/* Remarks */}
@@ -176,7 +189,7 @@ export default function ViewTaskModal({
                       {...field}
                       placeholder="Add review remarks"
                       rows={4}
-                      className="resize-none text-sm"
+                      className="resize-none text-sm rounded-xl"
                     />
                   </FormControl>
                 </FormItem>

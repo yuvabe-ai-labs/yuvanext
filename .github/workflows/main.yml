@@ -34,7 +34,7 @@ jobs:
       - name: Set environment variables
         run: |
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "VITE_STAGE_TYPE=production" >> $GITHUB_ENV
+            echo "VITE_STAGE_TYPE=main" >> $GITHUB_ENV
             echo "VITE_API_URL=${{ secrets.BACKEND_URL_PROD }}" >> $GITHUB_ENV
             echo "VITE_FRONTEND_URL=${{ secrets.FRONTEND_URL_PROD }}" >> $GITHUB_ENV
             echo "S3_BUCKET_NAME=${{ secrets.BUCKET_NAME_PROD }}" >> $GITHUB_ENV

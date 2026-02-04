@@ -1,4 +1,4 @@
-name: Deploy React App to S3 + CloudFront (Yuvanext)
+name: Deploy React App to S3 + CloudFront
 
 on:
   push:
@@ -22,25 +22,27 @@ jobs:
 
     steps:
       # --------------------
-      # Checkout
+      # Checkout code
       # --------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # --------------------
-      # Set environment-specific variables
-      # (EXACT SAME PATTERN AS BACKEND)
+      # Set env based on branch
       # --------------------
       - name: Set environment variables
+        shell: bash
         run: |
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "VITE_STAGE_TYPE=main" >> $GITHUB_ENV
+          set -e
+
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            echo "VITE_STAGE_TYPE=production" >> $GITHUB_ENV
             echo "VITE_API_URL=${{ secrets.BACKEND_URL_PROD }}" >> $GITHUB_ENV
             echo "VITE_FRONTEND_URL=${{ secrets.FRONTEND_URL_PROD }}" >> $GITHUB_ENV
             echo "S3_BUCKET_NAME=${{ secrets.BUCKET_NAME_PROD }}" >> $GITHUB_ENV
             echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.CF_DISTRIBUTION_PROD }}" >> $GITHUB_ENV
 
-          elif [ "${{ github.ref }}" == "refs/heads/staging" ]; then
+          elif [ "$GITHUB_REF" = "refs/heads/staging" ]; then
             echo "VITE_STAGE_TYPE=staging" >> $GITHUB_ENV
             echo "VITE_API_URL=${{ secrets.BACKEND_URL_STG }}" >> $GITHUB_ENV
             echo "VITE_FRONTEND_URL=${{ secrets.FRONTEND_URL_STG }}" >> $GITHUB_ENV
@@ -76,9 +78,9 @@ jobs:
         run: npm run build
 
       # --------------------
-      # Upload dist → S3
+      # Upload to S3
       # --------------------
-      - name: Upload dist folder to S3
+      - name: Upload dist to S3
         uses: jakejarvis/s3-sync-action@master
         with:
           args: --delete

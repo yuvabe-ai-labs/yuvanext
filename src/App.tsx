@@ -18,7 +18,6 @@ import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
 import UnitDashboard from "./pages/UnitDashboard";
-// import Chatbot from "./pages/Chatbot";
 import Chatbot from "./pages/Chatbot";
 import Internships from "./pages/Internships";
 import Courses from "./pages/Courses";
@@ -46,7 +45,6 @@ import EnvironmentIndicator from "@/components/EnvironmentIndicator";
 
 const queryClient = new QueryClient();
 
-// Protected Route component with onboarding check
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { data: session, isPending: isAuthPending } = useSession();
   const { data: profile, isLoading: isProfileLoading } = useProfile();
@@ -55,27 +53,18 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
 
   useEffect(() => {
-    // Wait for auth and profile to load
     if (isAuthPending || isProfileLoading || !session || !profile) return;
 
     const currentPath = location.pathname;
     const isOnChatbot = currentPath === "/chatbot";
 
-    // Check onboarding status
     if (profile.onboardingCompleted === true) {
-      // Onboarding completed - redirect away from chatbot to dashboard
       if (isOnChatbot) {
-        // Redirect based on role
-        if (profile.role === "candidate") {
-          navigate("/dashboard", { replace: true });
-        } else if (profile.role === "unit") {
-          navigate("/unit-dashboard", { replace: true });
-        } else {
-          navigate("/dashboard", { replace: true });
-        }
+        const target =
+          profile.role === "unit" ? "/unit-dashboard" : "/dashboard";
+        navigate(target, { replace: true });
       }
     } else {
-      // Onboarding NOT completed - redirect to chatbot
       if (!isOnChatbot) {
         navigate("/chatbot", { replace: true });
       }
@@ -89,7 +78,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     navigate,
   ]);
 
-  // Show loading spinner while checking auth and profile
   if (isAuthPending || (session && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-muted flex items-center justify-center">
@@ -98,7 +86,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  // If validated session exists, render children. Otherwise, redirect to Landing.
   return session ? <>{children}</> : <Navigate to="/" replace />;
 };
 
@@ -112,7 +99,6 @@ const App = () => (
         <ScrollToTop />
         <NuqsAdapter>
           <Routes>
-            {/* Public Routes */}
             <Route path="/" element={<Landing />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route
@@ -123,14 +109,15 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route path="/" element={<Landing />} />
             <Route path="/auth/:role/signin" element={<SignIn />} />
             <Route path="/auth/:role/signup" element={<SignUp />} />
-            <Route path="/auth/accept-invitation/:id" element={<AcceptInvitation />} />
+            <Route
+              path="/auth/accept-invitation/:id"
+              element={<AcceptInvitation />}
+            />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* Protected Routes */}
             <Route
               path="/internships/:id"
               element={
@@ -147,7 +134,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* Dashboards */}
             <Route
               path="/dashboard"
               element={
@@ -164,7 +150,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* Common Resources */}
             <Route
               path="/internships"
               element={
@@ -197,7 +182,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* Profiles */}
             <Route
               path="/profile"
               element={
@@ -214,7 +198,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* Candidate Views */}
             <Route
               path="/candidate/:id"
               element={
@@ -239,8 +222,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-
-            {/* Unit Management Views */}
             <Route
               path="/all-applications"
               element={
@@ -265,7 +246,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* Settings & Misc */}
             <Route
               path="/settings"
               element={
@@ -274,15 +254,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* <Route
-              path="/chatbot"
-              element={
-                <ProtectedRoute>
-                  <Chatbot />
-                </ProtectedRoute>
-              }
-            /> 
-            */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </NuqsAdapter>

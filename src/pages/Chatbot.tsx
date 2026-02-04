@@ -30,7 +30,12 @@ interface Message {
 
 const Chatbot = () => {
   const { data: session, isPending: sessionPending } = useSession();
-  const { data: profile, isLoading: profileLoading } = useProfile();
+  // Added refetch to manually update profile status
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    refetch: refetchProfile,
+  } = useProfile();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -51,7 +56,6 @@ const Chatbot = () => {
   const [initialGreetingSent, setInitialGreetingSent] = useState(false);
 
   const userRole = profile?.role || "";
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -122,7 +126,6 @@ const Chatbot = () => {
   const startChat = async () => {
     setShowChat(true);
     setInitialGreetingSent(false);
-
     setTimeout(() => {
       const name = profile?.name || session?.user?.name || "there";
       const initialMessage: Message = {
@@ -139,10 +142,8 @@ const Chatbot = () => {
   const sendMessage = async (messageContent?: string) => {
     const content = messageContent || inputValue.trim();
     if (!content || isLoading) return;
-
     setInputValue("");
     setSelectedOptions([]);
-
     try {
       await sendBackendMessage(content);
     } catch (error: any) {
@@ -156,12 +157,25 @@ const Chatbot = () => {
     }
   };
 
+  const [isNavigating, setIsNavigating] = useState(false);
+  // Fixed handler to avoid flickering and infinite loops
+  const handleExploreDashboard = async () => {
+    const { data: updatedProfile } = await refetchProfile();
+    if (updatedProfile?.role === "unit") {
+      navigate("/unit-dashboard");
+    } else {
+      navigate("/dashboard");
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    await refetchProfile();
+    navigate("/profile");
+  };
+
   const getQuestionType = (message: Message) => {
     if (!message.options || message.options.length === 0) return "single";
-
     if (message.fieldType === "multiselect") return "multi";
-
-    // Fallback keyword check
     const multiSelectKeywords = [
       "select all",
       "choose multiple",
@@ -382,15 +396,15 @@ const Chatbot = () => {
         )}
         <div className="flex gap-3 mt-10 justify-center">
           <button
-            onClick={() => navigate("/dashboard")}
-            className="flex items-center justify-center px-4 py-2 rounded-[18px] text-white font-medium bg-gradient-to-r from-[#C94100] to-[#FFB592] text-sm min-w-[140px]"
+            onClick={handleExploreDashboard}
+            className="flex items-center justify-center px-4 py-2 rounded-[18px] text-white font-medium bg-gradient-to-r from-[#C94100] to-[#FFB592] text-sm min-w-[140px] transition-all duration-200 hover:opacity-90 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
           >
             Explore my Dashboard
           </button>
           {!isUnit && (
             <button
-              onClick={() => navigate("/profile")}
-              className="flex items-center justify-center px-4 py-2 rounded-[18px] border border-[#C94100] text-[#C94100] font-medium text-sm min-w-[120px]"
+              onClick={handleUpdateProfile}
+              className="flex items-center justify-center px-4 py-2 rounded-[18px] border border-[#C94100] text-[#C94100] font-medium text-sm min-w-[120px] transition-all duration-200 hover:bg-[#C94100]/5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Update Profile
             </button>
@@ -423,7 +437,6 @@ const Chatbot = () => {
             Let's have a quick chat to personalize your internship journey!
           </p>
         </div>
-
         <div
           ref={messagesContainerRef}
           className="flex-1 scrollbar-none overflow-y-auto mb-4 px-2 flex flex-col select-text"
@@ -459,7 +472,6 @@ const Chatbot = () => {
                         </div>
                       )}
                     </Card>
-
                     {message.role === "assistant" &&
                       message.options &&
                       message.options.length > 0 &&
@@ -474,7 +486,6 @@ const Chatbot = () => {
                 </div>
               </div>
             ))}
-
             {streamingMessage && (
               <div className="flex justify-start">
                 <div className="flex items-start space-x-3 max-w-[80%]">
@@ -485,18 +496,15 @@ const Chatbot = () => {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <div className="flex flex-col w-full">
-                    <Card className="p-3 rounded-3xl border bg-transparent border-blue-500 text-blue-600 select-text">
-                      <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                        {renderMessageContent(streamingMessage)}
-                        <span className="inline-block w-1.5 h-4 bg-blue-600 ml-1 animate-pulse align-middle"></span>
-                      </div>
-                    </Card>
-                  </div>
+                  <Card className="p-3 rounded-3xl border bg-transparent border-blue-500 text-blue-600 select-text">
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                      {renderMessageContent(streamingMessage)}
+                      <span className="inline-block w-1.5 h-4 bg-blue-600 ml-1 animate-pulse align-middle"></span>
+                    </div>
+                  </Card>
                 </div>
               </div>
             )}
-
             {isLoading && !streamingMessage && (
               <div className="flex justify-start">
                 <div className="flex items-start space-x-3 max-w-[80%]">
@@ -526,7 +534,6 @@ const Chatbot = () => {
           </div>
           <div ref={messagesEndRef} className="h-2" />
         </div>
-
         <div className="mt-4">
           <div className="flex space-x-2">
             <Input

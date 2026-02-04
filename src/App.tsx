@@ -18,7 +18,6 @@ import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
 import UnitDashboard from "./pages/UnitDashboard";
-// import Chatbot from "./pages/Chatbot";
 import Chatbot from "./pages/Chatbot";
 import Internships from "./pages/Internships";
 import Courses from "./pages/Courses";
@@ -274,15 +273,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* <Route
-              path="/chatbot"
-              element={
-                <ProtectedRoute>
-                  <Chatbot />
-                </ProtectedRoute>
-              }
-            /> 
-            */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </NuqsAdapter>

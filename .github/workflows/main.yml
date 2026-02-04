@@ -28,24 +28,22 @@ jobs:
 
           if [ "$GITHUB_REF" = "refs/heads/main" ]; then
             echo "VITE_STAGE_TYPE=production" >> $GITHUB_ENV
-            echo "VITE_API_URL=${{ secrets.BACKEND_URL_PROD }}" >> $GITHUB_ENV
-            echo "VITE_FRONTEND_URL=${{ secrets.FRONTEND_URL_PROD }}" >> $GITHUB_ENV
-            echo "S3_BUCKET_NAME=${{ secrets.BUCKET_NAME_PROD }}" >> $GITHUB_ENV
-            echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.CF_DISTRIBUTION_PROD }}" >> $GITHUB_ENV
-
+            echo "VITE_API_URL=${{ secrets.PROD_API_URL }}" >> $GITHUB_ENV
+            echo "VITE_FRONTEND_URL=${{ secrets.PROD_FRONTEND_URL }}" >> $GITHUB_ENV
+            echo "S3_BUCKET_NAME=${{ secrets.PROD_S3_BUCKET }}" >> $GITHUB_ENV
+            echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.PROD_CLOUDFRONT_ID }}" >> $GITHUB_ENV
           elif [ "$GITHUB_REF" = "refs/heads/staging" ]; then
             echo "VITE_STAGE_TYPE=staging" >> $GITHUB_ENV
-            echo "VITE_API_URL=${{ secrets.BACKEND_URL_STG }}" >> $GITHUB_ENV
-            echo "VITE_FRONTEND_URL=${{ secrets.FRONTEND_URL_STG }}" >> $GITHUB_ENV
-            echo "S3_BUCKET_NAME=${{ secrets.BUCKET_NAME_STG }}" >> $GITHUB_ENV
-            echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.CF_DISTRIBUTION_STG }}" >> $GITHUB_ENV
-
+            echo "VITE_API_URL=${{ secrets.STAGING_API_URL }}" >> $GITHUB_ENV
+            echo "VITE_FRONTEND_URL=${{ secrets.STAGING_FRONTEND_URL }}" >> $GITHUB_ENV
+            echo "S3_BUCKET_NAME=${{ secrets.STAGING_S3_BUCKET }}" >> $GITHUB_ENV
+            echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.STAGING_CLOUDFRONT_ID }}" >> $GITHUB_ENV
           else
             echo "VITE_STAGE_TYPE=development" >> $GITHUB_ENV
-            echo "VITE_API_URL=${{ secrets.BACKEND_URL_DEV }}" >> $GITHUB_ENV
-            echo "VITE_FRONTEND_URL=${{ secrets.FRONTEND_URL_DEV }}" >> $GITHUB_ENV
-            echo "S3_BUCKET_NAME=${{ secrets.BUCKET_NAME_DEV }}" >> $GITHUB_ENV
-            echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.CF_DISTRIBUTION_DEV }}" >> $GITHUB_ENV
+            echo "VITE_API_URL=${{ secrets.DEV_API_URL }}" >> $GITHUB_ENV
+            echo "VITE_FRONTEND_URL=${{ secrets.DEV_FRONTEND_URL }}" >> $GITHUB_ENV
+            echo "S3_BUCKET_NAME=${{ secrets.DEV_S3_BUCKET }}" >> $GITHUB_ENV
+            echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.DEV_CLOUDFRONT_ID }}" >> $GITHUB_ENV
           fi
 
       - name: Setup Node.js

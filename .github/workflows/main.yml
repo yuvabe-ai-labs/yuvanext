@@ -1,73 +1,68 @@
 name: Deploy React App to S3 + CloudFront
-
 on:
   push:
     branches:
       - development
       - staging
       - main
-
 env:
   NODE_VERSION: 20
   AWS_REGION: ${{ secrets.AWS_REGION }}
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
+      
       - name: Set environment variables
         shell: bash
         run: |
           set -e
-
           if [ "$GITHUB_REF" = "refs/heads/main" ]; then
             echo "VITE_STAGE_TYPE=production" >> $GITHUB_ENV
             echo "VITE_API_URL=${{ secrets.PROD_API_URL }}" >> $GITHUB_ENV
             echo "VITE_FRONTEND_URL=${{ secrets.PROD_FRONTEND_URL }}" >> $GITHUB_ENV
-            echo "S3_BUCKET_NAME=${{ secrets.PROD_S3_BUCKET }}" >> $GITHUB_ENV
+            echo "AWS_S3_BUCKET=${{ secrets.PROD_S3_BUCKET }}" >> $GITHUB_ENV
             echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.PROD_CLOUDFRONT_ID }}" >> $GITHUB_ENV
           elif [ "$GITHUB_REF" = "refs/heads/staging" ]; then
             echo "VITE_STAGE_TYPE=staging" >> $GITHUB_ENV
             echo "VITE_API_URL=${{ secrets.STAGING_API_URL }}" >> $GITHUB_ENV
             echo "VITE_FRONTEND_URL=${{ secrets.STAGING_FRONTEND_URL }}" >> $GITHUB_ENV
-            echo "S3_BUCKET_NAME=${{ secrets.STAGING_S3_BUCKET }}" >> $GITHUB_ENV
+            echo "AWS_S3_BUCKET=${{ secrets.STAGING_S3_BUCKET }}" >> $GITHUB_ENV
             echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.STAGING_CLOUDFRONT_ID }}" >> $GITHUB_ENV
           else
             echo "VITE_STAGE_TYPE=development" >> $GITHUB_ENV
             echo "VITE_API_URL=${{ secrets.DEV_API_URL }}" >> $GITHUB_ENV
             echo "VITE_FRONTEND_URL=${{ secrets.DEV_FRONTEND_URL }}" >> $GITHUB_ENV
-            echo "S3_BUCKET_NAME=${{ secrets.DEV_S3_BUCKET }}" >> $GITHUB_ENV
+            echo "AWS_S3_BUCKET=${{ secrets.DEV_S3_BUCKET }}" >> $GITHUB_ENV
             echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.DEV_CLOUDFRONT_ID }}" >> $GITHUB_ENV
           fi
-
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-
+      
       - name: Install dependencies
         run: npm ci
-
+      
       - name: Build React app
         run: npm run build
-
+      
       - name: Upload to S3
         uses: jakejarvis/s3-sync-action@master
         with:
           args: --delete
         env:
-          AWS_S3_BUCKET: ${{ env.S3_BUCKET_NAME }}
+          AWS_S3_BUCKET: ${{ env.AWS_S3_BUCKET }}
           AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ env.AWS_REGION }}
           SOURCE_DIR: dist
-
+      
       - name: Invalidate CloudFront
         uses: chetan/invalidate-cloudfront-action@v2
         env:

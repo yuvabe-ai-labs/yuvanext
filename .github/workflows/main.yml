@@ -7,9 +7,6 @@ on:
       - staging
       - main
 
-# --------------------
-# Global environment
-# --------------------
 env:
   NODE_VERSION: 20
   AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -21,15 +18,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # --------------------
-      # Checkout code
-      # --------------------
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      # --------------------
-      # Set env based on branch
-      # --------------------
       - name: Set environment variables
         shell: bash
         run: |
@@ -57,30 +48,18 @@ jobs:
             echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.CF_DISTRIBUTION_DEV }}" >> $GITHUB_ENV
           fi
 
-      # --------------------
-      # Setup Node
-      # --------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # --------------------
-      # Install dependencies
-      # --------------------
       - name: Install dependencies
         run: npm ci
 
-      # --------------------
-      # Build React (Vite)
-      # --------------------
       - name: Build React app
         run: npm run build
 
-      # --------------------
-      # Upload to S3
-      # --------------------
-      - name: Upload dist to S3
+      - name: Upload to S3
         uses: jakejarvis/s3-sync-action@master
         with:
           args: --delete
@@ -91,10 +70,7 @@ jobs:
           AWS_REGION: ${{ env.AWS_REGION }}
           SOURCE_DIR: dist
 
-      # --------------------
-      # Invalidate CloudFront
-      # --------------------
-      - name: Invalidate CloudFront cache
+      - name: Invalidate CloudFront
         uses: chetan/invalidate-cloudfront-action@v2
         env:
           DISTRIBUTION: ${{ env.CLOUDFRONT_DISTRIBUTION_ID }}

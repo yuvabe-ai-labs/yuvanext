@@ -83,7 +83,7 @@ export default function UpdateEmailModal({
 
       toast({
         title: "Verification email sent",
-        description: `We sent a link to ${data.newEmail}. Click it to confirm the change.`,
+        description: `We sent a link to ${data.currentEmail}. Click it to confirm the change.`,
         duration: 8000,
       });
 

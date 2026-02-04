@@ -2,15 +2,14 @@ import Navbar from "@/components/Navbar";
 import { useState } from "react";
 import ApplicationStatusCard from "@/components/ApplicationStatusCard";
 import OfferCard from "@/components/OfferCard";
-import { useApplicationsStatusCard } from "@/hooks/useApplicationStatusCard";
-import { useMyOffers } from "@/hooks/useMyOffers";
-import { useAuth } from "@/hooks/useAuth";
+import { useAppliedInternshipStatus } from "@/hooks/useInternships";
+import { useSession } from "@/lib/auth-client";
 
 export default function CandidateTasks() {
   const [selected, setSelected] = useState("Tasks Management");
-  const { user } = useAuth();
-  const { applications } = useApplicationsStatusCard(user.id);
-  const { data: offersData, isLoading: offersLoading } = useMyOffers(user?.id);
+  const { data: session } = useSession();
+  const { data: applicationsData, isLoading: applicationsLoading } =
+    useAppliedInternshipStatus();
 
   const menuItems = ["Tasks Management", "Application Status"];
 
@@ -43,14 +42,36 @@ export default function CandidateTasks() {
 
           {selected === "Tasks Management" && (
             <div>
-              {offersLoading ? (
+              {applicationsLoading ? (
                 <p className="text-gray-500">Loading offers...</p>
-              ) : offersData?.data && offersData.data.length > 0 ? (
-                <div className="space-y-4">
-                  {offersData.data.map((offer) => (
-                    <OfferCard key={offer.id} offer={offer} />
-                  ))}
-                </div>
+              ) : applicationsData &&
+                Array.isArray(applicationsData) &&
+                applicationsData.length > 0 ? (
+                (() => {
+                  const hiredApplications = applicationsData.filter(
+                    (app) => app.status === "hired"
+                  );
+
+                  return hiredApplications.length > 0 ? (
+                    <div className="space-y-4">
+                      {hiredApplications.map((application) => (
+                        <OfferCard
+                          key={application.id}
+                          application={application}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500 text-lg">
+                        No pending offers at the moment
+                      </p>
+                      <p className="text-gray-400 text-sm mt-2">
+                        Your internship offers will appear here
+                      </p>
+                    </div>
+                  );
+                })()
               ) : (
                 <div className="text-center py-12">
                   <p className="text-gray-500 text-lg">
@@ -66,10 +87,14 @@ export default function CandidateTasks() {
 
           {selected === "Application Status" && (
             <div>
-              {applications && applications.length > 0 ? (
-                applications.map((application, index) => (
+              {applicationsLoading ? (
+                <p className="text-gray-500">Loading applications...</p>
+              ) : applicationsData &&
+                Array.isArray(applicationsData) &&
+                applicationsData.length > 0 ? (
+                applicationsData.map((application) => (
                   <ApplicationStatusCard
-                    key={index}
+                    key={application.id}
                     application={application}
                   />
                 ))

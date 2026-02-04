@@ -1,13 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   MapPin,
   Clock,
-  DollarSign,
   Bookmark,
   Share2,
   CircleCheckBig,
@@ -15,166 +13,107 @@ import {
   IndianRupee,
 } from "lucide-react";
 import { ShareDialog } from "@/components/ShareDialog";
-import Navbar from "@/components/Navbar";
 import ProfileSummaryDialog from "@/components/ProfileSummaryDialog";
 import ApplicationSuccessDialog from "@/components/ApplicationSuccessDialog";
-import { supabase } from "@/integrations/supabase/client";
-import { useApplicationStatus } from "@/hooks/useApplicationStatus";
-import { useIsSaved } from "@/hooks/useSavedInternships";
+import { useSession } from "@/lib/auth-client";
+import { useInternshipStatus } from "@/hooks/useSavedInternships";
+import {
+  useInternshipById,
+  useSaveInternship,
+  useRemoveSavedInternship,
+} from "@/hooks/useInternships";
 import { useToast } from "@/hooks/use-toast";
-import type { Tables } from "@/integrations/supabase/types";
-import { PayIcon } from "@/components/ui/custom-icons";
-
-const safeParse = (data: any, fallback: any) => {
-  if (!data) return fallback;
-  try {
-    return typeof data === "string" ? JSON.parse(data) : data;
-  } catch {
-    return fallback;
-  }
-};
+import Navbar from "@/components/Navbar";
 
 const InternshipDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [internship, setInternship] = useState<Tables<"internships"> | null>(
-    null
-  );
-  const [unit, setUnit] = useState<any | null>(null);
+  const { data: session } = useSession();
+
+  // Fetch internship data
+  const { data: internship, isLoading, error } = useInternshipById(id || "");
+
+  // Get saved and applied status for this internship
+  const {
+    isSaved,
+    isApplied,
+    applicationData,
+    isLoading: isCheckingStatus,
+    refetchSaved,
+    refetchApplied,
+  } = useInternshipStatus(id || "");
+
+  // Mutations for save/unsave
+  const { mutate: saveInternship, isPending: isSaving } = useSaveInternship();
+  const { mutate: removeSavedInternship, isPending: isRemoving } =
+    useRemoveSavedInternship();
+
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [showApplicationDialog, setShowApplicationDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [savingInternship, setSavingInternship] = useState(false);
-  const {
-    hasApplied,
-    isLoading: isCheckingStatus,
-    markAsApplied,
-  } = useApplicationStatus(id || "");
-  const {
-    isSaved,
-    isLoading: isCheckingSaved,
-    refetch: refetchSaved,
-  } = useIsSaved(id || "");
+
+  const savingInternship = isSaving || isRemoving;
 
   const handleSaveInternship = async () => {
     if (!id) return;
 
-    setSavingInternship(true);
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in to save internships.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!profile) {
-        toast({
-          title: "Error",
-          description: "Profile not found.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (isSaved) {
-        const { error } = await supabase
-          .from("saved_internships")
-          .delete()
-          .eq("student_id", profile.id)
-          .eq("internship_id", id);
-
-        if (error) throw error;
-
-        toast({
-          title: "Removed",
-          description: "Internship removed from saved list.",
-        });
-      } else {
-        const { error } = await supabase.from("saved_internships").insert({
-          student_id: profile.id,
-          internship_id: id,
-        });
-
-        if (error) throw error;
-
-        toast({
-          title: "Saved",
-          description: "Internship saved successfully!",
-        });
-      }
-
-      refetchSaved();
-    } catch (error: any) {
-      console.error("Error saving internship:", error);
+    if (!session) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to save internship.",
+        title: "Authentication Required",
+        description: "Please sign in to save internships.",
         variant: "destructive",
       });
-    } finally {
-      setSavingInternship(false);
+      return;
+    }
+
+    if (isSaved) {
+      removeSavedInternship(id, {
+        onSuccess: () => {
+          toast({
+            title: "Removed",
+            description: "Internship removed from saved list.",
+          });
+          refetchSaved();
+        },
+        onError: (error) => {
+          console.error("Error removing internship:", error);
+          toast({
+            title: "Error",
+            description: error.message || "Failed to remove internship.",
+            variant: "destructive",
+          });
+        },
+      });
+    } else {
+      saveInternship(id, {
+        onSuccess: () => {
+          toast({
+            title: "Saved",
+            description: "Internship saved successfully!",
+          });
+          refetchSaved();
+        },
+        onError: (error) => {
+          console.error("Error saving internship:", error);
+          toast({
+            title: "Error",
+            description: error.message || "Failed to save internship.",
+            variant: "destructive",
+          });
+        },
+      });
     }
   };
 
-  useEffect(() => {
-    const fetchInternship = async () => {
-      if (!id) return;
+  const handleApplicationSuccess = () => {
+    refetchApplied();
+    setShowSuccessDialog(true);
+  };
 
-      try {
-        const { data, error } = await supabase
-          .from("internships")
-          .select("*")
-          .eq("id", id)
-          .single();
-
-        if (error) throw error;
-        setInternship(data);
-
-        // Fetch unit ID from the creator's profile
-        if (data.created_by) {
-          const { data: unitData } = await supabase
-            .from("units")
-            .select("*")
-            .eq("profile_id", data.created_by)
-            .maybeSingle();
-
-          if (unitData) {
-            setUnit(unitData);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching internship:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load internship details.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchInternship();
-  }, [id, toast]);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
         <div className="max-w-5xl mx-auto px-6 py-8">
           <Skeleton className="h-12 w-64 mb-4" />
           <Skeleton className="h-96 w-full rounded-2xl" />
@@ -183,12 +122,16 @@ const InternshipDetail = () => {
     );
   }
 
-  if (!internship) {
+  if (error || !internship) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
         <div className="max-w-5xl mx-auto px-6 py-8 text-center">
           <h1 className="text-2xl font-bold mb-4">Internship Not Found</h1>
+          <p className="text-muted-foreground mb-6">
+            {error instanceof Error
+              ? error.message
+              : "The internship you are looking for does not exist."}
+          </p>
           <Button onClick={() => navigate("/internships")}>
             Back to Internships
           </Button>
@@ -197,15 +140,15 @@ const InternshipDetail = () => {
     );
   }
 
-  const responsibilities = safeParse(internship.responsibilities, []);
-  const requirements = safeParse(internship.requirements, []);
-  const benefits = safeParse(internship.benefits, []);
-  const skillsRequired = safeParse(internship.skills_required, []);
+  const unit = internship.createdBy;
+  const responsibilities = internship.responsibilities || [];
+  const requirements = internship.skillsRequired || [];
+  const benefits = internship.benefits || [];
+  const skillsRequired = internship.skillsRequired || [];
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-
       {/* Main Content */}
       <div className="container px-4 py-4 md:px-8 lg:px-[7.5rem] lg:py-10 overflow-hidden">
         {/* Mobile Header */}
@@ -219,7 +162,7 @@ const InternshipDetail = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={handleSaveInternship}
-              disabled={savingInternship || isCheckingSaved}
+              disabled={savingInternship || isCheckingStatus}
               className="p-2"
             >
               <Bookmark
@@ -236,17 +179,17 @@ const InternshipDetail = () => {
             <Button
               variant="gradient"
               className="rounded-full text-white"
-              disabled={hasApplied || isCheckingStatus}
+              disabled={isApplied || isCheckingStatus}
               onClick={() => setShowApplicationDialog(true)}
             >
-              {hasApplied ? "Applied" : "Apply Now"}
+              {isApplied ? "Applied" : "Apply Now"}
             </Button>
           </div>
         </div>
 
-        <div className="space-y-8 rounded-3xl  border-0 md:border md:border-gray-200 p-2 md:p-10 lg:p-14">
+        <div className="space-y-8 rounded-3xl border-0 md:border md:border-gray-200 p-2 md:p-10 lg:p-14">
           {/* Header Card */}
-          <Card className="mb-6  border-0 first-line:shadow-none">
+          <Card className="mb-6 border-0 first-line:shadow-none">
             <CardContent className="border-0 p-0">
               <div className="flex lg:hidden flex-col gap-4 pb-7 border-b border-gray-200">
                 {/* Avatar + title + company */}
@@ -254,20 +197,20 @@ const InternshipDetail = () => {
                   {/* Avatar */}
                   <div
                     className={`${
-                      unit?.avatar_url
+                      unit?.avatarUrl
                         ? "bg-transparent border border-gray-200"
                         : "bg-gradient-to-br from-teal-400 to-teal-600"
                     } w-[4rem] h-[4rem] rounded-full flex items-center justify-center flex-shrink-0`}
                   >
-                    {unit?.avatar_url ? (
+                    {unit?.avatarUrl ? (
                       <img
-                        src={unit.avatar_url}
-                        alt={unit.unit_name || internship.company_name}
+                        src={unit.avatarUrl}
+                        alt={unit.name}
                         className="w-full h-full rounded-full object-cover"
                       />
                     ) : (
                       <span className="text-xl text-white font-bold">
-                        {internship.company_name.charAt(0)}
+                        {unit?.name?.charAt(0) || "C"}
                       </span>
                     )}
                   </div>
@@ -278,15 +221,15 @@ const InternshipDetail = () => {
                       {internship.title}
                     </h1>
                     <p className="text-sm text-muted-foreground font-medium">
-                      {internship.company_name}
+                      {unit?.name}
                     </p>
 
                     {/* icons (location, duration, paid) */}
                     <div className="flex flex-wrap gap-3 text-xs mt-1">
-                      {internship.location && (
+                      {unit?.location && (
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <MapPin className="w-3 h-3" />
-                          <span>{internship.location}</span>
+                          <span>{unit.location}</span>
                         </div>
                       )}
                       {internship.duration && (
@@ -295,12 +238,12 @@ const InternshipDetail = () => {
                           <span>{internship.duration}</span>
                         </div>
                       )}
-                      {internship?.is_paid ? (
+                      {internship.isPaid ? (
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <IndianRupee className="w-4 h-4" />
                           <span>
                             Paid{" "}
-                            {internship?.payment && `- ${internship?.payment}`}
+                            {internship.payment && `- ${internship.payment}`}
                           </span>
                         </div>
                       ) : (
@@ -311,19 +254,19 @@ const InternshipDetail = () => {
                       )}
 
                       <div className="flex items-center text-muted-foreground">
-                        {internship.job_type === "full_time"
+                        {internship.jobType === "full_time"
                           ? "Full Time"
-                          : internship.job_type === "part_time"
-                          ? "Part Time"
-                          : internship.job_type === "both"
-                          ? "Full Time & Part Time"
-                          : "Not specified"}
+                          : internship.jobType === "part_time"
+                            ? "Part Time"
+                            : internship.jobType === "both"
+                              ? "Full Time & Part Time"
+                              : "Not specified"}
                       </div>
 
                       {/* Minimum Age */}
-                      {internship.min_age_required && (
+                      {internship.minAgeRequired && (
                         <div className="flex items-center text-muted-foreground">
-                          Minimum Age: {internship.min_age_required}
+                          Minimum Age: {internship.minAgeRequired}
                         </div>
                       )}
                     </div>
@@ -335,21 +278,21 @@ const InternshipDetail = () => {
                 <div className="flex gap-7 flex-1">
                   <div
                     className={`${
-                      unit?.avatar_url
+                      unit?.avatarUrl
                         ? "bg-transparent border border-gray-200"
                         : "bg-gradient-to-br from-teal-400 to-teal-600"
-                    } w-[6.25rem] h-[6.25rem] rounded-full  flex items-center justify-center flex-shrink-0`}
+                    } w-[6.25rem] h-[6.25rem] rounded-full flex items-center justify-center flex-shrink-0`}
                   >
                     <span className="text-3xl text-white font-bold">
-                      {unit?.avatar_url ? (
+                      {unit?.avatarUrl ? (
                         <img
-                          src={unit.avatar_url}
-                          alt={unit.unit_name || internship.company_name}
+                          src={unit.avatarUrl}
+                          alt={unit.name}
                           className="w-full h-full rounded-full object-cover"
                         />
                       ) : (
                         <span className="text-3xl text-white font-bold">
-                          {internship.company_name.charAt(0)}
+                          {unit?.name?.charAt(0) || "C"}
                         </span>
                       )}
                     </span>
@@ -358,14 +301,14 @@ const InternshipDetail = () => {
                   <div className="flex-1">
                     <h1 className="text-3xl font-bold">{internship.title}</h1>
                     <p className="text-lg text-muted-foreground font-medium mb-2.5">
-                      {internship.company_name}
+                      {unit?.name}
                     </p>
 
                     <div className="flex flex-wrap gap-4 text-sm">
-                      {internship.location && (
+                      {unit?.location && (
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <MapPin className="w-4 h-4" />
-                          <span>{internship.location}</span>
+                          <span>{unit.location}</span>
                         </div>
                       )}
                       {internship.duration && (
@@ -375,12 +318,12 @@ const InternshipDetail = () => {
                         </div>
                       )}
 
-                      {internship?.is_paid ? (
+                      {internship.isPaid ? (
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <IndianRupee className="w-4 h-4" />
                           <span>
                             Paid{" "}
-                            {internship?.payment && `- ${internship?.payment}`}
+                            {internship.payment && `- ${internship.payment}`}
                           </span>
                         </div>
                       ) : (
@@ -391,19 +334,19 @@ const InternshipDetail = () => {
                       )}
 
                       <div className="flex items-center text-muted-foreground">
-                        {internship.job_type === "full_time"
+                        {internship.jobType === "full_time"
                           ? "Full Time"
-                          : internship.job_type === "part_time"
-                          ? "Part Time"
-                          : internship.job_type === "both"
-                          ? "Full Time & Part Time"
-                          : "Not specified"}
+                          : internship.jobType === "part_time"
+                            ? "Part Time"
+                            : internship.jobType === "both"
+                              ? "Full Time & Part Time"
+                              : "Not specified"}
                       </div>
 
                       {/* Minimum Age */}
-                      {internship.min_age_required && (
+                      {internship.minAgeRequired && (
                         <div className="flex items-center text-muted-foreground">
-                          Minimum Age: {internship.min_age_required}
+                          Minimum Age: {internship.minAgeRequired}
                         </div>
                       )}
                     </div>
@@ -420,7 +363,7 @@ const InternshipDetail = () => {
                         : "text-gray-600 bg-white"
                     }`}
                     onClick={handleSaveInternship}
-                    disabled={savingInternship || isCheckingSaved}
+                    disabled={savingInternship || isCheckingStatus}
                   >
                     <Bookmark
                       className={`w-4 h-4 ${isSaved ? "fill-current" : ""}`}
@@ -438,15 +381,31 @@ const InternshipDetail = () => {
                   <Button
                     variant="gradient"
                     className="rounded-full text-white"
-                    disabled={hasApplied || isCheckingStatus}
+                    disabled={isApplied || isCheckingStatus}
                     onClick={() => setShowApplicationDialog(true)}
                   >
-                    {hasApplied ? "Applied" : "Apply Now"}
+                    {isApplied ? "Applied" : "Apply Now"}
                   </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Status Banner - Shows if saved or applied */}
+          {isApplied && (
+            <div className="flex gap-2 mb-4">
+              {isApplied && applicationData && (
+                <div className="px-4 py-2 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                  <CircleCheckBig className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-700">
+                    Applied on{" "}
+                    {new Date(applicationData.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* About the Internship */}
           <div className="lg:hidden border-b border-gray-200 pb-7">
             {unit?.description && (
@@ -460,10 +419,10 @@ const InternshipDetail = () => {
                 <div className="py-4">
                   <Button
                     variant="gradient"
-                    className="border-none  bg-orange-500 hover:bg-orange-600 text-white rounded-full px-8"
+                    className="border-none bg-orange-500 hover:bg-orange-600 text-white rounded-full px-8"
                     onClick={() => {
-                      if (unit.id) {
-                        navigate(`/units/${unit.id}`);
+                      if (unit.userId) {
+                        navigate(`/units/${unit.userId}`);
                       } else {
                         toast({
                           title: "Not Available",
@@ -479,6 +438,7 @@ const InternshipDetail = () => {
               </section>
             )}
           </div>
+
           <section className="border-b border-gray-200 pb-7">
             <h2 className="text-xl font-medium mb-4">About the Internship</h2>
             <p className="text-muted-foreground leading-relaxed text-justify">
@@ -545,17 +505,6 @@ const InternshipDetail = () => {
                   </li>
                 ))}
               </ul>
-              {/* <div className="flex flex-wrap gap-2">
-                {skillsRequired.map((skill: string, idx: number) => (
-                  <Badge
-                    key={idx}
-                    variant="outline"
-                    className="px-4 py-2 border-gray-600"
-                  >
-                    {skill}
-                  </Badge>
-                ))}
-              </div> */}
             </section>
           )}
         </div>
@@ -571,19 +520,19 @@ const InternshipDetail = () => {
                       Ready to Apply
                     </h2>
                     <p className="text-muted-foreground">
-                      Join {internship.company_name} and make a meaningful
-                      impact in {internship.location || "Auroville"}
+                      Join {unit?.name} and make a meaningful impact in{" "}
+                      {unit?.location || "Auroville"}
                     </p>
                   </div>
 
                   {/* Button */}
                   <Button
                     variant="gradient"
-                    className="text-white rounded-full "
-                    disabled={hasApplied || isCheckingStatus}
+                    className="text-white rounded-full"
+                    disabled={isApplied || isCheckingStatus}
                     onClick={() => setShowApplicationDialog(true)}
                   >
-                    {hasApplied ? "Applied" : "Apply Now"}
+                    {isApplied ? "Applied" : "Apply Now"}
                   </Button>
                 </div>
               </CardContent>
@@ -598,33 +547,31 @@ const InternshipDetail = () => {
               <div className="flex gap-6 flex-1">
                 <div
                   className={`${
-                    unit?.avatar_url
+                    unit?.avatarUrl
                       ? "bg-transparent border border-gray-200"
                       : "bg-gradient-to-br from-teal-400 to-teal-600"
-                  } w-[6.25rem] h-[6.25rem] rounded-full  flex items-center justify-center flex-shrink-0`}
+                  } w-[6.25rem] h-[6.25rem] rounded-full flex items-center justify-center flex-shrink-0`}
                 >
                   <span className="text-3xl text-white font-bold">
-                    {unit?.avatar_url ? (
+                    {unit?.avatarUrl ? (
                       <img
-                        src={unit.avatar_url}
-                        alt={unit.unit_name || internship.company_name}
+                        src={unit.avatarUrl}
+                        alt={unit.name}
                         className="w-full h-full rounded-full object-cover"
                       />
                     ) : (
                       <span className="text-3xl text-white font-bold">
-                        {internship.company_name.charAt(0)}
+                        {unit?.name?.charAt(0) || "C"}
                       </span>
                     )}
                   </span>
                 </div>
 
                 <div className="flex-1">
-                  {unit?.contact_email && (
+                  {unit?.phone && (
                     <div>
-                      <h2 className="text-2xl font-bold">{unit.unit_name}</h2>
-                      <p className="font-[500] text-gray-500">
-                        {unit.contact_email}
-                      </p>
+                      <h2 className="text-2xl font-bold">{unit.name}</h2>
+                      <p className="font-[500] text-gray-500">{unit.phone}</p>
                     </div>
                   )}
 
@@ -640,8 +587,8 @@ const InternshipDetail = () => {
                   variant="gradient"
                   className="border-none bg-orange-500 hover:bg-orange-600 text-white rounded-full px-8"
                   onClick={() => {
-                    if (unit.id) {
-                      navigate(`/units/${unit.id}`);
+                    if (unit?.userId) {
+                      navigate(`/units/${unit.userId}`);
                     } else {
                       toast({
                         title: "Not Available",
@@ -677,10 +624,7 @@ const InternshipDetail = () => {
           isOpen={showApplicationDialog}
           onClose={() => setShowApplicationDialog(false)}
           internship={internship}
-          onSuccess={() => {
-            markAsApplied();
-            setShowSuccessDialog(true);
-          }}
+          onSuccess={handleApplicationSuccess}
         />
       )}
 

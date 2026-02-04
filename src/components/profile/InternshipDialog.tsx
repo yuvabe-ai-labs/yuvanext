@@ -6,67 +6,49 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { InternshipEntry } from "@/types/profile";
-
-const internshipSchema = z
-  .object({
-    title: z.string().min(1, "Title is required"),
-    company: z.string().min(1, "Company is required"),
-    start_date: z.string().min(1, "Start date is required"),
-    end_date: z.string().optional(),
-    description: z.string().optional(),
-    is_current: z.boolean().default(false),
-  })
-  .refine(
-    (data) => {
-      // If currently working, or if dates are missing, skip this validation
-      if (data.is_current || !data.end_date || !data.start_date) {
-        return true;
-      }
-      // Convert strings to Date objects for comparison
-      const start = new Date(data.start_date);
-      const end = new Date(data.end_date);
-      return end >= start;
-    },
-    {
-      message: "End date cannot be before start date",
-      path: ["end_date"], // Attach error to end_date field
-    }
-  );
+import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
+import { CandidateInternship } from "@/types/profiles.types";
+import { internshipSchema } from "@/lib/schemas";
 
 type InternshipFormData = z.infer<typeof internshipSchema>;
 
+interface InternshipWithId extends CandidateInternship {
+  index?: number;
+}
+
 interface InternshipDialogProps {
   children: React.ReactNode;
-  internship?: InternshipEntry;
-  onSave: (internship: Omit<InternshipEntry, "id">) => Promise<void>;
+  internship?: InternshipWithId;
+  onUpdate?: () => void;
 }
 
 export const InternshipDialog: React.FC<InternshipDialogProps> = ({
   children,
   internship,
-  onSave,
+  onUpdate,
 }) => {
   const [open, setOpen] = React.useState(false);
   const { toast } = useToast();
+  const { data: profileData } = useProfile();
+  const { mutateAsync: updateProfile, isPending } = useUpdateProfile();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    watch,
-    setValue,
-    clearErrors, // Added clearErrors
-  } = useForm<InternshipFormData>({
+  const form = useForm<InternshipFormData>({
     resolver: zodResolver(internshipSchema),
     defaultValues: {
       title: internship?.title || "",
@@ -78,25 +60,31 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
     },
   });
 
-  const isCurrent = watch("is_current");
+  const isCurrent = form.watch("is_current");
 
   const onSubmit = async (data: InternshipFormData) => {
     try {
-      await onSave({
-        title: data.title!,
-        company: data.company!,
-        start_date: data.start_date!,
-        end_date: data.is_current ? null : data.end_date || null,
-        description: data.description || null,
-        is_current: data.is_current!,
-      } as Omit<InternshipEntry, "id">);
-      toast({
-        title: "Success",
-        description: `Internship ${
-          internship ? "updated" : "added"
-        } successfully`,
-      });
+      const existingInternships = profileData?.internship ?? [];
+
+      const internshipPayload = {
+        ...data,
+        end_date: data.is_current ? "" : data.end_date,
+      };
+
+      let updatedInternships;
+      if (internship?.index !== undefined) {
+        updatedInternships = existingInternships.map((i, idx) =>
+          idx === internship.index ? internshipPayload : i
+        );
+      } else {
+        updatedInternships = [...existingInternships, internshipPayload];
+      }
+
+      await updateProfile({ internship: updatedInternships });
+      toast({ title: "Success", description: "Internship saved successfully" });
       setOpen(false);
+      form.reset();
+      onUpdate?.();
     } catch (error) {
       toast({
         title: "Error",
@@ -108,10 +96,10 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
 
   React.useEffect(() => {
     if (isCurrent) {
-      setValue("end_date", "");
-      clearErrors("end_date"); // Clear error when switching to "current"
+      form.setValue("end_date", "");
+      form.clearErrors("end_date");
     }
-  }, [isCurrent, setValue, clearErrors]);
+  }, [isCurrent, form]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -122,111 +110,123 @@ export const InternshipDialog: React.FC<InternshipDialogProps> = ({
             {internship ? "Edit Internship" : "Add Internship"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <Label htmlFor="title">Position Title *</Label>
-            <Input
-              id="title"
-              {...register("title")}
-              placeholder="e.g. Software Development Intern"
-              className="rounded-full"
-            />
-            {errors.title && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.title.message}
-              </p>
-            )}
-          </div>
 
-          <div>
-            <Label htmlFor="company">Company *</Label>
-            <Input
-              id="company"
-              {...register("company")}
-              placeholder="e.g. Tech Corp"
-              className="rounded-full"
-            />
-            {errors.company && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.company.message}
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="start_date">Start Date *</Label>
-              <Input
-                className="rounded-full"
-                id="start_date"
-                type="date"
-                {...register("start_date")}
-              />
-              {errors.start_date && (
-                <p className="text-sm text-destructive mt-1">
-                  {errors.start_date.message}
-                </p>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Position Title *</FormLabel>
+                  <FormControl>
+                    <Input {...field} className="rounded-full" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
+            />
+
+            <FormField
+              control={form.control}
+              name="company"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Company *</FormLabel>
+                  <FormControl>
+                    <Input {...field} className="rounded-full" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="start_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Date *</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} className="rounded-full" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="end_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Date {!isCurrent && "*"}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        disabled={isCurrent}
+                        {...field}
+                        className="rounded-full"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
-            <div>
-              <Label htmlFor="end_date">End Date</Label>
-              <Input
-                className="rounded-full"
-                id="end_date"
-                type="date"
-                disabled={isCurrent}
-                {...register("end_date")}
-              />
-              {/* Added Error Message Display Below */}
-              {errors.end_date && (
-                <p className="text-sm text-destructive mt-1">
-                  {errors.end_date.message}
-                </p>
+            <FormField
+              control={form.control}
+              name="is_current"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <FormLabel className="font-normal cursor-pointer">
+                    Currently working here
+                  </FormLabel>
+                </FormItem>
               )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      placeholder="Roles and responsibilities..."
+                      className="rounded-xl"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                className="rounded-full"
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isPending} className="rounded-full">
+                {isPending ? "Saving..." : "Save"}
+              </Button>
             </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="is_current"
-              checked={isCurrent}
-              onCheckedChange={(checked) =>
-                setValue("is_current", checked as boolean)
-              }
-            />
-            <Label htmlFor="is_current">Currently working here</Label>
-          </div>
-
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              {...register("description")}
-              placeholder="Describe your responsibilities and achievements"
-              rows={3}
-              className="rounded-xl"
-            />
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              className="rounded-full"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-full"
-            >
-              {isSubmitting ? "Saving..." : internship ? "Update" : "Add"}
-            </Button>
-          </div>
-        </form>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

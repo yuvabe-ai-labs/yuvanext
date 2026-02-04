@@ -2,10 +2,9 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { X, Eye, EyeOff } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { authClient } from "@/lib/auth-client";
 import { updateEmailSchema } from "@/lib/schemas";
 
 type UpdateEmailFormData = z.infer<typeof updateEmailSchema>;
@@ -20,7 +19,8 @@ export default function UpdateEmailModal({
   onClose,
 }: UpdateEmailModalProps) {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
   const [showPassword, setShowPassword] = useState(false);
 
   const currentEmail = user?.email || "";
@@ -53,42 +53,37 @@ export default function UpdateEmailModal({
   if (!isOpen) return null;
 
   const onSubmit = async (data: UpdateEmailFormData) => {
-    if (!user?.email) {
-      setError("root", {
-        message: "Unable to get user. Please login again.",
-      });
-      return;
-    }
+    if (!user?.email) return;
 
     try {
-      // Re-authenticate user
-      const { error: reauthError } = await supabase.auth.signInWithPassword({
+      // Step 1: Re-verify password (Manual Check)
+      // We try to sign in. If it fails, the password is wrong.
+      const { error: signInError } = await authClient.signIn.email({
         email: data.currentEmail,
         password: data.password,
       });
 
-      if (reauthError) {
+      if (signInError) {
         setError("password", { message: "Incorrect password." });
         return;
       }
 
-      // Update email
-      const { error: updateErr } = await supabase.auth.updateUser(
-        { email: data.newEmail },
-        {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        }
-      );
+      // Step 2: Request Email Change
+      // This sends a verification email to the NEW address.
+      // The email will NOT change until the link in that email is clicked.
+      const { error: changeError } = await authClient.changeEmail({
+        newEmail: data.newEmail,
+        callbackURL: `${import.meta.env.VITE_FRONTEND_URL}/settings`,
+      });
 
-      if (updateErr) {
-        setError("root", { message: updateErr.message });
+      if (changeError) {
+        setError("root", { message: changeError.message });
         return;
       }
 
       toast({
         title: "Verification email sent",
-        description:
-          "Please check your new email inbox and confirm the change.",
+        description: `We sent a link to ${data.currentEmail}. Click it to confirm the change.`,
         duration: 8000,
       });
 
@@ -118,7 +113,8 @@ export default function UpdateEmailModal({
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
           <p className="text-xs text-blue-800">
             <strong>Important:</strong> A confirmation email will be sent to
-            your new email address.
+            your <b>new</b> email address. You must click the link to finalize
+            the change.
           </p>
         </div>
 
@@ -128,7 +124,6 @@ export default function UpdateEmailModal({
           </p>
         )}
 
-        {/* Hidden field required for Zod refine */}
         <input type="hidden" {...register("currentEmail")} />
 
         <div className="space-y-4">
@@ -165,7 +160,7 @@ export default function UpdateEmailModal({
 
           <div className="relative">
             <label className="text-sm text-gray-600 block mb-1">
-              Current Password
+              Current Password (for verification)
             </label>
             <input
               type={showPassword ? "text" : "password"}
@@ -194,7 +189,7 @@ export default function UpdateEmailModal({
             disabled={isSubmitting}
             className="w-full bg-blue-600 text-white py-2 rounded-lg disabled:opacity-50 hover:bg-blue-700"
           >
-            {isSubmitting ? "Sending verification email..." : "Update Email"}
+            {isSubmitting ? "Processing..." : "Update Email"}
           </button>
         </div>
       </div>

@@ -6,22 +6,36 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useNotifications } from "@/hooks/useNotifications";
+import {
+  useNotifications,
+  useMarkNotificationAsRead,
+  useMarkAllNotificationsAsRead,
+  useDeleteNotification,
+  useDeleteNotifications,
+} from "@/hooks/useNotifications";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 export const NotificationDropdown = () => {
-  const {
-    notifications,
-    unreadCount,
-    markAsRead,
-    markAllAsRead,
-    deleteNotification,
-  } = useNotifications();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Fetch notifications
+  const { data: notificationsData, isLoading } = useNotifications();
+
+  // Mutations
+  const { mutate: markAsReadMutation } = useMarkNotificationAsRead();
+  const { mutate: markAllAsReadMutation } = useMarkAllNotificationsAsRead();
+  const { mutate: deleteNotificationMutation } = useDeleteNotification();
+  const { mutate: deleteAllNotificationsMutation } = useDeleteNotifications();
 
   const [showAll, setShowAll] = useState(false);
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
+
+  // Extract data from response
+  const notifications = notificationsData?.notifications || [];
+  const unreadCount = notificationsData?.unreadCount || 0;
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -58,9 +72,9 @@ export const NotificationDropdown = () => {
       : notifications.slice(0, 3);
 
     notificationsToShow.forEach((notification) => {
-      if (isToday(notification.created_at)) {
+      if (isToday(notification.createdAt)) {
         today.push(notification);
-      } else if (isYesterday(notification.created_at)) {
+      } else if (isYesterday(notification.createdAt)) {
         yesterday.push(notification);
       } else {
         earlier.push(notification);
@@ -76,11 +90,11 @@ export const NotificationDropdown = () => {
   useEffect(() => {
     if (open && notifications.length > 0) {
       const unreadNotifications = showAll
-        ? notifications.filter((n) => !n.is_read)
-        : notifications.slice(0, 3).filter((n) => !n.is_read);
+        ? notifications.filter((n) => !n.isRead)
+        : notifications.slice(0, 3).filter((n) => !n.isRead);
 
       unreadNotifications.forEach((notification) => {
-        markAsRead(notification.id);
+        markAsReadMutation(notification.id);
       });
     }
   }, [open, showAll]);
@@ -91,6 +105,24 @@ export const NotificationDropdown = () => {
         <Building2 className="h-5 w-5 text-white" />
       </div>
     );
+  };
+
+  const handleDeleteNotification = (notificationId: string) => {
+    deleteNotificationMutation(notificationId, {
+      onSuccess: () => {
+        toast({
+          title: "Deleted",
+          description: "Notification deleted successfully.",
+        });
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to delete notification.",
+          variant: "destructive",
+        });
+      },
+    });
   };
 
   const NotificationItem = ({
@@ -110,7 +142,7 @@ export const NotificationDropdown = () => {
           </p>
           <div className="flex justify-end">
             <p className="text-xs text-gray-400">
-              {formatTimeAgo(notification.created_at)}
+              {formatTimeAgo(notification.createdAt)}
             </p>
           </div>
         </div>
@@ -121,7 +153,7 @@ export const NotificationDropdown = () => {
             className="h-6 w-6 hover:bg-red-50"
             onClick={(e) => {
               e.stopPropagation();
-              deleteNotification(notification.id);
+              handleDeleteNotification(notification.id);
             }}
           >
             <Trash2 className="h-3 w-3 text-gray-400 hover:text-red-500" />
@@ -131,7 +163,6 @@ export const NotificationDropdown = () => {
     </div>
   );
 
-  // ✅ Updated Section with Clear All
   const NotificationSection = ({
     title,
     items,
@@ -143,7 +174,16 @@ export const NotificationDropdown = () => {
 
     const handleClearAll = (e: React.MouseEvent) => {
       e.stopPropagation();
-      items.forEach((notification) => deleteNotification(notification.id));
+
+      // Delete each notification in the section
+      items.forEach((notification) => {
+        deleteNotificationMutation(notification.id);
+      });
+
+      toast({
+        title: "Cleared",
+        description: `All ${title.toLowerCase()} notifications cleared.`,
+      });
     };
 
     return (
@@ -202,7 +242,12 @@ export const NotificationDropdown = () => {
               : "h-auto max-h-[400px]"
           } overflow-y-auto`}
         >
-          {notifications.length === 0 ? (
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Bell className="h-16 w-16 mb-3 opacity-20 animate-pulse" />
+              <p className="text-sm font-medium">Loading notifications...</p>
+            </div>
+          ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <Bell className="h-16 w-16 mb-3 opacity-20" />
               <p className="text-sm font-medium">No notifications yet</p>

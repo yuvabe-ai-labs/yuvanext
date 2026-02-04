@@ -1,136 +1,165 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/components/ui/use-toast";
 import signupIllustrate from "@/assets/signinillustion.png";
 import signinLogo from "@/assets/signinLogo.svg";
 import { Eye, EyeOff } from "lucide-react";
 import { Arrow } from "@/components/ui/custom-icons";
 import unitIllustration from "@/assets/unit_illstration.png";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { SignInFormValues, signInSchema } from "@/lib/authentication";
 
 const SignIn = () => {
   const { role } = useParams<{ role: string }>();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const { signIn, signInWithOAuth } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [keepLoggedIn, setKeepLoggedIn] = useState(false);
 
+  // 3. Initialize React Hook Form
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<SignInFormValues>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  // 4. Submit Handler
+  const onSubmit = async (data: SignInFormValues) => {
+    setLoading(true);
+
+    const { data: authData, error } = await authClient.signIn.email({
+      email: data.email,
+      password: data.password,
+      rememberMe: keepLoggedIn,
+    });
+
+    if (error) {
+      let errorMessage =
+        error.message || "Something went wrong. Please try again.";
+      let errorTitle = "Sign in failed";
+
+      if (error.status === 401) {
+        errorMessage =
+          "Incorrect email or password. Please check your credentials.";
+      } else if (error.status === 403) {
+        errorMessage =
+          "Please check your email and verify your account before signing in.";
+        errorTitle = "Verification Required";
+      } else if (error.status === 429) {
+        errorMessage = "Too many login attempts. Please try again later.";
+      }
+
+      toast({
+        title: errorTitle,
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } else {
+      // --- LOGIC CHANGE STARTS HERE ---
+      const userRole = authData?.user?.role;
+      const currentRouteRole = role; // Comes from useParams
+
+      // Scenario 1: User is on the UNIT login page, but logged in as a CANDIDATE
+      if (currentRouteRole === "unit" && userRole !== "unit") {
+        await authClient.signOut(); // Important: Kill the session immediately
+        toast({
+          title: "Access Denied",
+          description:
+            "This is the Unit login portal. Please use the Candidate login.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Scenario 2: User is on the CANDIDATE login page, but logged in as a UNIT
+      if (currentRouteRole !== "unit" && userRole === "unit") {
+        await authClient.signOut(); // Important: Kill the session immediately
+        toast({
+          title: "Access Denied",
+          description:
+            "You are a Unit account. Please sign in via the Unit portal.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // If checks pass, proceed with success logic
+      toast({
+        title: "Welcome back!",
+        description: "You have successfully signed in.",
+      });
+
+      if (userRole === "unit") {
+        navigate("/unit-dashboard");
+      } else {
+        navigate("/dashboard");
+      }
+    }
+
+    setLoading(false);
+  };
+
+  // Helper for UI
   const illustrationText =
     role === "unit"
       ? "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role’s requirements."
       : "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    const { error } = await signIn(email, password, keepLoggedIn, role);
-
-    if (error) {
-      let errorMessage =
-        error.message || "Something went wrong. Please try again.";
-
-      if (
-        errorMessage.includes("Edge Function returned a non-2xx status code") ||
-        errorMessage.toLowerCase().includes("invalid") ||
-        errorMessage.toLowerCase().includes("incorrect") ||
-        errorMessage.toLowerCase().includes("credentials")
-      ) {
-        errorMessage =
-          "Incorrect email or password. Please check your credentials and try again.";
-      } else if (
-        errorMessage.includes("Email not confirmed") ||
-        errorMessage.includes("email_not_confirmed")
-      ) {
-        errorMessage =
-          "Please check your email and verify your account before signing in.";
-      }
-
-      toast({
-        title: "Sign in failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully signed in.",
-      });
-      navigate("/dashboard");
-    }
-
-    setLoading(false);
-  };
-
-  const handleOAuthSignIn = async (provider: "google" | "apple") => {
-    setLoading(true);
-    if (role) localStorage.setItem("pendingRole", role);
-
-    const { error } = await signInWithOAuth(provider);
-
-    if (error) {
-      localStorage.removeItem("pendingRole");
-
-      let errorMessage =
-        error.message || "Authentication failed. Please try again.";
-
-      if (
-        errorMessage.includes("Edge Function returned a non-2xx status code")
-      ) {
-        errorMessage =
-          "Authentication failed. Please try again or use a different sign-in method.";
-      }
-
-      toast({
-        title: "Sign in failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    }
-
-    setLoading(false);
-  };
-
   return (
     <div className="min-h-screen bg-white flex">
       {/* Left Side - Illustration */}
       <div className="hidden lg:flex w-[41%] h-screen relative p-4">
-        <div className="w-full h-full rounded-3xl overflow-hidden relative">
+        <div className="w-full h-full rounded-3xl overflow-hidden relative flex flex-col items-center justify-center">
+          {/* Background Image */}
           <img
             src={signupIllustrate}
             alt="Signin Illustration"
-            className="w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover"
           />
 
-          {/* Center content */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-8">
+          {/* Content Overlay */}
+          <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-6 px-8 w-full h-full">
             {/* Logo */}
-            <img src={signinLogo} alt="Sign in Logo" className="w-32 h-auto" />
+            <img
+              src={signinLogo}
+              alt="Sign in Logo"
+              className="w-32 h-auto shrink-0"
+            />
 
             {role === "unit" && (
-              <div className="relative flex items-center justify-center p-6">
-                <Arrow className="absolute w-[650px] h-[650px] text-white opacity-95 bottom-10" />
+              <div className="relative flex items-center justify-center p-2 w-full shrink-1">
+                {/* FIX 1: Responsive Arrow sizing */}
+                <Arrow className="absolute w-[80%] h-auto max-h-[50vh] text-white opacity-95 bottom-0" />
 
+                {/* FIX 2: Responsive Image height (max-h-[40vh]) */}
                 <img
                   src={unitIllustration}
                   alt="Unit Illustration"
-                  className="relative z-10 w-[450px] h-[450px] object-contain"
+                  className="relative z-10 w-auto h-auto max-h-[30vh] lg:max-h-[40vh] object-contain"
                 />
               </div>
             )}
 
             {/* Text */}
-            <p className="text-white text-base font-medium max-w-xl leading-relaxed">
+            <p className="text-white text-base font-medium max-w-xl leading-relaxed shrink-0">
               {illustrationText}
             </p>
           </div>
 
-          {/* Footer */}
-          <div className="absolute bottom-4 left-0 right-0 flex justify-between px-6 text-white/80 text-xs">
+          {/* Footer Link */}
+          <div className="absolute bottom-4 left-0 right-0 flex justify-between px-6 text-white/80 text-xs z-20">
             <a
               href="https://www.yuvanext.com/privacy-policy"
               target="_blank"
@@ -147,7 +176,6 @@ const SignIn = () => {
       <div className="flex-1 flex items-center justify-center bg-white px-4 sm:px-6">
         <div className="w-full max-w-[474px]">
           <div className="bg-white rounded-[15px] px-6 sm:px-12 md:px-[40px] py-8 sm:py-12 w-full">
-            {/* Header */}
             <div className="text-center mb-8">
               <h1
                 className="text-[24px] font-bold leading-[35px] mb-2"
@@ -171,8 +199,8 @@ const SignIn = () => {
               </p>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Form Connected to RHF */}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               {/* Email */}
               <div>
                 <label
@@ -182,18 +210,25 @@ const SignIn = () => {
                 >
                   Email Address *
                 </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
+                <div
+                  className={`border rounded-lg h-8 px-4 py-4 flex items-center ${
+                    errors.email ? "border-red-500" : "border-[#D1D5DB]"
+                  }`}
+                >
                   <input
                     id="email"
                     type="email"
                     placeholder="Enter email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    {...register("email")}
                     className="w-full text-[13px] outline-none bg-transparent placeholder-[#D1D5DB]"
-                    required
                     disabled={loading}
                   />
                 </div>
+                {errors.email && (
+                  <p className="text-red-500 text-[10px] mt-1">
+                    {errors.email.message}
+                  </p>
+                )}
               </div>
 
               {/* Password */}
@@ -205,15 +240,17 @@ const SignIn = () => {
                 >
                   Password *
                 </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center gap-2">
+                <div
+                  className={`border rounded-lg h-8 px-4 py-4 flex items-center gap-2 ${
+                    errors.password ? "border-red-500" : "border-[#D1D5DB]"
+                  }`}
+                >
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    {...register("password")}
                     className="w-full text-[13px] outline-none bg-transparent placeholder-[#D1D5DB]"
-                    required
                     disabled={loading}
                   />
                   <button
@@ -225,9 +262,14 @@ const SignIn = () => {
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
+                {errors.password && (
+                  <p className="text-red-500 text-[10px] mt-1">
+                    {errors.password.message}
+                  </p>
+                )}
               </div>
 
-              {/* Keep me logged in + Forgot Password */}
+              {/* Keep Logged In & Forgot Password */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <input
@@ -255,7 +297,6 @@ const SignIn = () => {
                 </Link>
               </div>
 
-              {/* Button */}
               <button
                 type="submit"
                 disabled={loading}
@@ -266,7 +307,6 @@ const SignIn = () => {
               </button>
             </form>
 
-            {/* Footer */}
             <div className="text-center mt-6">
               <span className="text-[13px]" style={{ color: "#9CA3AF" }}>
                 Don't have an account?{" "}

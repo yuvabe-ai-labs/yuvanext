@@ -9,7 +9,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -17,17 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-interface ProjectData {
-  project_name: string;
-  client_name: string;
-  description: string;
-  status: string; // "Completed" or "Ongoing"
-  completion_date?: string;
-}
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { ProjectFormValues, projectSchema } from "@/lib/unitDialogSchemas";
 
 interface UnitProjectDialogProps {
-  onSave: (project: ProjectData) => void;
+  onSave: (project: ProjectFormValues) => void;
   children: React.ReactNode;
 }
 
@@ -36,24 +30,33 @@ export const UnitProjectDialog: React.FC<UnitProjectDialogProps> = ({
   children,
 }) => {
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState<ProjectData>({
-    project_name: "",
-    client_name: "",
-    description: "",
-    status: "Ongoing",
-    completion_date: "",
-  });
 
-  const handleSave = () => {
-    if (!formData.project_name.trim()) return alert("Project name is required");
-    onSave(formData);
-    setFormData({
-      project_name: "",
-      client_name: "",
+  // 2. Initialize Hook Form
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<ProjectFormValues>({
+    resolver: zodResolver(projectSchema),
+    defaultValues: {
+      projectName: "",
+      clientName: "",
       description: "",
       status: "Ongoing",
-      completion_date: "",
-    });
+      completionDate: "",
+    },
+  });
+
+  // Watch status to conditionally render date field
+  const status = watch("status");
+
+  // 3. Handle Submit
+  const onSubmit = (data: ProjectFormValues) => {
+    onSave(data);
+    reset();
     setOpen(false);
   };
 
@@ -65,87 +68,100 @@ export const UnitProjectDialog: React.FC<UnitProjectDialogProps> = ({
           <DialogTitle>Add Project</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
           {/* Project Name */}
-          <div>
-            <Label htmlFor="project_name">Project Name</Label>
+          <div className="space-y-2">
+            <Label htmlFor="projectName">
+              Project Name <span className="text-red-500">*</span>
+            </Label>
             <Input
-              id="project_name"
+              id="projectName"
               placeholder="Enter project name"
-              value={formData.project_name}
-              onChange={(e) =>
-                setFormData({ ...formData, project_name: e.target.value })
-              }
+              {...register("projectName")}
             />
+            {errors.projectName && (
+              <p className="text-xs text-red-500">
+                {errors.projectName.message}
+              </p>
+            )}
           </div>
 
           {/* Client Name */}
-          <div>
-            <Label htmlFor="client_name">Client Name</Label>
+          <div className="space-y-2">
+            <Label htmlFor="clientName">Client Name</Label>
             <Input
-              id="client_name"
+              id="clientName"
               placeholder="Enter client name"
-              value={formData.client_name}
-              onChange={(e) =>
-                setFormData({ ...formData, client_name: e.target.value })
-              }
+              {...register("clientName")}
             />
           </div>
 
-          {/* Description */}
-          {/* <div>
+          {/* Description (Hidden/Commented as requested) */}
+          {/* <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
               placeholder="Enter project description"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
+              {...register("description")}
             />
-          </div> */}
+          </div> 
+          */}
 
-          {/* Status */}
-          <div>
+          {/* Status (Controlled Component) */}
+          <div className="space-y-2">
             <Label htmlFor="status">Status</Label>
-            <Select
-              value={formData.status}
-              onValueChange={(value) =>
-                setFormData({ ...formData, status: value })
-              }
-            >
-              <SelectTrigger id="status">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Completed">Completed</SelectItem>
-                <SelectItem value="Ongoing">Ongoing</SelectItem>
-              </SelectContent>
-            </Select>
+            <Controller
+              name="status"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                    <SelectItem value="Ongoing">Ongoing</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </div>
 
-          {/* Completion Date (only if completed) */}
-          {formData.status === "Completed" && (
-            <div>
-              <Label htmlFor="completion_date">Completion Date</Label>
+          {/* Completion Date (Conditional Render) */}
+          {status === "Completed" && (
+            <div className="space-y-2">
+              <Label htmlFor="completionDate">
+                Completion Date <span className="text-red-500">*</span>
+              </Label>
               <Input
-                id="completion_date"
+                id="completionDate"
                 type="date"
-                value={formData.completion_date}
-                onChange={(e) =>
-                  setFormData({ ...formData, completion_date: e.target.value })
-                }
+                {...register("completionDate")}
               />
+              {errors.completionDate && (
+                <p className="text-xs text-red-500">
+                  {errors.completionDate.message}
+                </p>
+              )}
             </div>
           )}
-        </div>
 
-        <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave}>Save</Button>
-        </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              Save
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

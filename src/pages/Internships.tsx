@@ -23,20 +23,20 @@ import {
   Filter,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { useIntern } from "@/hooks/useInternships";
-import { useUnits } from "@/hooks/useUnits";
+import { useInternship } from "@/hooks/useInternships";
 import {
   differenceInDays,
   differenceInHours,
   differenceInMinutes,
   formatDistanceToNow,
 } from "date-fns";
-import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 const Internship = () => {
   const navigate = useNavigate();
-  const { units } = useUnits();
-  const { internships, loading, error } = useIntern();
+  const { data: internshipsData, isLoading: internshipsLoading } =
+    useInternship();
+
+  const allInternships = internshipsData || [];
 
   const [filters, setFilters] = useState({
     internships: [] as string[],
@@ -56,6 +56,18 @@ const Internship = () => {
   const [showAllIndustries, setShowAllIndustries] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
+  useEffect(() => {
+    if (showMobileFilters) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "auto";
+    }
+
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [showMobileFilters]);
+
   const resetFilters = () => {
     setFilters({
       internships: [],
@@ -68,7 +80,7 @@ const Internship = () => {
     setActiveDateRange("");
   };
 
-  const parsePgTimestamp = (ts: any): Date => {
+  const parsePgTimestamp = (ts): Date => {
     if (ts instanceof Date) return ts;
     if (!ts) return new Date(NaN);
     let s = String(ts).trim();
@@ -81,29 +93,12 @@ const Internship = () => {
   };
 
   const uniqueUnits = [
-    ...new Set(internships.map((i) => i.company_name).filter(Boolean)),
-  ];
-  const uniqueTitles = [
-    ...new Set(internships.map((i) => i.title).filter(Boolean)),
-  ];
-  // const uniqueIndustries = [
-  //   ...new Set(units.flatMap((u) => u.industry).filter(Boolean)),
-  // ];
-  // const uniqueDepartments = [
-  //   ...new Set(internships.flatMap((i) => i.skills_offered).filter(Boolean)),
-  // ];
+    ...new Set(allInternships.map((i) => i.createdBy?.name).filter(Boolean)),
+  ] as string[];
 
-  // const interestAreas = [
-  //   ...new Set(
-  //     units.flatMap((u) =>
-  //       typeof u.focus_areas === "object" && u.focus_areas
-  //         ? Object.values(u.focus_areas)
-  //         : typeof u.focus_areas_backup === "object" && u.focus_areas_backup
-  //         ? Object.keys(u.focus_areas_backup)
-  //         : []
-  //     )
-  //   ),
-  // ];
+  const uniqueTitles = [
+    ...new Set(allInternships.map((i) => i.title).filter(Boolean)),
+  ] as string[];
 
   const toggleFilter = (category: keyof typeof filters, value: string) => {
     if (category === "postingDate") return;
@@ -144,55 +139,20 @@ const Internship = () => {
     });
   };
 
-  // const filteredUnits = units.filter((unit) => {
-  //   if (filters.industries.length) {
-  //     const ind = unit.industry;
-  //     if (!ind || !filters.industries.includes(ind)) return false;
-  //   }
-  //   return false;
-  // });
-
-  const filteredInternships = internships.filter((internship) => {
-    if (
-      filters.internships.length &&
-      !filters.internships.includes(internship.company_name)
-    )
-      return false;
-    if (filters.titles.length) {
-      const ind = internship.title;
-      if (!ind || !filters.titles.includes(ind)) return false;
+  const filteredInternships = allInternships.filter((internship) => {
+    if (filters.internships.length) {
+      const companyName = internship.createdBy?.name;
+      if (!companyName || !filters.internships.includes(companyName))
+        return false;
     }
-    // if (filters.industries.length) {
-    //   const unitId = internship.created_by;
-    //   const unit = units.filter((u) => u.profile_id === unitId);
 
-    //   const ind = internship.title;
-    //   if (!ind || !filters.titles.includes(ind)) return false;
-    // }
-    // if (
-    //   filters.departments.length &&
-    //   !filters.departments.some((skill) =>
-    //     Array.isArray(unit.skills_offered)
-    //       ? unit.skills_offered.includes(skill)
-    //       : false
-    //   )
-    // )
-    // return false;
-
-    // if (filters.interestAreas.length) {
-    //   const areas: string[] = [];
-    //   if (typeof unit.focus_areas === "object" && unit.focus_areas)
-    //     areas.push(...Object.values(unit.focus_areas).map(String));
-    //   if (
-    //     typeof unit.focus_areas_backup === "object" &&
-    //     unit.focus_areas_backup
-    //   )
-    //     areas.push(...Object.keys(unit.focus_areas_backup).map(String));
-    //   if (!filters.interestAreas.some((a) => areas.includes(a))) return false;
-    // }
+    if (filters.titles.length) {
+      const title = internship.title;
+      if (!title || !filters.titles.includes(title)) return false;
+    }
 
     if (filters.postingDate.from || filters.postingDate.to) {
-      const unitDate = parsePgTimestamp(internship.created_at).getTime();
+      const unitDate = parsePgTimestamp(internship.updatedAt).getTime();
       const from = filters.postingDate.from
         ? new Date(filters.postingDate.from).getTime()
         : -Infinity;
@@ -247,16 +207,6 @@ const Internship = () => {
                 showAll={showAllUnits}
                 setShowAll={setShowAllUnits}
               />
-              {/* <FilterSection
-              label="Industry"
-              searchValue={searchTitles}
-              onSearch={setSearchTitles}
-              list={uniqueIndustries}
-              selected={filters.industries}
-              onToggle={(v) => toggleFilter("industries", v)}
-              showAll={showAllTitles}
-              setShowAll={setShowAlltitles}
-            /> */}
               <FilterSection
                 label="Internships Title"
                 searchValue={searchTitles}
@@ -364,21 +314,32 @@ const Internship = () => {
                 {filteredInternships.length !== 1 ? "s" : ""}
               </h1>
             </div>
-            {/* <div className="mb-4 sm:mb-6">
-              <h1 className="text-xl sm:text-2xl text-gray-600 font-medium">
-                Explore {filteredInternships.length} Internship
-                {internships.length !== 1 ? "s" : ""}
-              </h1>
-            </div> */}
 
-            {error ? (
-              <p className="text-destructive">{error}</p>
+            {internshipsLoading ? (
+              <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Card
+                    key={`skeleton-${i}`}
+                    className="px-5 py-4 rounded-xl border border-gray-300"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between">
+                        <Skeleton className="w-8 h-8 rounded-full" />
+                        <Skeleton className="h-6 w-24" />
+                      </div>
+                      <Skeleton className="h-6 w-3/4" />
+                      <Skeleton className="h-16 w-full" />
+                      <Skeleton className="h-4 w-1/2" />
+                    </div>
+                  </Card>
+                ))}
+              </div>
             ) : (
               <>
                 <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredInternships.map((internship, index) => {
                     const gradient = getInternshipGradient(index);
-                    const dateToUse = internship.created_at;
+                    const dateToUse = internship.updatedAt;
 
                     const getShortTimeAgo = (date: string | Date) => {
                       const now = new Date();
@@ -398,10 +359,6 @@ const Internship = () => {
 
                     const timeAgo = getShortTimeAgo(dateToUse);
 
-                    const matchingUnit = units.find(
-                      (unit) => unit.profile_id === internship.created_by
-                    );
-
                     return (
                       <Card
                         key={internship.id}
@@ -413,14 +370,14 @@ const Internship = () => {
                         <div className="space-y-2">
                           <div className="flex items-start justify-between">
                             <div className="w-8 h-8 bg-foreground rounded-full flex items-center justify-center text-background font-bold">
-                              {matchingUnit?.avatar_url ? (
+                              {internship.createdBy?.avatarUrl ? (
                                 <img
-                                  src={matchingUnit.avatar_url}
-                                  alt={matchingUnit.unit_name}
+                                  src={internship.createdBy.avatarUrl}
+                                  alt={internship.createdBy.name}
                                   className="w-full h-full rounded-full object-cover"
                                 />
                               ) : (
-                                internship.company_name?.charAt(0) || "C"
+                                internship.createdBy?.name?.charAt(0) || "C"
                               )}
                             </div>
                             <Badge className="bg-primary text-primary-foreground">{`Posted ${timeAgo} ago`}</Badge>
@@ -453,6 +410,21 @@ const Internship = () => {
                     );
                   })}
                 </div>
+
+                {!internshipsLoading && filteredInternships.length === 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-muted-foreground">
+                      No internships found matching your filters.
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={resetFilters}
+                      className="mt-4"
+                    >
+                      Clear Filters
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -472,7 +444,7 @@ const FilterSection = ({
   onToggle,
   showAll,
   setShowAll,
-}: any) => {
+}) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -578,7 +550,7 @@ const PostingDateFilter = ({
   activeDateRange,
   onSelectDate,
   onDateChange,
-}: any) => (
+}) => (
   <div>
     <Label className="text-sm font-semibold text-muted-foreground mb-3 block">
       Posting Date

@@ -3,17 +3,28 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useUpdateTask, useDeleteTask } from "@/hooks/useCandidateTasks";
+import { Task, TaskStatus } from "@/types/candidateTasks.types";
+import type { UpdateTaskPayload } from "@/types/candidateTasks.types";
+import { toast } from "sonner";
 import {
-  useUpdateStudentTask,
-  useDeleteStudentTask,
-} from "@/hooks/useStudentTasks";
-import type { StudentTask } from "@/types/studentTasks.types";
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { updateTaskSchema } from "@/lib/schemas";
 
 interface UpdateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  task: StudentTask;
+  task: Task;
+  applicationId: string;
 }
 
 const COLORS = [
@@ -35,96 +46,111 @@ export default function UpdateTaskModal({
 }: UpdateTaskModalProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const updateTask = useUpdateStudentTask();
-  const deleteTask = useDeleteStudentTask();
+  const updateTaskMutation = useUpdateTask();
+  const deleteTaskMutation = useDeleteTask();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-    watch,
-    setValue,
-  } = useForm<UpdateTaskFormData>({
+  const form = useForm<UpdateTaskFormData>({
     resolver: zodResolver(updateTaskSchema),
     defaultValues: {
-      startDate: task.start_date || "",
-      endDate: task.end_date || "",
-      color: task.color || COLORS[0],
-      note: task.description || "",
-      submissionLink: task.submission_link || "",
+      startDate: task.taskStartDate || "",
+      startTime: task.taskStartTime || "",
+      endDate: task.taskEndDate || "",
+      endTime: task.taskEndTime || "",
+      color: task.taskColor || COLORS[0],
+      note: task.taskDescription || "",
+      submissionLink: task.taskSubmissionLink || "",
     },
   });
 
-  const selectedColor = watch("color");
-  const startDate = watch("startDate");
+  const selectedColor = form.watch("color");
+  const startDate = form.watch("startDate");
 
-  // Reset form when task changes
   useEffect(() => {
-    if (task) {
-      reset({
-        startDate: task.start_date || "",
-        endDate: task.end_date || "",
-        color: task.color || COLORS[0],
-        note: task.description || "",
-        submissionLink: task.submission_link || "",
+    if (task && isOpen) {
+      form.reset({
+        startDate: task.taskStartDate || "",
+        startTime: task.taskStartTime || "",
+        endDate: task.taskEndDate || "",
+        endTime: task.taskEndTime || "",
+        color: task.taskColor || COLORS[0],
+        note: task.taskDescription || "",
+        submissionLink: task.taskSubmissionLink || "",
       });
     }
-  }, [task, reset]);
+  }, [task, isOpen, form]);
 
   const onSubmit = async (data: UpdateTaskFormData) => {
     try {
-      await updateTask.mutateAsync({
-        taskId: task.id,
-        updates: {
-          start_date: data.startDate,
-          end_date: data.endDate,
-          color: data.color,
-          description: data.note?.trim() || undefined,
-          submission_link: data.submissionLink?.trim() || undefined,
-        },
+      // Since it's now required, we can assume it will be present and valid
+      const newStatus = TaskStatus.SUBMITTED;
+
+      const payload: UpdateTaskPayload = {
+        title: task.taskTitle,
+        startDate: data.startDate,
+        startTime: data.startTime,
+        endDate: data.endDate,
+        endTime: data.endTime,
+        color: data.color,
+        description: data.note,
+        submissionLink: data.submissionLink.trim(),
+        status: newStatus,
+      };
+
+      await updateTaskMutation.mutateAsync({
+        taskId: task.taskId,
+        payload,
       });
 
+      toast.success("Task submitted successfully!");
       onClose();
     } catch (error) {
-      console.error("Error updating task:", error);
-      alert("Failed to update task. Please try again.");
+      toast.error("Failed to update task. Please try again.");
     }
   };
 
   const handleDelete = async () => {
     try {
-      await deleteTask.mutateAsync(task.id);
+      await deleteTaskMutation.mutateAsync(task.taskId);
+      toast.success("Task deleted successfully");
+      setShowDeleteConfirm(false);
       onClose();
     } catch (error) {
-      console.error("Error deleting task:", error);
-      alert("Failed to delete task. Please try again.");
+      toast.error("Failed to delete task. Please try again.");
     }
+  };
+
+  const handleClose = () => {
+    setShowDeleteConfirm(false);
+    form.reset();
+    onClose();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-[480px] max-h-[90vh] overflow-y-auto shadow-xl">
         <div className="p-6 sm:p-8">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
               <button
+                type="button"
                 onClick={() => setShowDeleteConfirm(true)}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                title="Delete task"
+                className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors flex-shrink-0"
+                aria-label="Delete task"
               >
                 <Trash2 size={20} />
               </button>
-              <h2 className="text-2xl font-semibold text-gray-800">
-                {task.title}
+              <h2 className="text-2xl font-semibold text-gray-800 truncate">
+                {task.taskTitle}
               </h2>
             </div>
             <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              type="button"
+              onClick={handleClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors ml-2 flex-shrink-0"
+              aria-label="Close modal"
             >
               <X size={24} />
             </button>
@@ -133,133 +159,194 @@ export default function UpdateTaskModal({
           {/* Delete Confirmation */}
           {showDeleteConfirm && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <p className="text-sm text-red-800 mb-3">
-                Are you sure you want to delete this task? This action cannot be
-                undone.
+              <p className="text-sm text-red-800 mb-3 font-medium">
+                Are you sure you want to delete this task permanently?
               </p>
               <div className="flex gap-2">
-                <button
+                <Button
+                  type="button"
                   onClick={handleDelete}
-                  disabled={deleteTask.isPending}
-                  className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                  disabled={deleteTaskMutation.isPending}
+                  className="bg-red-600 hover:bg-red-700 rounded-lg"
+                  size="sm"
                 >
-                  {deleteTask.isPending ? "Deleting..." : "Yes, Delete"}
-                </button>
-                <button
+                  {deleteTaskMutation.isPending ? "Deleting..." : "Delete"}
+                </Button>
+                <Button
+                  type="button"
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
+                  variant="outline"
+                  className="rounded-lg"
+                  size="sm"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           )}
 
-          {/* Start / Due Date */}
-          <div className="grid grid-cols-2 gap-4 mb-5">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Start date <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                {...register("startDate")}
-                className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                  errors.startDate ? "border-red-500" : "border-gray-300"
-                }`}
-              />
-              {errors.startDate && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.startDate.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Due date <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                {...register("endDate")}
-                min={startDate}
-                className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                  errors.endDate ? "border-red-500" : "border-gray-300"
-                }`}
-              />
-              {errors.endDate && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.endDate.message}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Color Picker */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Color <span className="text-red-500">*</span>
-            </label>
-            <div className="flex items-center justify-between pb-2">
-              {COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => setValue("color", color)}
-                  className={`w-7 h-7 rounded-full transition-all ${
-                    selectedColor === color
-                      ? "scale-125 ring-2 ring-gray-400"
-                      : ""
-                  }`}
-                  style={{ backgroundColor: color }}
-                  aria-label={`Select color ${color}`}
+          {/* Form */}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+              {/* Start Date and Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Start Date <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input type="date" className="rounded-xl" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              ))}
-            </div>
-          </div>
+                <FormField
+                  control={form.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Time <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input type="time" className="rounded-xl" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-          {/* Note */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Note
-            </label>
-            <textarea
-              {...register("note")}
-              placeholder="Describe this task"
-              rows={4}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-            />
-          </div>
+              {/* Due Date and Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Due Date <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          min={startDate}
+                          className="rounded-xl"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Time <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input type="time" className="rounded-xl" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-          {/* Submission Link */}
-          <div className="mb-7">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Submission link
-            </label>
-            <input
-              type="url"
-              {...register("submissionLink")}
-              placeholder="https://www.url.com/"
-              className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                errors.submissionLink ? "border-red-500" : "border-gray-300"
-              }`}
-            />
-            {errors.submissionLink && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.submissionLink.message}
-              </p>
-            )}
-          </div>
+              {/* Color Picker */}
+              <FormField
+                control={form.control}
+                name="color"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Theme Color <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <div className="flex gap-3 flex-wrap">
+                        {COLORS.map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => field.onChange(color)}
+                            className={`w-10 h-10 rounded-full transition-all ${
+                              selectedColor === color
+                                ? "ring-2 ring-offset-2 ring-gray-400 scale-110"
+                                : "hover:scale-105"
+                            }`}
+                            style={{ backgroundColor: color }}
+                            aria-label={`Select color ${color}`}
+                          />
+                        ))}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          {/* Save Button */}
-          <button
-            type="button"
-            onClick={handleSubmit(onSubmit)}
-            disabled={updateTask.isPending}
-            className="w-full py-3 bg-indigo-600 text-white font-medium rounded-full hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {updateTask.isPending ? "Saving..." : "Save"}
-          </button>
+              {/* Note */}
+              <FormField
+                control={form.control}
+                name="note"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Notes <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Task details..."
+                        rows={3}
+                        className="rounded-xl resize-none"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Submission Link */}
+              <FormField
+                control={form.control}
+                name="submissionLink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Submission Link <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="url"
+                        placeholder="https://example.com/submission"
+                        className="rounded-xl"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Submit Button */}
+              <Button
+                type="submit"
+                disabled={updateTaskMutation.isPending}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 rounded-full py-6 text-base font-semibold"
+              >
+                {updateTaskMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </form>
+          </Form>
         </div>
       </div>
     </div>

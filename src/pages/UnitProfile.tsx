@@ -1,4 +1,4 @@
-import { useAuth } from "@/hooks/useAuth";
+import { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,55 +19,128 @@ import {
   ChevronRight,
   Camera,
 } from "lucide-react";
-import { useUnitProfileData } from "@/hooks/useUnitProfileData";
+
+// 1. IMPORT HOOKS
+import {
+  useUnitProfile,
+  useUpdateUnitProfile,
+  useAvatarOperations,
+  useBannerOperations,
+} from "@/hooks/useUnitProfile";
+import { useSession } from "@/lib/auth-client";
+// ADDED: Import useQueryClient for manual cache updates
+import { useQueryClient } from "@tanstack/react-query";
+
+// 2. IMPORT TYPES
+import type { Profile, Project, SocialLink } from "@/types/profiles.types";
+
+// Components
 import { UnitDetailsDialog } from "@/components/unit/UnitDetailsDialog";
 import { UnitDescriptionDialog } from "@/components/unit/UnitDescriptionDialog";
 import { UnitProjectDialog } from "@/components/unit/UnitProjectDialog";
 import { UnitSocialLinksDialog } from "@/components/unit/UnitSocialLinksDialog";
 import { GalleryDialog } from "@/components/GalleryDialog";
 import { GlimpseDialog } from "@/components/GlimpseDialog";
-import { useEffect, useState, useRef } from "react";
 import { CircularProgress } from "@/components/CircularProgress";
-import { useUnitProfileCompletion } from "@/hooks/useUnitProfileCompletion";
 import { ImageUploadDialog } from "@/components/ImageUploadDialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { type ProjectFormValues } from "@/lib/unitDialogSchemas";
 
 const UnitProfile = () => {
-  const { user } = useAuth();
-  const {
-    profile,
-    unitProfile,
-    loading,
-    updateProfile,
-    updateUnitProfile,
-    addProjectEntry,
-    removeProjectEntry,
-    updateSocialLinks,
-    removeSocialLink,
-    parseJsonField,
-    refetch,
-  } = useUnitProfileData();
+  const { data: session } = useSession();
+  const user = session?.user;
+  const queryClient = useQueryClient();
 
+  // 3. USE REACT QUERY HOOKS WITH TYPE
+  const { data: profileData, isLoading, refetch } = useUnitProfile();
+  const { uploadAvatar, deleteAvatar } = useAvatarOperations();
+  const { uploadBanner, deleteBanner } = useBannerOperations();
+
+  const profile = profileData as Profile | undefined;
+  const updateMutation = useUpdateUnitProfile();
+
+  // Dialog States
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const [isBannerDialogOpen, setIsBannerDialogOpen] = useState(false);
   const [isGalleryDialogOpen, setIsGalleryDialogOpen] = useState(false);
   const [isGlimpseDialogOpen, setIsGlimpseDialogOpen] = useState(false);
   const [viewImage, setViewImage] = useState<string | null>(null);
 
-  const profileCompletion = useUnitProfileCompletion({ profile, unitProfile });
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (!loading && (profile || user)) {
-      console.log("=== Unit Profile Data Retrieved ===");
-      console.log("Auth User ID:", user?.id);
-      console.log("Profile ID:", profile?.id);
-      console.log("Profile Completion:", profileCompletion + "%");
-      console.log("==============================");
-    }
-  }, [loading, profile, unitProfile, user, profileCompletion]);
+  // --- 4. OPTIMISTIC UPDATE HELPER ---
+  const performOptimisticUpdate = (updates: Partial<Profile>) => {
+    const previousProfile = queryClient.getQueryData<Profile>(["unitProfile"]);
 
-  if (loading) {
+    queryClient.setQueryData<Profile>(["unitProfile"], (old) => {
+      if (!old) return old;
+      return { ...old, ...updates };
+    });
+
+    updateMutation.mutate(updates, {
+      onError: (err) => {
+        console.error("Update failed, rolling back", err);
+        if (previousProfile) {
+          queryClient.setQueryData(["unitProfile"], previousProfile);
+        }
+      },
+    });
+  };
+
+  // --- HANDLERS ---
+
+  const handleUpdateProfile = (updates: Partial<Profile>) => {
+    performOptimisticUpdate(updates);
+  };
+
+  const handleAddProject = (projectData: ProjectFormValues) => {
+    const currentProjects = profile?.projects || [];
+    const tempProject: Project = {
+      ...projectData,
+      id: `temp-${Date.now()}`,
+    } as Project;
+    const updatedProjects = [...currentProjects, tempProject];
+    performOptimisticUpdate({ projects: updatedProjects });
+  };
+
+  const handleRemoveProject = (projectId: string) => {
+    if (!projectId) return;
+    const currentProjects = profile?.projects || [];
+    const updatedProjects = currentProjects.filter((p) => p.id !== projectId);
+    performOptimisticUpdate({ projects: updatedProjects });
+  };
+
+  // 1. Update Social Links (Pass Array Directly)
+  const handleUpdateSocialLinks = (links: SocialLink[]) => {
+    // The backend now expects an array, so we just pass it through!
+    performOptimisticUpdate({ socialLinks: links });
+  };
+
+  // 2. Remove Social Link (Filter Array)
+  const handleRemoveSocialLink = (identifier: string) => {
+    const currentLinks = (profile?.socialLinks || []) as SocialLink[];
+    const updatedLinks = currentLinks.filter((l) => {
+      const itemIdentifier = l.id || l.platform;
+      return itemIdentifier !== identifier;
+    });
+    performOptimisticUpdate({ socialLinks: updatedLinks });
+  };
+
+  const handleImageSuccess = () => {
+    refetch();
+  };
+
+  // 5. DATA MAPPING
+  const projects = profile?.projects || [];
+  const galleryImages = profile?.galleryImages || [];
+  const glimpseUrl = profile?.galleryVideos || null;
+  const profileScore = profile?.profileScore || 0;
+
+  // --- FIX: Direct Array Access (No Object Conversion Needed) ---
+  const socialLinks = profile?.socialLinks || [];
+  // -------------------------------------------------------------
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -92,43 +165,16 @@ const UnitProfile = () => {
     );
   }
 
-  const projects = parseJsonField(unitProfile?.projects, []);
-  const galleryImages = parseJsonField(unitProfile?.gallery_images, []);
-  const socialLinks = parseJsonField(unitProfile?.social_links, []);
-  const glimpseUrl = (unitProfile as any)?.glimpse || null;
-
-  const handleImageUploadSuccess = () => {
-    refetch();
-  };
-
-  const handleGallerySuccess = () => {
-    refetch();
-  };
-
-  const handleGlimpseSuccess = () => {
-    refetch();
-  };
-
-  const handleSocialLinksSave = async (links: any[]) => {
-    await updateSocialLinks(links);
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
       {/* Hero Background - Banner */}
       <div className="relative h-48 sm:h-56 md:h-64 lg:h-72 bg-gradient-to-r from-primary to-primary-foreground group">
-        {(unitProfile as any)?.banner_url ? (
+        {profile?.bannerUrl ? (
           <img
-            src={(unitProfile as any).banner_url}
+            src={profile.bannerUrl}
             alt="Banner"
-            className="w-full h-full object-cover"
-          />
-        ) : unitProfile?.cover_image_url ? (
-          <img
-            src={unitProfile.cover_image_url}
-            alt="Cover"
             className="w-full h-full object-cover"
           />
         ) : (
@@ -149,23 +195,14 @@ const UnitProfile = () => {
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
               <div className="relative group">
                 <CircularProgress
-                  percentage={profileCompletion}
+                  percentage={profileScore}
                   size={90}
                   strokeWidth={3}
                 >
                   <Avatar className="h-20 w-20">
-                    <AvatarImage
-                      src={
-                        (unitProfile as any)?.avatar_url ||
-                        unitProfile?.logo_url ||
-                        ""
-                      }
-                    />
+                    <AvatarImage src={profile?.avatarUrl || undefined} />
                     <AvatarFallback className="text-lg bg-primary text-primary-foreground">
-                      {unitProfile?.unit_name?.charAt(0) ||
-                        profile?.full_name?.charAt(0) ||
-                        user?.email?.charAt(0)?.toUpperCase() ||
-                        "U"}
+                      {profile?.name?.charAt(0) || "U"}
                     </AvatarFallback>
                   </Avatar>
                 </CircularProgress>
@@ -180,34 +217,30 @@ const UnitProfile = () => {
               <div className="flex-1 w-full">
                 <div className="flex items-center space-x-2 mb-2">
                   <h1 className="text-xl sm:text-2xl font-bold">
-                    {unitProfile?.unit_name ||
-                      profile?.full_name ||
-                      "Unit Name"}
+                    {profile?.name || "Unit Name"}
                   </h1>
-                  {profile && (
-                    <UnitDetailsDialog
-                      profile={profile}
-                      unitProfile={unitProfile}
-                      onUpdate={updateProfile}
-                      onUpdateUnit={updateUnitProfile}
-                    >
-                      <Pencil className="w-4 h-4 text-muted-foreground cursor-pointer hover:text-primary" />
-                    </UnitDetailsDialog>
-                  )}
+                  <UnitDetailsDialog
+                    unitProfile={profile}
+                    onUpdateUnit={handleUpdateProfile}
+                  >
+                    <Pencil className="w-4 h-4 text-muted-foreground cursor-pointer hover:text-primary" />
+                  </UnitDetailsDialog>
                 </div>
                 <p className="text-sm sm:text-base text-muted-foreground mb-2">
-                  {unitProfile?.unit_type || "Organization"} •{" "}
-                  {unitProfile?.industry || "Industry"}
+                  {profile?.type || "Organization"} •{" "}
+                  {profile?.industry || "Industry"}
                 </p>
 
                 <div className="mb-4 flex items-start gap-2">
                   <p className="text-xs sm:text-sm text-muted-foreground flex-1">
-                    {unitProfile?.description ||
+                    {profile?.description ||
                       "Tell the world about your organization - what you do, who you serve, and what makes you unique."}
                   </p>
                   <UnitDescriptionDialog
-                    description={unitProfile?.description || ""}
-                    onSave={(description) => updateUnitProfile({ description })}
+                    description={profile?.description || ""}
+                    onSave={(description) =>
+                      handleUpdateProfile({ description })
+                    }
                     title="Edit About Us"
                   >
                     <Pencil className="w-3 h-3 text-muted-foreground cursor-pointer hover:text-primary flex-shrink-0 mt-0.5" />
@@ -218,31 +251,28 @@ const UnitProfile = () => {
                   <div className="flex items-center space-x-1">
                     <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
                     <span className="truncate max-w-[200px] sm:max-w-none">
-                      {unitProfile?.contact_email ||
-                        profile?.email ||
-                        user?.email ||
-                        "No email provided"}
+                      {profile?.email || user?.email || "No email provided"}
                     </span>
                   </div>
-                  {unitProfile?.contact_phone && (
+                  {profile?.phone && (
                     <div className="flex items-center space-x-1">
                       <Phone className="w-3 h-3 sm:w-4 sm:h-4" />
-                      <span>{unitProfile.contact_phone}</span>
+                      <span>{profile.phone}</span>
                     </div>
                   )}
-                  {unitProfile?.address && (
+                  {profile?.address && (
                     <div className="flex items-center space-x-1">
                       <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
                       <span className="truncate max-w-[150px] sm:max-w-none">
-                        {unitProfile.address}
+                        {profile.address}
                       </span>
                     </div>
                   )}
-                  {unitProfile?.website_url && (
+                  {profile?.websiteUrl && (
                     <div className="flex items-center space-x-1">
                       <Globe className="w-3 h-3 sm:w-4 sm:h-4" />
                       <a
-                        href={unitProfile.website_url}
+                        href={profile.websiteUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hover:text-primary"
@@ -257,6 +287,7 @@ const UnitProfile = () => {
           </CardContent>
         </Card>
 
+        {/* Sidebar & Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 sm:gap-4">
           {/* Left Sidebar - Quick Links */}
           <div className="lg:col-span-1 mb-4 lg:mb-0">
@@ -266,13 +297,12 @@ const UnitProfile = () => {
                   Quick Links
                 </h3>
                 <div className="space-y-3 text-xs sm:text-sm">
+                  {/* Unit Details Link */}
                   <div className="flex items-center justify-between">
                     <span>Unit Details</span>
                     <UnitDetailsDialog
-                      profile={profile}
-                      unitProfile={unitProfile}
-                      onUpdate={updateProfile}
-                      onUpdateUnit={updateUnitProfile}
+                      unitProfile={profile}
+                      onUpdateUnit={handleUpdateProfile}
                     >
                       <Button
                         variant="ghost"
@@ -284,12 +314,13 @@ const UnitProfile = () => {
                     </UnitDetailsDialog>
                   </div>
 
+                  {/* About Us Link */}
                   <div className="flex items-center justify-between">
                     <span>About Us</span>
                     <UnitDescriptionDialog
-                      description={unitProfile?.description || ""}
+                      description={profile?.description || ""}
                       onSave={(description) =>
-                        updateUnitProfile({ description })
+                        handleUpdateProfile({ description })
                       }
                       title="Edit About Us"
                     >
@@ -303,6 +334,7 @@ const UnitProfile = () => {
                     </UnitDescriptionDialog>
                   </div>
 
+                  {/* Glimpse Link */}
                   <div className="flex items-center justify-between">
                     <span>Glimpse</span>
                     <Button
@@ -315,11 +347,12 @@ const UnitProfile = () => {
                     </Button>
                   </div>
 
+                  {/* Mission Link */}
                   <div className="flex items-center justify-between">
                     <span>Mission</span>
                     <UnitDescriptionDialog
-                      description={unitProfile?.mission || ""}
-                      onSave={(mission) => updateUnitProfile({ mission })}
+                      description={profile?.mission || ""}
+                      onSave={(mission) => handleUpdateProfile({ mission })}
                       title="Edit Mission"
                     >
                       <Button
@@ -332,11 +365,12 @@ const UnitProfile = () => {
                     </UnitDescriptionDialog>
                   </div>
 
+                  {/* Values Link */}
                   <div className="flex items-center justify-between">
                     <span>Values</span>
                     <UnitDescriptionDialog
-                      description={unitProfile?.values || ""}
-                      onSave={(values) => updateUnitProfile({ values })}
+                      description={profile?.values || ""}
+                      onSave={(values) => handleUpdateProfile({ values })}
                       title="Edit Values"
                     >
                       <Button
@@ -349,9 +383,10 @@ const UnitProfile = () => {
                     </UnitDescriptionDialog>
                   </div>
 
+                  {/* Projects Link */}
                   <div className="flex items-center justify-between">
                     <span>Projects</span>
-                    <UnitProjectDialog onSave={addProjectEntry}>
+                    <UnitProjectDialog onSave={handleAddProject}>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -362,10 +397,11 @@ const UnitProfile = () => {
                     </UnitProjectDialog>
                   </div>
 
+                  {/* Social Links Link */}
                   <div className="flex items-center justify-between">
                     <span>Social Links</span>
                     <UnitSocialLinksDialog
-                      onSave={handleSocialLinksSave}
+                      onSave={handleUpdateSocialLinks}
                       currentLinks={socialLinks}
                     >
                       <Button
@@ -378,6 +414,7 @@ const UnitProfile = () => {
                     </UnitSocialLinksDialog>
                   </div>
 
+                  {/* Gallery Link */}
                   <div className="flex items-center justify-between">
                     <span>Gallery</span>
                     <Button
@@ -396,12 +433,12 @@ const UnitProfile = () => {
 
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-2 sm:space-y-4">
-            {/* Projects */}
+            {/* Projects Section */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg sm:text-xl font-semibold">Projects</h3>
-                  <UnitProjectDialog onSave={addProjectEntry}>
+                  <UnitProjectDialog onSave={handleAddProject}>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -414,27 +451,27 @@ const UnitProfile = () => {
 
                 {projects.length > 0 ? (
                   <div className="divide-y divide-border">
-                    {projects.map((project: any, index: number) => (
+                    {projects.map((project, index) => (
                       <div key={index} className="py-3 sm:py-4">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <h4 className="font-semibold text-sm sm:text-base text-foreground">
-                              {project.project_name || "Untitled Project"}
+                              {project.projectName || "Untitled Project"}
                             </h4>
 
-                            {project.client_name && (
+                            {project.clientName && (
                               <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                                {project.client_name}
+                                {project.clientName}
                               </p>
                             )}
 
                             <p className="text-xs text-muted-foreground mt-2">
                               {project.status === "Completed" &&
-                              project.completion_date ? (
+                              project.completionDate ? (
                                 <>
                                   Completed on{" "}
                                   {new Date(
-                                    project.completion_date
+                                    project.completionDate
                                   ).toLocaleDateString()}
                                 </>
                               ) : (
@@ -448,7 +485,9 @@ const UnitProfile = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeProjectEntry(project.id)}
+                            onClick={() => {
+                              if (project.id) handleRemoveProject(project.id);
+                            }}
                             className="text-muted-foreground hover:text-destructive flex-shrink-0"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -466,15 +505,15 @@ const UnitProfile = () => {
               </CardContent>
             </Card>
 
-            {/* Mission */}
+            {/* Mission Section */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
                     Mission
                     <UnitDescriptionDialog
-                      description={unitProfile?.mission || ""}
-                      onSave={(mission) => updateUnitProfile({ mission })}
+                      description={profile?.mission || ""}
+                      onSave={(mission) => handleUpdateProfile({ mission })}
                       title="Edit Mission"
                     >
                       <Pencil className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground cursor-pointer hover:text-primary" />
@@ -483,39 +522,38 @@ const UnitProfile = () => {
                 </div>
                 <div className="rounded-xl min-h-[100px]">
                   <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap">
-                    {unitProfile?.mission ||
+                    {profile?.mission ||
                       "Define your organization's mission statement - the purpose and primary objectives that drive your work."}
                   </p>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Values */}
+            {/* Values Section */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center mb-4">
                   <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
                     Values
                     <UnitDescriptionDialog
-                      description={unitProfile?.values || ""}
-                      onSave={(values) => updateUnitProfile({ values })}
+                      description={profile?.values || ""}
+                      onSave={(values) => handleUpdateProfile({ values })}
                       title="Edit Values"
                     >
                       <Pencil className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground cursor-pointer hover:text-primary" />
                     </UnitDescriptionDialog>
                   </h3>
                 </div>
-
                 <div className="rounded-xl min-h-[100px]">
                   <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap">
-                    {unitProfile?.values ||
+                    {profile?.values ||
                       "Describe the principles and ethics that define your organization's culture and decisions."}
                   </p>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Social Links */}
+            {/* Social Links Section */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -523,7 +561,7 @@ const UnitProfile = () => {
                     Social Links
                   </h2>
                   <UnitSocialLinksDialog
-                    onSave={handleSocialLinksSave}
+                    onSave={handleUpdateSocialLinks}
                     currentLinks={socialLinks}
                   >
                     <Button
@@ -538,7 +576,7 @@ const UnitProfile = () => {
 
                 {socialLinks.length > 0 ? (
                   <div className="space-y-3 sm:space-y-4">
-                    {socialLinks.map((link: any, index: number) => (
+                    {socialLinks.map((link, index) => (
                       <div
                         key={index}
                         className="flex flex-col sm:grid sm:grid-cols-5 gap-2 sm:items-center"
@@ -557,7 +595,9 @@ const UnitProfile = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => removeSocialLink(link.id)}
+                          onClick={() =>
+                            handleRemoveSocialLink(link.id || link.platform)
+                          }
                           className="text-muted-foreground hover:text-destructive sm:justify-self-end self-end"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -573,7 +613,7 @@ const UnitProfile = () => {
               </CardContent>
             </Card>
 
-            {/* Glimpse of the Unit */}
+            {/* Glimpse of the Unit Section */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -597,7 +637,6 @@ const UnitProfile = () => {
                       controls
                       controlsList="nodownload"
                       className="w-full h-full"
-                      poster=""
                     >
                       Your browser does not support the video tag.
                     </video>
@@ -614,7 +653,7 @@ const UnitProfile = () => {
               </CardContent>
             </Card>
 
-            {/* Gallery */}
+            {/* Gallery Section */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -631,7 +670,6 @@ const UnitProfile = () => {
 
                 {galleryImages.length > 0 ? (
                   <div className="flex items-center space-x-2 sm:space-x-4">
-                    {/* Left Chevron */}
                     <button
                       onClick={() =>
                         scrollRef.current?.scrollBy({
@@ -644,7 +682,6 @@ const UnitProfile = () => {
                       <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
 
-                    {/* Scrollable Image Container */}
                     <div
                       ref={scrollRef}
                       className="flex overflow-x-auto space-x-3 sm:space-x-4 scroll-smooth no-scrollbar"
@@ -653,7 +690,7 @@ const UnitProfile = () => {
                         msOverflowStyle: "none",
                       }}
                     >
-                      {galleryImages.map((image: string, index: number) => (
+                      {galleryImages.map((image, index) => (
                         <div
                           key={index}
                           className="relative flex-shrink-0 w-48 h-48 sm:w-64 sm:h-64 rounded-lg overflow-hidden border border-border group cursor-pointer"
@@ -671,7 +708,6 @@ const UnitProfile = () => {
                       ))}
                     </div>
 
-                    {/* Right Chevron */}
                     <button
                       onClick={() =>
                         scrollRef.current?.scrollBy({
@@ -699,31 +735,37 @@ const UnitProfile = () => {
         </div>
       </div>
 
-      {/* All Dialogs */}
-      {profile && unitProfile && (
+      {/* All Upload & Details Dialogs */}
+      {profile && (
         <>
+          {/* Avatar Dialog */}
           <ImageUploadDialog
             isOpen={isAvatarDialogOpen}
             onClose={() => setIsAvatarDialogOpen(false)}
-            currentImageUrl={
-              (unitProfile as any)?.avatar_url || unitProfile.logo_url
-            }
+            currentImageUrl={profile.avatarUrl}
             userId={profile.id}
-            userName={unitProfile.unit_name || profile.full_name}
+            userName={profile.name}
             imageType="avatar"
             entityType="unit"
-            onSuccess={handleImageUploadSuccess}
+            onSuccess={handleImageSuccess}
+            onUpload={(file) => uploadAvatar.mutateAsync(file)}
+            onDelete={() => deleteAvatar.mutateAsync()}
+            isProcessing={uploadAvatar.isPending || deleteAvatar.isPending}
           />
 
+          {/* Banner Dialog */}
           <ImageUploadDialog
             isOpen={isBannerDialogOpen}
             onClose={() => setIsBannerDialogOpen(false)}
-            currentImageUrl={(unitProfile as any)?.banner_url}
+            currentImageUrl={profile.bannerUrl}
             userId={profile.id}
-            userName={unitProfile.unit_name || profile.full_name}
+            userName={profile.name}
             imageType="banner"
             entityType="unit"
-            onSuccess={handleImageUploadSuccess}
+            onSuccess={handleImageSuccess}
+            onUpload={(file) => uploadBanner.mutateAsync(file)}
+            onDelete={() => deleteBanner.mutateAsync()}
+            isProcessing={uploadBanner.isPending || deleteBanner.isPending}
           />
 
           <GalleryDialog
@@ -731,7 +773,7 @@ const UnitProfile = () => {
             onClose={() => setIsGalleryDialogOpen(false)}
             userId={profile.id}
             currentImages={galleryImages}
-            onSuccess={handleGallerySuccess}
+            onSuccess={handleImageSuccess}
           />
 
           <GlimpseDialog
@@ -739,7 +781,7 @@ const UnitProfile = () => {
             onClose={() => setIsGlimpseDialogOpen(false)}
             userId={profile.id}
             currentGlimpseUrl={glimpseUrl}
-            onSuccess={handleGlimpseSuccess}
+            onSuccess={handleImageSuccess}
           />
         </>
       )}

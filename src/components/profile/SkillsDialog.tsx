@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -6,55 +6,102 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus } from "lucide-react";
-import { StudentProfile } from "@/types/profile";
+import { X } from "lucide-react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useUpdateProfile } from "@/hooks/useProfile";
+import { useToast } from "@/hooks/use-toast";
+import { Profile } from "@/types/profiles.types";
+import { skillsFormSchema } from "@/lib/schemas";
+
+type SkillsFormData = z.infer<typeof skillsFormSchema>;
 
 interface SkillsDialogProps {
-  studentProfile: StudentProfile | null;
-  onUpdate: (updates: Partial<StudentProfile>) => Promise<void>;
+  profile: Profile | null | undefined;
+  onUpdate?: () => void;
   children: React.ReactNode;
 }
 
 export const SkillsDialog = ({
-  studentProfile,
+  profile,
   onUpdate,
   children,
 }: SkillsDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [skills, setSkills] = useState<string[]>(studentProfile?.skills || []);
   const [newSkill, setNewSkill] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+  const { mutateAsync: updateProfile, isPending } = useUpdateProfile();
+
+  const form = useForm<SkillsFormData>({
+    resolver: zodResolver(skillsFormSchema),
+    defaultValues: {
+      skills: (profile?.skills ?? []).map((s) => ({ value: s })),
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "skills",
+  });
+
+  // Sync internal state when profile data changes or dialog opens
+  useEffect(() => {
+    if (open && profile?.skills) {
+      form.reset({
+        skills: profile.skills.map((s) => ({ value: s })),
+      });
+    }
+  }, [open, profile?.skills, form]);
 
   const addSkill = () => {
-    if (newSkill.trim() && !skills.includes(newSkill.trim())) {
-      setSkills([...skills, newSkill.trim()]);
-      setNewSkill("");
+    const trimmed = newSkill.trim();
+    if (trimmed) {
+      const currentValues = fields.map((f) => f.value);
+      if (!currentValues.includes(trimmed)) {
+        append({ value: trimmed });
+        setNewSkill("");
+      }
     }
   };
 
-  const removeSkill = (skillToRemove: string) => {
-    setSkills(skills.filter((skill) => skill !== skillToRemove));
-  };
-
-  const handleSave = async () => {
-    setLoading(true);
-    try {
-      await onUpdate({ skills });
-      setOpen(false);
-    } catch (error) {
-      console.error("Error updating skills:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
       addSkill();
+    }
+  };
+
+  const onSubmit = async (data: SkillsFormData) => {
+    try {
+      // Map object array back to string array for the API
+      const skillStrings = data.skills.map((s) => s.value);
+      await updateProfile({ skills: skillStrings });
+
+      toast({
+        title: "Success",
+        description: "Skills updated successfully",
+      });
+
+      setOpen(false);
+      onUpdate?.();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update skills",
+        variant: "destructive",
+      });
     }
   };
 
@@ -65,56 +112,67 @@ export const SkillsDialog = ({
         <DialogHeader>
           <DialogTitle>Edit Skills</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="flex space-x-2">
-            <Input
-              placeholder="Add a skill"
-              value={newSkill}
-              onChange={(e) => setNewSkill(e.target.value)}
-              onKeyPress={handleKeyPress}
-              className="rounded-full "
-            />
 
-            <Button type="button" onClick={addSkill} className="rounded-full ">
-              Add
-            </Button>
-          </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormItem>
+              <FormLabel>Add a skill</FormLabel>
+              <div className="flex space-x-2">
+                <FormControl>
+                  <Input
+                    placeholder="e.g. React, TypeScript, Node.js"
+                    value={newSkill}
+                    onChange={(e) => setNewSkill(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="rounded-full"
+                  />
+                </FormControl>
+                <Button 
+                  type="button" 
+                  onClick={addSkill} 
+                  className="rounded-full"
+                >
+                  Add
+                </Button>
+              </div>
+              <FormMessage />
+            </FormItem>
 
-          <div className="flex flex-wrap gap-2 max-h-40 items-center overflow-y-auto">
-            {skills.map((skill, index) => (
-              <Badge
-                key={index}
-                variant="secondary"
-                className="px-3 py-1 bg-blue-50 text-blue-500"
+            <div className="flex flex-wrap gap-2 max-h-40 items-center overflow-y-auto p-1">
+              {fields.map((field, index) => (
+                <Badge
+                  key={field.id}
+                  variant="secondary"
+                  className="px-3 py-1 bg-blue-50 text-blue-500 flex items-center gap-1"
+                >
+                  {field.value}
+                  <X
+                    className="w-3 h-3 ml-1 cursor-pointer"
+                    onClick={() => remove(index)}
+                  />
+                </Badge>
+              ))}
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                className="rounded-full"
               >
-                {skill}
-
-                <X
-                  className="w-3 h-3 ml-1 cursor-pointer"
-                  onClick={() => removeSkill(skill)}
-                />
-              </Badge>
-            ))}
-          </div>
-
-          <div className="flex justify-end space-x-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              className="rounded-full"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={loading}
-              className="rounded-full"
-            >
-              {loading ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
-        </div>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="rounded-full"
+              >
+                {isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

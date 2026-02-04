@@ -1,5 +1,4 @@
-import { useProfileCompletion } from "@/hooks/useProfileCompletion";
-import { useAuth } from "@/hooks/useAuth";
+import { useSession } from "@/lib/auth-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,16 +10,11 @@ import {
   Phone,
   MapPin,
   Trash2,
-  X,
-  Sparkle,
-  Pencil,
   Pen,
+  Camera,
   CircleCheckBig,
   CircleX,
-  Camera,
 } from "lucide-react";
-import { useProfileData } from "@/hooks/useProfileData";
-import { AvatarUploadDialog } from "@/components/AvatarUploadDialog";
 import { useState } from "react";
 import { PersonalDetailsDialog } from "@/components/profile/PersonalDetailsDialog";
 import { SkillsDialog } from "@/components/profile/SkillsDialog";
@@ -32,45 +26,104 @@ import { InternshipDialog } from "@/components/profile/InternshipDialog";
 import { ProfileSummaryDialog } from "@/components/profile/ProfileSummaryDialog";
 import { format, formatDistanceToNow } from "date-fns";
 import { CircularProgress } from "@/components/CircularProgress";
-import { LinkDialog } from "@/components/profile/LinkDialog";
 import AIEditIcon from "@/components/ui/custom-icons";
+import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { useToast } from "@/hooks/use-toast";
+import { UnitSocialLinksDialog } from "@/components/unit/UnitSocialLinksDialog";
+import {
+  Language,
+  CandidateEducation,
+  CandidateCourse,
+  CandidateInternship,
+  CandidateProject,
+  Link,
+  Gender,
+  MaritalStatus,
+} from "@/types/profiles.types";
+import { ImageUploadDialog } from "@/components/ImageUploadDialog";
+import { useAvatarOperations } from "@/hooks/useUnitProfile";
+import { CandidateSocialLinksDialog } from "@/components/profile/CandidateSocialLinksDialog";
+import { parseISO } from "date-fns";
 
 const Profile = () => {
-  const { user } = useAuth();
-  const {
-    profile,
-    studentProfile,
-    loading,
-    updateProfile,
-    updateStudentProfile,
-    addEducationEntry,
-    addProjectEntry,
-    addCourseEntry,
-    addLanguageEntry,
-    addLinkEntry,
-    addInternshipEntry,
-    updateInterests,
-    updateCoverLetter,
-    parseJsonField,
-    removeEducationEntry,
-    removeProjectEntry,
-    removeCourseEntry,
-    removeLanguageEntry,
-    removeLinkEntry,
-    removeInternshipEntry,
-    removeInterest,
-    removeSkill,
-    refetch,
-  } = useProfileData();
+  const { data: session } = useSession();
+  const { data: profileData, isLoading, refetch } = useProfile();
+  const { mutateAsync: updateProfile } = useUpdateProfile();
+  const { toast } = useToast();
+
+  const { uploadAvatar, deleteAvatar } = useAvatarOperations();
 
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
-  const profileCompletion = useProfileCompletion({ profile, studentProfile });
 
-  const handleAvatarUploadSuccess = () => {
+  const GENDER_LABELS: Record<Gender, string> = {
+  [Gender.MALE]: "Male",
+  [Gender.FEMALE]: "Female",
+  [Gender.OTHER]: "Other",
+};
+
+const MARITAL_STATUS_LABELS: Record<MaritalStatus, string> = {
+  [MaritalStatus.SINGLE]: "Single",
+  [MaritalStatus.MARRIED]: "Married",
+  [MaritalStatus.PREFER_NOT_TO_SAY]: "Prefer not to say",
+};
+
+  const handleImageSuccess = () => {
     refetch?.();
   };
 
-  if (loading) {
+  // FIXED: Logic handles both array-based and object-based (socialLinks) deletions using targetIndex or Key
+  const handleDelete = async (
+    field: string,
+    targetIdentifier: number | string,
+  ) => {
+    try {
+      const { data: freshProfile } = await refetch();
+      const rawData = freshProfile?.[field as keyof typeof freshProfile];
+
+      let updatedPayload;
+
+      if (field === "socialLinks" && typeof targetIdentifier === "string") {
+        // Handle object-based deletion for socialLinks
+        const currentLinks = (rawData as Record<string, any>) || {};
+        updatedPayload = Object.fromEntries(
+          Object.entries(currentLinks).filter(
+            ([key]) => key !== targetIdentifier,
+          ),
+        );
+      } else if (Array.isArray(rawData)) {
+        // Handle array-based deletion using index
+        updatedPayload = rawData.filter((_, idx) => idx !== targetIdentifier);
+      }
+
+      await updateProfile({ [field]: updatedPayload });
+
+      toast({ title: "Success", description: "Deleted successfully" });
+      refetch();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Delete failed",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const skills = profileData?.skills ?? [];
+  const education = profileData?.education ?? [];
+  const projects = profileData?.projects ?? [];
+  const interests = (profileData?.interests ?? []).filter(
+    (i: string) => i !== "No Ideas" && i !== "I want to explore",
+  );
+  const languages: Language[] = profileData?.language ?? [];
+  const completedCourses = profileData?.course ?? [];
+  const internships = profileData?.internship ?? [];
+  const links: Link[] = Array.isArray(profileData?.socialLinks)
+    ? profileData.socialLinks
+    : [];
+
+  const profileCompletion = profileData?.profileScore || 0;
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -95,59 +148,13 @@ const Profile = () => {
     );
   }
 
-  const quickLinks = [
-    { name: "Profile Summary", action: "Update" },
-    { name: "Courses", action: "Add" },
-    { name: "Key Skills", action: "" },
-    { name: "Education", action: "" },
-    { name: "Projects", action: "Add" },
-    { name: "Interests", action: "Add" },
-    { name: "Internships", action: "Add" },
-    { name: "Personal Details", action: "Add" },
-  ];
-
-  const renderProficiencyDots = (level: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <div
-        key={i}
-        className={`w-2 h-2 rounded-full ${
-          i < level ? "bg-primary" : "bg-muted"
-        }`}
-      />
-    ));
-  };
-
-  // Safe data extraction
-  const skills = parseJsonField(studentProfile?.skills, []);
-  const education = parseJsonField(studentProfile?.education, []);
-  const projects = parseJsonField(studentProfile?.projects, []);
-  const newInterests = parseJsonField(studentProfile?.interests, []);
-
-  const interests = newInterests.filter(
-    (i) => i !== "No Ideas" && i !== "I want to explore"
-  );
-  const languages = parseJsonField(studentProfile?.languages, []);
-  const completedCourses = parseJsonField(
-    studentProfile?.completed_courses,
-    []
-  );
-
-  const internships = parseJsonField((studentProfile as any)?.internships, []);
-
-  const links = parseJsonField(studentProfile?.links, []);
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      {/* Hero Background */}
-
-      <div className="relative h-[17.625rem] bg-gradient-to-r from-primary to-primary-foreground">
-        {/* <div className="  bg-black/20" /> */}
-      </div>
+      <div className="relative h-[17.625rem] bg-gradient-to-r from-primary to-primary-foreground" />
 
       <div className="-mt-[8.25rem] pt-0 container px-4 sm:px-6 lg:px-[7.5rem] py-4 lg:py-10">
-        {/* Profile Header */}
         <Card className="relative mb-2 min-h-[185px] h-auto border-gray-200 bg-white rounded-3xl">
           <CardContent className="p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
@@ -159,11 +166,11 @@ const Profile = () => {
                 >
                   <Avatar className="h-20 w-20">
                     <AvatarImage
-                      src={(studentProfile as any)?.avatar_url || ""}
+                      src={profileData?.avatarUrl || profileData?.image || ""}
                     />
                     <AvatarFallback className="text-lg bg-primary text-primary-foreground">
-                      {profile?.full_name?.charAt(0) ||
-                        user?.email?.charAt(0).toUpperCase()}
+                      {profileData?.name?.charAt(0) ||
+                        session?.user?.email?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 </CircularProgress>
@@ -178,231 +185,149 @@ const Profile = () => {
               <div className="flex-1">
                 <div className="flex items-center space-x-2 mb-2">
                   <h1 className="text-2xl font-bold">
-                    {profile?.full_name.toLocaleUpperCase() || "Student Name"}
+                    {profileData?.name?.toLocaleUpperCase() || "Student Name"}
                   </h1>
-                  {profile && (
-                    <>
-                      <PersonalDetailsDialog
-                        profile={profile}
-                        studentProfile={studentProfile}
-                        onUpdate={updateProfile}
-                        onUpdateStudent={updateStudentProfile}
-                      >
-                        <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
-                      </PersonalDetailsDialog>
-                    </>
+                  {profileData && (
+                    <PersonalDetailsDialog
+                      profile={profileData}
+                      onUpdate={() => refetch()}
+                    >
+                      <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
+                    </PersonalDetailsDialog>
                   )}
                 </div>
                 <p className="text-muted-foreground mb-2">
-                  {profile?.role === "student"
-                    ? studentProfile.headline
-                    : profile?.role || "User"}
+                  {profileData?.type || profileData?.role || "User"}
                 </p>
-
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
                   <div className="flex items-center space-x-1">
                     <Mail className="w-4 h-4" />
                     <span>
-                      {profile?.email || user?.email || "No email provided"}
+                      {profileData?.email ||
+                        session?.user?.email ||
+                        "No email provided"}
                     </span>
                   </div>
-                  {profile?.phone && (
+                  {profileData?.phone && (
                     <div className="flex items-center space-x-1">
                       <Phone className="w-4 h-4" />
-                      <span>{profile.phone}</span>
+                      <span>{profileData.phone}</span>
                     </div>
                   )}
                   <div className="flex items-center space-x-1">
                     <MapPin className="w-4 h-4" />
                     <span>
-                      {studentProfile?.location
-                        ? studentProfile.location[0].toLocaleUpperCase() +
-                          studentProfile.location.slice(1)
+                      {profileData?.location
+                        ? profileData.location[0].toLocaleUpperCase() +
+                          profileData.location.slice(1)
                         : "Location not provided"}
                     </span>
                   </div>
                 </div>
                 <p className="text-muted-foreground text-sm text-gray-400 mt-2.5">
-                  {`Last updated - ${
-                    studentProfile.updated_at
-                      ? formatDistanceToNow(
-                          new Date(studentProfile.updated_at),
-                          {
-                            addSuffix: true,
-                          }
-                        )
-                      : "recently"
-                  }`}
+                  {`Last updated - ${profileData?.updatedAt ? formatDistanceToNow(new Date(profileData.updatedAt), { addSuffix: true }) : "recently"}`}
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">
-          {/* Left Sidebar - Quick Links */}
           <div className="lg:col-span-1 mb-4 lg:mb-0">
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-6">
                 <h3 className="font-semibold text-lg mb-4">Quick Links</h3>
                 <div className="space-y-3 text-sm">
-                  {/* Profile Summary */}
-                  <div className="flex items-center justify-between">
-                    <span>Profile Summary</span>
-                    <ProfileSummaryDialog
-                      summary={studentProfile?.cover_letter || ""}
-                      onSave={updateCoverLetter}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary p-0 h-auto"
+                  {[
+                    {
+                      name: "Profile Summary",
+                      component: ProfileSummaryDialog,
+                      props: {
+                        summary: profileData?.profileSummary || "",
+                        onSave: refetch,
+                      },
+                    },
+                    {
+                      name: "Courses",
+                      component: CourseDialog,
+                      props: { onUpdate: refetch },
+                    },
+                    {
+                      name: "Key Skills",
+                      component: SkillsDialog,
+                      props: { profile: profileData, onUpdate: refetch },
+                    },
+                    {
+                      name: "Education",
+                      component: EducationDialog,
+                      props: { onUpdate: refetch },
+                    },
+                    {
+                      name: "Projects",
+                      component: ProjectDialog,
+                      props: { onUpdate: refetch },
+                    },
+                    {
+                      name: "Interests",
+                      component: InterestDialog,
+                      props: { interests, onUpdate: refetch },
+                    },
+                    {
+                      name: "Internships",
+                      component: InternshipDialog,
+                      props: { onUpdate: refetch },
+                    },
+                    {
+                      name: "Personal Details",
+                      component: PersonalDetailsDialog,
+                      props: { profile: profileData, onUpdate: refetch },
+                    },
+                    {
+                      name: "Links",
+                      component: UnitSocialLinksDialog,
+                      props: {
+                        currentLinks: links,
+                        onSave: async (updatedLinksArray: any) => {
+                          try {
+                            const socialLinks = Object.fromEntries(
+                              updatedLinksArray.map((l: any) => [
+                                l.platform,
+                                l.url,
+                              ]),
+                            );
+                            await updateProfile({ socialLinks });
+                            refetch();
+                          } catch (e) {
+                            console.error(e);
+                          }
+                        },
+                      },
+                    },
+                  ].map((link) => {
+                    const DialogComponent = link.component as any;
+                    return (
+                      <div
+                        key={link.name}
+                        className="flex items-center justify-between"
                       >
-                        Update
-                      </Button>
-                    </ProfileSummaryDialog>
-                  </div>
-                  {/* Courses */}
-                  <div className="flex items-center justify-between">
-                    <span>Courses</span>
-                    <CourseDialog onSave={addCourseEntry}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary p-0 h-auto"
-                      >
-                        Add
-                      </Button>
-                    </CourseDialog>
-                  </div>
-                  {/* Key Skills */}
-                  <div className="flex items-center justify-between">
-                    <span>Key Skills</span>
-                    <SkillsDialog
-                      studentProfile={studentProfile}
-                      onUpdate={updateStudentProfile}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary p-0 h-auto"
-                      >
-                        Add
-                      </Button>
-                    </SkillsDialog>
-                  </div>
-                  {/* Education */}
-                  <div className="flex items-center justify-between">
-                    <span>Education</span>
-                    <EducationDialog onSave={addEducationEntry}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary p-0 h-auto"
-                      >
-                        Add
-                      </Button>
-                    </EducationDialog>
-                  </div>
-                  {/* Projects */}
-                  <div className="flex items-center justify-between">
-                    <span>Projects</span>
-                    <ProjectDialog onSave={addProjectEntry}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary p-0 h-auto"
-                      >
-                        Add
-                      </Button>
-                    </ProjectDialog>
-                  </div>
-                  {/* Interests */}
-                  <div className="flex items-center justify-between">
-                    <span>Interests</span>
-                    <InterestDialog
-                      interests={interests.filter(
-                        (i) => i !== "No Ideas" && i !== "I want to explore"
-                      )}
-                      onSave={updateInterests}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary p-0 h-auto"
-                      >
-                        Add
-                      </Button>
-                    </InterestDialog>
-                  </div>
-                  {/* Internships */}
-                  <div className="flex items-center justify-between">
-                    <span>Internships</span>
-                    <InternshipDialog onSave={addInternshipEntry}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary p-0 h-auto"
-                      >
-                        Add
-                      </Button>
-                    </InternshipDialog>
-                  </div>
-                  {/* Personal Details */}
-                  <div className="flex items-center justify-between">
-                    <span>Personal Details</span>
-                    <PersonalDetailsDialog
-                      profile={profile}
-                      studentProfile={studentProfile}
-                      onUpdate={updateProfile}
-                      onUpdateStudent={updateStudentProfile}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary p-0 h-auto"
-                      >
-                        Add
-                      </Button>
-                    </PersonalDetailsDialog>
-                  </div>
-                  {/* Languages */}
-                  <div className="flex items-center justify-between">
-                    <span>Languages</span>
-                    <PersonalDetailsDialog
-                      profile={profile}
-                      studentProfile={studentProfile}
-                      onUpdate={updateProfile}
-                      onUpdateStudent={updateStudentProfile}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary p-0 h-auto"
-                      >
-                        Add
-                      </Button>
-                    </PersonalDetailsDialog>
-                  </div>
-
-                  {/* Links */}
-                  <div className="flex items-center justify-between">
-                    <span>Links</span>
-                    <LinkDialog onSave={addInternshipEntry}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary p-0 h-auto"
-                      >
-                        Add
-                      </Button>
-                    </LinkDialog>
-                  </div>
+                        <span>{link.name}</span>
+                        <DialogComponent {...link.props}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-primary p-0 h-auto"
+                          >
+                            Add
+                          </Button>
+                        </DialogComponent>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Main Content */}
           <div className="lg:col-span-3 space-y-2">
             {/* Profile Summary */}
             <Card className="rounded-3xl border-gray-200">
@@ -410,31 +335,31 @@ const Profile = () => {
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="text-lg font-semibold">Profile Summary</h3>
                   <ProfileSummaryDialog
-                    summary={studentProfile?.cover_letter || ""}
-                    onSave={updateCoverLetter}
+                    summary={profileData?.profileSummary || ""}
+                    onSave={refetch}
                   >
                     <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
                   </ProfileSummaryDialog>
                 </div>
                 <div className="border border-gray-400 rounded-2xl p-3 min-h-28">
-                  <p className="text-muted-foreground">
-                    {studentProfile?.cover_letter || (
-                      <p className="flex pr-2 items-center gap-1">
-                        <AIEditIcon />
-                        Get AI assistance to write your Profile Summary
-                      </p>
+                  <div className="text-muted-foreground">
+                    {profileData?.profileSummary || (
+                      <div className="flex pr-2 items-center gap-1">
+                        <AIEditIcon /> Get AI assistance to write your Profile
+                        Summary
+                      </div>
                     )}
-                  </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Completed Courses */}
+            {/* Completed Courses - FIXED index passing */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Completed Courses</h3>
-                  <CourseDialog onSave={addCourseEntry}>
+                  <CourseDialog onUpdate={refetch}>
                     <Button variant="ghost" size="sm" className="text-primary">
                       Add Completed Course
                     </Button>
@@ -442,45 +367,51 @@ const Profile = () => {
                 </div>
                 <div className="space-y-4">
                   {completedCourses.length > 0 ? (
-                    completedCourses.map((course: any, index: number) => (
-                      <div key={index}>
-                        <div className="flex items-center justify-between  rounded-lg">
-                          <div>
-                            <h4 className="font-medium">
-                              {course.title || "Course Title"}
-                            </h4>
-                            <p className="text-sm text-muted-foreground">
-                              {course.provider || "Provider"}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Completed on{" "}
-                              {course.completion_date
-                                ? format(
-                                    new Date(course.completion_date),
-                                    "MMM dd, yyyy"
-                                  )
-                                : "Date not specified"}
-                            </p>
+                    completedCourses.map(
+                      (course: CandidateCourse, index: number) => (
+                        <div key={index}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-medium">{course.title}</h4>
+                              <p className="text-sm text-muted-foreground">
+                                {course.provider}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Completed on{" "}
+                                {course.completion_date
+                                  ? format(
+                                      new Date(course.completion_date),
+                                      "MMM dd, yyyy",
+                                    )
+                                  : "N/A"}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <CourseDialog
+                                course={{ ...course, index }}
+                                onUpdate={refetch}
+                              >
+                                <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary mr-2" />
+                              </CourseDialog>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete("course", index)}
+                                className="text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeCourseEntry(course.id)}
-                              className="text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          {index < completedCourses.length - 1 && (
+                            <hr className="border-gray-200 mt-2.5" />
+                          )}
                         </div>
-                        {course.title !== completedCourses.at(-1).title ? (
-                          <hr className="border-0.5 border-gray-200  mt-2.5" />
-                        ) : undefined}
-                      </div>
-                    ))
+                      ),
+                    )
                   ) : (
                     <p className="text-muted-foreground">
-                      No completed courses yet. Add your first course!
+                      No completed courses yet.
                     </p>
                   )}
                 </div>
@@ -492,10 +423,7 @@ const Profile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="text-lg font-semibold">Key Skills</h3>
-                  <SkillsDialog
-                    studentProfile={studentProfile}
-                    onUpdate={updateStudentProfile}
-                  >
+                  <SkillsDialog profile={profileData} onUpdate={refetch}>
                     <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
                   </SkillsDialog>
                 </div>
@@ -505,160 +433,129 @@ const Profile = () => {
                       <Badge
                         key={index}
                         variant="outline"
-                        className="px-4 py-2 border-gray-400 flex items-center gap-1 bg-transparent"
+                        className="px-4 py-2 border-gray-400 bg-transparent"
                       >
                         {skill}
-                        {/* <X
-                          className="w-3 h-3 cursor-pointer hover:text-destructive"
-                          onClick={() => removeSkill(skill)}
-                        /> */}
                       </Badge>
                     ))
                   ) : (
                     <p className="text-muted-foreground">
-                      No skills added yet. Click the edit icon to add your
-                      skills!
+                      No skills added yet.
                     </p>
                   )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Education */}
+            {/* Education - FIXED index passing */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Education</h3>
-                  <EducationDialog onSave={addEducationEntry}>
+                  <EducationDialog onUpdate={refetch}>
                     <Button variant="ghost" size="sm" className="text-primary">
                       Add Education
                     </Button>
                   </EducationDialog>
                 </div>
                 <div className="space-y-4">
-                  {education.length > 0 ? (
-                    education.map((edu: any, index: number) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between rounded-xl"
-                      >
-                        <div>
-                          <h4 className="font-medium">
-                            {edu.degree || "Degree"}
-                          </h4>
-                          <p className="text-sm text-muted-foreground">
-                            {edu.institution || "Institution"}
+                  {education.map((edu: CandidateEducation, index: number) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between"
+                    >
+                      <div>
+                        <h4 className="font-medium">{edu.degree}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {edu.institution}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-sm">
+                            {edu.start_year} - {edu.end_year || "Present"}
                           </p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className="text-sm">
-                              {edu.start_year || "Start"} -{" "}
-                              {edu.end_year || "Present"}
+                          {edu.score && (
+                            <p className="text-sm text-primary font-medium">
+                              {edu.score} - CGPA
                             </p>
-                            {edu.score && (
-                              <p className="text-sm text-primary font-medium">
-                                {edu.score} - CGPA
-                              </p>
-                            )}
-                          </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EducationDialog
+                            education={{ ...edu, index }}
+                            onUpdate={refetch}
+                          >
+                            <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary mr-2" />
+                          </EducationDialog>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeEducationEntry(edu.id)}
+                            onClick={() => handleDelete("education", index)}
                             className="text-muted-foreground hover:text-destructive"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-muted-foreground">
-                      No education details added yet.
-                    </p>
-                  )}
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Projects */}
+            {/* Projects - FIXED index passing */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Projects</h3>
-                  <ProjectDialog onSave={addProjectEntry}>
+                  <ProjectDialog onUpdate={refetch}>
                     <Button variant="ghost" size="sm" className="text-primary">
                       Add Project
                     </Button>
                   </ProjectDialog>
                 </div>
-                {projects.length > 0 ? (
-                  <div className="space-y-4">
-                    {projects.map((project: any, index: number) => (
-                      <div key={index} className="rounded-xl">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-medium truncate">
-                                {project.title || "Project Title"}
-                              </h4>
-                              <p className="text-xs text-muted-foreground ml-2 whitespace-nowrap">
-                                {project.start_date
-                                  ? format(
-                                      new Date(project.start_date),
-                                      "MMM yyyy"
-                                    )
-                                  : "Start date"}{" "}
-                                -{" "}
-                                {project.end_date
-                                  ? format(
-                                      new Date(project.end_date),
-                                      "MMM yyyy"
-                                    )
-                                  : "Present"}
-                              </p>
-                            </div>
-
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {project.description || "No description"}
-                            </p>
-                            {project.technologies &&
-                              Array.isArray(project.technologies) &&
-                              project.technologies.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                  {project.technologies.map(
-                                    (tech: string, techIndex: number) => (
-                                      <Badge
-                                        key={techIndex}
-                                        variant="outline"
-                                        className="text-xs"
-                                      >
-                                        {tech}
-                                      </Badge>
-                                    )
-                                  )}
-                                </div>
-                              )}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeProjectEntry(project.id)}
-                            className="text-muted-foreground hover:text-destructive ml-2"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                <div className="space-y-4">
+                  {projects.map((project: CandidateProject, index: number) => (
+                    <div
+                      key={index}
+                      className="flex items-start justify-between"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium">
+                            {project.title || project.name}
+                          </h4>
+                          <span className="text-xs text-muted-foreground">
+                            {project.start_date
+                              ? format(new Date(project.start_date), "MMM yyyy")
+                              : ""}{" "}
+                            - {project.end_date || "Present"}
+                          </span>
                         </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {project.description}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">
-                    Stand out by adding details about the projects that you have
-                    done so far.
-                  </p>
-                )}
+                      <div className="flex items-center gap-2">
+                        <ProjectDialog
+                          project={{ ...project, index }}
+                          onUpdate={refetch}
+                        >
+                          <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary mr-2" />
+                        </ProjectDialog>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete("projects", index)}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
@@ -667,98 +564,108 @@ const Profile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Interests</h3>
-                  <InterestDialog
-                    interests={interests}
-                    onSave={updateInterests}
-                  >
+                  <InterestDialog interests={interests} onUpdate={refetch}>
                     <Button variant="ghost" size="sm" className="text-primary">
                       Add Interest
                     </Button>
                   </InterestDialog>
                 </div>
-                {interests.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {interests.map((interest: string, index: number) => (
-                      <Badge
-                        key={index}
-                        variant="outline"
-                        className="px-4 py-2 flex items-center gap-1 border-gray-400"
-                      >
-                        {interest}
-                        {/* <X
-                          className="w-3 h-3 cursor-pointer hover:text-destructive"
-                          onClick={() => removeInterest(interest)}
-                        /> */}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">
-                    Stand out by telling about your interests.
-                  </p>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  {interests.map((interest: string, index: number) => (
+                    <Badge
+                      key={index}
+                      variant="outline"
+                      className="px-4 py-2 border-gray-400"
+                    >
+                      {interest}
+                    </Badge>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
-            {/* Internships */}
+            {/* Internships - FIXED index passing */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Internships</h3>
-                  <InternshipDialog onSave={addInternshipEntry}>
-                    <Button variant="ghost" size="sm" className="text-primary">
+                  <InternshipDialog onUpdate={refetch}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-primary hover:bg-transparent p-0"
+                    >
                       Add Internship
                     </Button>
                   </InternshipDialog>
                 </div>
                 {internships.length > 0 ? (
-                  <div className="space-y-4">
-                    {internships.map((internship: any, index: number) => (
-                      <div key={index} className="rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-medium">
-                              {internship.title || "Internship Title"}
-                            </h4>
-                            <p className="text-sm text-muted-foreground">
-                              {internship.company || "Company"}
-                            </p>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {internship.description || "No description"}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {internship.start_date
-                                ? format(
-                                    new Date(internship.start_date),
-                                    "MMM yyyy"
-                                  )
-                                : "Start date"}{" "}
-                              -
-                              {internship.currently_working
-                                ? " Present"
-                                : internship.end_date
-                                ? format(
-                                    new Date(internship.end_date),
-                                    "MMM yyyy"
-                                  )
-                                : " End date"}
-                            </p>
+                  <div className="space-y-6">
+                    {internships.map(
+                      (internship: CandidateInternship, index: number) => (
+                        <div key={index} className="group relative">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1 pr-4">
+                              <h4 className="text-lg font-medium text-gray-900 leading-tight">
+                                {internship.title || "Internship Title"}
+                              </h4>
+                              <p className="text-sm text-gray-400 mt-0.5 mb-2">
+                                {internship.company || "Company Name"}
+                              </p>
+                              <p className="text-sm text-gray-500 leading-relaxed mb-3 max-w-[95%]">
+                                {internship.description ||
+                                  "No description provided."}
+                              </p>
+                              <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                                {internship.start_date
+                                  ? format(
+                                      new Date(internship.start_date),
+                                      "MMM yyyy",
+                                    )
+                                  : "Start Date"}{" "}
+                                -{" "}
+                                {internship.is_current
+                                  ? "Present"
+                                  : internship.end_date
+                                    ? format(
+                                        new Date(internship.end_date),
+                                        "MMM yyyy",
+                                      )
+                                    : "End date"}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-6">
+                              <InternshipDialog
+                                internship={{ ...internship, index }}
+                                onUpdate={refetch}
+                              >
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-gray-500 hover:text-primary hover:bg-transparent h-auto p-1"
+                                >
+                                  <Pen className="w-4 h-4" />
+                                </Button>
+                              </InternshipDialog>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleDelete("internship", index)
+                                }
+                                className="text-gray-500 hover:text-destructive hover:bg-transparent h-auto p-1"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </Button>
+                            </div>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeInternshipEntry(internship.id)}
-                            className="text-muted-foreground hover:text-destructive ml-2"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
                         </div>
-                      </div>
-                    ))}
+                      ),
+                    )}
                   </div>
                 ) : (
-                  <p className="text-muted-foreground">
-                    No internships added yet. Add your internship experience!
+                  <p className="text-muted-foreground text-sm">
+                    No internships added yet.
                   </p>
                 )}
               </CardContent>
@@ -769,12 +676,10 @@ const Profile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="text-lg font-semibold">Personal Details</h3>
-                  {profile && (
+                  {profileData && (
                     <PersonalDetailsDialog
-                      profile={profile}
-                      studentProfile={studentProfile}
-                      onUpdate={updateProfile}
-                      onUpdateStudent={updateStudentProfile}
+                      profile={profileData}
+                      onUpdate={() => refetch()}
                     >
                       <Pen className="w-4 h-4 text-gray-500 cursor-pointer hover:text-primary" />
                     </PersonalDetailsDialog>
@@ -786,16 +691,18 @@ const Profile = () => {
                       Personal
                     </p>
                     <p className="font-medium">
-                      {`${profile?.gender}, ${studentProfile?.marital_status}` ||
-                        "Not specified"}
-                    </p>
-                  </div>
+                        {/* Map the enum to a label, or fallback to "Not specified" */}
+                        {profileData?.gender ? GENDER_LABELS[profileData.gender as Gender] : "Not specified"}
+                        {", "}
+                        {profileData?.maritalStatus ? MARITAL_STATUS_LABELS[profileData.maritalStatus as MaritalStatus] : "Single"}
+                      </p>             
+                      </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">
                       Career Break
                     </p>
                     <p className="font-medium">
-                      {studentProfile?.has_career_break ? "Yes" : "No"}
+                      {profileData?.hasCareerBreak ? "Yes" : "No"}
                     </p>
                   </div>
                   <div>
@@ -803,8 +710,8 @@ const Profile = () => {
                       Date Of Birth
                     </p>
                     <p className="font-medium">
-                      {profile?.date_of_birth
-                        ? format(new Date(profile.date_of_birth), "dd MMM yyyy")
+                      {profileData?.dateOfBirth
+                        ? format(parseISO(profileData.dateOfBirth), "dd MMM yyyy")
                         : "Not provided"}
                     </p>
                   </div>
@@ -813,23 +720,21 @@ const Profile = () => {
                       Differently Abled
                     </p>
                     <p className="font-medium">
-                      {studentProfile?.is_differently_abled ? "Yes" : "No"}{" "}
+                      {profileData?.isDifferentlyAbled ? "Yes" : "No"}
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Languages */}
+            {/* Languages Section - FIXED index logic */}
             <Card className="rounded-3xl border-gray-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Languages</h3>
                   <PersonalDetailsDialog
-                    profile={profile}
-                    studentProfile={studentProfile}
-                    onUpdate={updateProfile}
-                    onUpdateStudent={updateStudentProfile}
+                    profile={profileData}
+                    onUpdate={() => refetch()}
                   >
                     <Button variant="ghost" size="sm" className="text-primary">
                       Add Languages
@@ -841,14 +746,12 @@ const Profile = () => {
                     <>
                       <div className="grid grid-cols-5 gap-4 text-sm text-center text-muted-foreground mb-2">
                         <span className="flex self-start">Language</span>
-                        {/* <span>Proficiency</span> */}
                         <span>Read</span>
                         <span>Write</span>
                         <span>Speak</span>
                         <span></span>
                       </div>
-
-                      {languages.map((lang: any, index: number) => (
+                      {languages.map((lang: Language, index: number) => (
                         <div
                           key={index}
                           className="grid grid-cols-5 items-center rounded-lg"
@@ -856,7 +759,6 @@ const Profile = () => {
                           <span className="font-medium">
                             {lang.name || "Language"}
                           </span>
-
                           <div className="flex justify-center items-center">
                             {lang.read ? (
                               <CircleCheckBig className="w-4 text-blue-500" />
@@ -881,7 +783,7 @@ const Profile = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeLanguageEntry(lang.id)}
+                            onClick={() => handleDelete("language", index)}
                             className="text-muted-foreground hover:text-destructive justify-self-end"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -898,74 +800,94 @@ const Profile = () => {
               </CardContent>
             </Card>
 
-            {/* links */}
-            <div className="mt-8">
-              <Card className="rounded-3xl border-gray-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold">Links</h2>
-                    <LinkDialog
-                      existingLinks={studentProfile.links || []}
-                      onSave={addLinkEntry}
+            {/* Links Section - FIXED Object key deletion */}
+            <Card className="rounded-3xl border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-semibold">Links</h2>
+                  <CandidateSocialLinksDialog
+                    currentLinks={links}
+                    onSave={async (updatedLinks: Link[]) => {
+                      try {
+                        await updateProfile({ socialLinks: updatedLinks });
+                        toast({
+                          title: "Success",
+                          description: "Links updated",
+                        });
+                        refetch();
+                      } catch (e) {
+                        toast({
+                          title: "Error",
+                          description: "Update failed",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-primary hover:bg-transparent p-0"
                     >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary"
+                      Add Links
+                    </Button>
+                  </CandidateSocialLinksDialog>
+                </div>
+                <div className="space-y-4">
+                  {links.length > 0 ? (
+                    links.map((link, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-4 group"
                       >
-                        Add Links
-                      </Button>
-                    </LinkDialog>
-                  </div>
-
-                  {studentProfile.links.length > 0 ? (
-                    <div>
-                      {studentProfile.links.map((link: any, index: number) => (
-                        <div
-                          key={index}
-                          className="grid grid-cols-5 items-center mt-4"
-                        >
-                          <p className="font-medium">{link.platform}</p>
+                        <p className="font-medium text-gray-900 capitalize min-w-[100px]">
+                          {link.platform}
+                        </p>
+                        <div className="flex-1 px-4 py-2 border border-gray-200 rounded-2xl bg-white">
                           <a
                             href={link.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline break-all grid col-span-3 border border-gray-400 rounded-xl px-3 py-2"
+                            className="text-blue-500 hover:underline truncate text-sm block"
                           >
                             {link.url}
                           </a>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeLinkEntry(link.id)}
-                            className="text-muted-foreground hover:text-destructive justify-self-end"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
                         </div>
-                      ))}
-                    </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete("socialLinks", index)}
+                          className="text-gray-300 hover:text-destructive hover:bg-transparent h-auto p-0"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </Button>
+                      </div>
+                    ))
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No links added yet.
+                    <p className="text-muted-foreground text-sm">
+                      No social links added yet.
                     </p>
                   )}
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
 
-      {/* Avatar Upload Dialog */}
-      {profile && studentProfile && (
-        <AvatarUploadDialog
+      {profileData && (
+        <ImageUploadDialog
           isOpen={isAvatarDialogOpen}
           onClose={() => setIsAvatarDialogOpen(false)}
-          currentAvatarUrl={(studentProfile as any)?.avatar_url}
-          userId={profile.id}
-          userName={profile.full_name}
-          onSuccess={handleAvatarUploadSuccess}
+          currentImageUrl={profileData.avatarUrl || profileData.image}
+          userId={profileData.id}
+          userName={profileData.name}
+          imageType="avatar"
+          entityType="candidate"
+          onSuccess={handleImageSuccess}
+          onUpload={(file) => uploadAvatar.mutateAsync(file)}
+          onDelete={() => deleteAvatar.mutateAsync()}
+          isProcessing={uploadAvatar.isPending || deleteAvatar.isPending}
         />
       )}
     </div>

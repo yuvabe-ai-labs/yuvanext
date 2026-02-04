@@ -1,52 +1,102 @@
 name: Deploy React App to S3 + CloudFront (Yuvanext)
 
-# Trigger workflow on push to main branch
 on:
   push:
     branches:
-      - production
+      - development
+      - staging
+      - main
+
+# --------------------
+# Global environment
+# --------------------
+env:
+  NODE_VERSION: 20
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repository
+      # --------------------
+      # Checkout
+      # --------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js
+      # --------------------
+      # Set environment-specific variables
+      # (EXACT SAME PATTERN AS BACKEND)
+      # --------------------
+      - name: Set environment variables
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "VITE_STAGE_TYPE=production" >> $GITHUB_ENV
+            echo "VITE_API_URL=${{ secrets.BACKEND_URL_PROD }}" >> $GITHUB_ENV
+            echo "VITE_FRONTEND_URL=${{ secrets.FRONTEND_URL_PROD }}" >> $GITHUB_ENV
+            echo "S3_BUCKET_NAME=${{ secrets.BUCKET_NAME_PROD }}" >> $GITHUB_ENV
+            echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.CF_DISTRIBUTION_PROD }}" >> $GITHUB_ENV
+
+          elif [ "${{ github.ref }}" == "refs/heads/staging" ]; then
+            echo "VITE_STAGE_TYPE=staging" >> $GITHUB_ENV
+            echo "VITE_API_URL=${{ secrets.BACKEND_URL_STG }}" >> $GITHUB_ENV
+            echo "VITE_FRONTEND_URL=${{ secrets.FRONTEND_URL_STG }}" >> $GITHUB_ENV
+            echo "S3_BUCKET_NAME=${{ secrets.BUCKET_NAME_STG }}" >> $GITHUB_ENV
+            echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.CF_DISTRIBUTION_STG }}" >> $GITHUB_ENV
+
+          else
+            echo "VITE_STAGE_TYPE=development" >> $GITHUB_ENV
+            echo "VITE_API_URL=${{ secrets.BACKEND_URL_DEV }}" >> $GITHUB_ENV
+            echo "VITE_FRONTEND_URL=${{ secrets.FRONTEND_URL_DEV }}" >> $GITHUB_ENV
+            echo "S3_BUCKET_NAME=${{ secrets.BUCKET_NAME_DEV }}" >> $GITHUB_ENV
+            echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.CF_DISTRIBUTION_DEV }}" >> $GITHUB_ENV
+          fi
+
+      # --------------------
+      # Setup Node
+      # --------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
 
-      # 3️⃣ Install dependencies
+      # --------------------
+      # Install dependencies
+      # --------------------
       - name: Install dependencies
         run: npm ci
 
-      # 4️⃣ Build React app
+      # --------------------
+      # Build React (Vite)
+      # --------------------
       - name: Build React app
         run: npm run build
 
-      # 5️⃣ Upload /dist folder to S3
+      # --------------------
+      # Upload dist → S3
+      # --------------------
       - name: Upload dist folder to S3
         uses: jakejarvis/s3-sync-action@master
         with:
           args: --delete
         env:
-          AWS_S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_S3_BUCKET: ${{ env.S3_BUCKET_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ env.AWS_REGION }}
           SOURCE_DIR: dist
 
-      # 6️⃣ Invalidate CloudFront cache
+      # --------------------
+      # Invalidate CloudFront
+      # --------------------
       - name: Invalidate CloudFront cache
         uses: chetan/invalidate-cloudfront-action@v2
         env:
-          DISTRIBUTION: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+          DISTRIBUTION: ${{ env.CLOUDFRONT_DISTRIBUTION_ID }}
           PATHS: "/*"
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ env.AWS_REGION }}

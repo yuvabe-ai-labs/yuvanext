@@ -1,24 +1,45 @@
 import { Mail, Phone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useCandidateProfile } from "@/hooks/useCandidateProfile";
-import { useStudentTasks } from "@/hooks/useStudentTasks";
+import { useCandidateTasks } from "@/hooks/useCandidateTasks";
 import { calculateOverallTaskProgress } from "@/utils/taskProgress";
+import { useMemo, useEffect } from "react";
 
 interface CandidateInfoCardProps {
-  applicationId: string | undefined;
+  applicationId: string;
 }
 
 export default function CandidateInfoCard({
   applicationId,
 }: CandidateInfoCardProps) {
-  const { data, loading, error } = useCandidateProfile(applicationId || "");
-  const { data: tasksData } = useStudentTasks(applicationId);
+  const { data, isLoading, error } = useCandidateTasks(applicationId);
 
-  const tasks = tasksData?.data || [];
-  const taskProgress = calculateOverallTaskProgress(tasks);
+  // Calculate task progress
+  const taskProgress = useMemo(() => {
+    if (!data || !data.tasks || data.tasks.length === 0) {
+      console.log("No tasks available");
+      return 0;
+    }
 
-  if (loading) {
+    const progress = calculateOverallTaskProgress(data.tasks);
+    console.log("Calculated progress:", progress + "%");
+    return progress;
+  }, [data?.tasks]);
+
+  // Memoize circle calculations
+  const circleMetrics = useMemo(() => {
+    const radius = 48;
+    const circumference = 2 * Math.PI * radius;
+    const progressOffset = circumference * (1 - taskProgress / 100);
+    console.log("Circle metrics:", {
+      progress: taskProgress,
+      circumference,
+      offset: progressOffset,
+    });
+    return { circumference, progressOffset };
+  }, [taskProgress]);
+
+  if (isLoading) {
     return (
       <Card className="w-full p-6">
         <div className="animate-pulse flex items-center gap-4">
@@ -37,13 +58,22 @@ export default function CandidateInfoCard({
     return (
       <Card className="w-full p-6">
         <p className="text-red-500 text-center">
-          {error || "Failed to load candidate information"}
+          Failed to load candidate information
         </p>
       </Card>
     );
   }
 
-  const { profile, studentProfile, internship } = data;
+  const candidate = {
+    name: data.applicantName,
+    email: data.applicantEmail,
+    phone: data.candidatePhoneNumber,
+    avatarUrl: data.candidateAvatarUrl,
+  };
+
+  const internship = {
+    title: data.internshipName,
+  };
 
   const getInitials = (name: string) => {
     return name
@@ -54,11 +84,6 @@ export default function CandidateInfoCard({
       .slice(0, 2);
   };
 
-  // Calculate stroke dash for progress circle
-  const radius = 28;
-  const circumference = 2 * Math.PI * radius;
-  const progressOffset = circumference * (1 - taskProgress / 100);
-
   return (
     <Card className="w-full p-10 bg-white shadow-sm border border-gray-200 rounded-3xl">
       <div className="flex items-center gap-6">
@@ -66,11 +91,11 @@ export default function CandidateInfoCard({
         <div className="relative">
           <Avatar className="w-20 h-20">
             <AvatarImage
-              src={studentProfile.avatar_url || undefined}
-              alt={profile.full_name || "User"}
+              src={candidate.avatarUrl || undefined}
+              alt={candidate.name || "User"}
             />
             <AvatarFallback className="bg-gradient-to-br from-teal-400 to-teal-600 text-white text-xl font-semibold">
-              {getInitials(profile.full_name || "NA")}
+              {getInitials(candidate.name || "NA")}
             </AvatarFallback>
           </Avatar>
         </div>
@@ -78,7 +103,7 @@ export default function CandidateInfoCard({
         {/* Candidate Info */}
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-gray-900 mb-1">
-            {profile.full_name || "N/A"}
+            {candidate.name || "N/A"}
           </h2>
           <p className="text-gray-600 font-medium mb-3">
             {internship.title || "N/A"}
@@ -88,12 +113,12 @@ export default function CandidateInfoCard({
           <div className="flex flex-wrap gap-4 text-sm text-gray-600">
             <div className="flex items-center gap-2">
               <Mail className="w-4 h-4" />
-              <span>{profile.email || "N/A"}</span>
+              <span>{candidate.email || "N/A"}</span>
             </div>
-            {profile.phone && (
+            {candidate.phone && (
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4" />
-                <span>{profile.phone}</span>
+                <span>{candidate.phone}</span>
               </div>
             )}
           </div>
@@ -102,8 +127,8 @@ export default function CandidateInfoCard({
         {/* Task Progress Circle */}
         <div className="flex flex-col items-center gap-1">
           <div className="relative w-28 h-28">
-            {" "}
-            <svg className="transform rotate-90 w-28 h-28">
+            <svg className="transform -rotate-90 w-28 h-28">
+              {/* Background circle */}
               <circle
                 cx="56"
                 cy="56"
@@ -112,7 +137,7 @@ export default function CandidateInfoCard({
                 strokeWidth="10"
                 fill="none"
               />
-
+              {/* Progress circle */}
               <circle
                 cx="56"
                 cy="56"
@@ -120,19 +145,17 @@ export default function CandidateInfoCard({
                 stroke="#00C271"
                 strokeWidth="10"
                 fill="none"
-                strokeDasharray={2 * Math.PI * 48}
-                strokeDashoffset={2 * Math.PI * 48 * (1 - taskProgress / 100)}
+                strokeDasharray={circleMetrics.circumference}
+                strokeDashoffset={circleMetrics.progressOffset}
                 strokeLinecap="round"
                 className="transition-all duration-700 ease-out"
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center leading-tight">
               <span className="text-base font-semibold text-gray-500">
-                {" "}
                 {taskProgress}%
               </span>
               <span className="text-[9px] font-medium text-gray-500 mt-0.5">
-                {" "}
                 Projects Progress
               </span>
             </div>

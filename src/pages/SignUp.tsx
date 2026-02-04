@@ -1,37 +1,44 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useAuth } from "@/hooks/useAuth";
+import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/components/ui/use-toast";
-import { CheckCircle } from "lucide-react";
-import signupIllustration from "@/assets/signup-illustration.png";
+import { CheckCircle, Eye, EyeOff } from "lucide-react";
+import { Arrow } from "@/components/ui/custom-icons";
 import signupIllustrate from "@/assets/signinillustion.png";
 import signinLogo from "@/assets/signinLogo.svg";
-import { Eye, EyeOff } from "lucide-react";
-import { Arrow } from "@/components/ui/custom-icons";
 import unitIllustration from "@/assets/unit_illstration.png";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { SignUpFormValues, signUpSchema } from "@/lib/authentication";
 
 const SignUp = () => {
   const { role } = useParams<{ role: string }>();
-  const [fullName, setFullName] = useState("");
-  const [companyWebsite, setCompanyWebsite] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const { signUp, signInWithOAuth } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const isUnitRole = role === "unit";
 
-  const illustrationText = isUnitRole
-    ? "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role's requirements."
-    : "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
+  // 3. Initialize React Hook Form
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm<SignUpFormValues>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      password: "",
+      companyWebsite: "",
+    },
+  });
 
-  // Password validation rules
+  const passwordValue = watch("password") || "";
+
   const passwordRules = [
     { test: (p: string) => /[a-z]/.test(p), label: "one lowercase character" },
     { test: (p: string) => /[A-Z]/.test(p), label: "one uppercase character" },
@@ -43,60 +50,38 @@ const SignUp = () => {
     { test: (p: string) => p.length >= 8, label: "8 character minimum" },
   ];
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate password
-    const isPasswordValid = passwordRules.every((rule) => rule.test(password));
-    if (!isPasswordValid) {
-      toast({
-        title: "Password requirements not met",
-        description: "Please ensure your password meets all requirements.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (isUnitRole && companyWebsite) {
-      try {
-        new URL(companyWebsite);
-      } catch {
-        toast({
-          title: "Invalid website URL",
-          description: "Please enter a valid URL (e.g., https://example.com)",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
+  const onSubmit = async (data: SignUpFormValues) => {
     setLoading(true);
 
-    const { error } = await signUp(
-      email,
-      password,
-      fullName,
-      role,
-      isUnitRole ? companyWebsite : undefined
-    );
+    const { error } = await authClient.signUp.email({
+      email: data.email,
+      password: data.password,
+      name: data.fullName,
+      callbackURL: `${import.meta.env.VITE_FRONTEND_URL}/chatbot`,
+      metadata: {
+        role: role,
+        companyWebsite: isUnitRole ? data.companyWebsite : undefined,
+      },
+    });
 
     if (error) {
-      // Check if user already exists
-      if (
-        error.message.includes("already registered") ||
-        error.message.includes("User already registered") ||
-        error.message.toLowerCase().includes("already exists")
-      ) {
+      if (error.status === 409) {
         toast({
           title: "Account already exists",
           description:
             "This email is already registered. Please sign in instead.",
           variant: "destructive",
         });
+      } else if (error.status === 429) {
+        toast({
+          title: "Too many attempts",
+          description: "Please wait a moment before trying again.",
+          variant: "destructive",
+        });
       } else {
         toast({
           title: "Sign up failed",
-          description: error.message,
+          description: error.message || "An unknown error occurred.",
           variant: "destructive",
         });
       }
@@ -106,7 +91,7 @@ const SignUp = () => {
         description:
           "Please check your email to verify your account then sign in to continue.",
       });
-      // Redirect to sign-in page after successful signup
+
       setTimeout(() => {
         navigate(`/auth/${role || "student"}/signin`);
       }, 2000);
@@ -115,59 +100,61 @@ const SignUp = () => {
     setLoading(false);
   };
 
-  const handleOAuthSignUp = async (provider: "google" | "apple") => {
-    // Store the role for profile creation after OAuth
-    if (role) {
-      localStorage.setItem("pendingRole", role);
-    }
-
-    const { error } = await signInWithOAuth(provider);
-    if (error) {
-      localStorage.removeItem("pendingRole");
-      toast({
-        title: "Sign up failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+  const onError = () => {
+    toast({
+      title: "Validation Error",
+      description: "Please check the form for errors.",
+      variant: "destructive",
+    });
   };
+
+  const illustrationText = isUnitRole
+    ? "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role's requirements."
+    : "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
 
   return (
     <div className="min-h-screen bg-white flex">
       {/* Left Side - Illustration */}
       <div className="hidden lg:flex w-[41%] h-screen relative p-4">
-        <div className="w-full h-full rounded-3xl overflow-hidden relative">
+        <div className="w-full h-full rounded-3xl overflow-hidden relative flex flex-col items-center justify-center">
+          {/* Background Image */}
           <img
             src={signupIllustrate}
             alt="Signin Illustration"
-            className="w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover"
           />
 
-          {/* Center content */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center space-y-6 px-8">
+          {/* Content Overlay */}
+          <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-6 px-8 w-full h-full">
             {/* Logo */}
-            <img src={signinLogo} alt="Sign in Logo" className="w-32 h-auto" />
+            <img
+              src={signinLogo}
+              alt="Sign in Logo"
+              className="w-32 h-auto shrink-0"
+            />
 
             {isUnitRole && (
-              <div className="relative flex items-center justify-center p-6">
-                <Arrow className="absolute w-[650px] h-[650px] text-white opacity-95 bottom-10" />
+              <div className="relative flex items-center justify-center p-2 w-full shrink-1">
+                {/* FIX 1: Responsive sizing using vh/vw and max constraints */}
+                <Arrow className="absolute w-[80%] h-auto max-h-[50vh] text-white opacity-95 bottom-0" />
 
+                {/* FIX 2: Responsive Image height (max-h-[40vh]) ensures it scales down on short screens */}
                 <img
                   src={unitIllustration}
                   alt="Unit Illustration"
-                  className="relative z-10 w-[450px] h-[450px] object-contain"
+                  className="relative z-10 w-auto h-auto max-h-[30vh] lg:max-h-[40vh] object-contain"
                 />
               </div>
             )}
 
             {/* Text */}
-            <p className="text-white text-base font-medium max-w-xl leading-relaxed">
+            <p className="text-white text-base font-medium max-w-xl leading-relaxed shrink-0">
               {illustrationText}
             </p>
           </div>
 
-          {/* Footer */}
-          <div className="absolute bottom-4 left-0 right-0 flex justify-between px-6 text-white/80 text-xs">
+          {/* Footer Link */}
+          <div className="absolute bottom-4 left-0 right-0 flex justify-between px-6 text-white/80 text-xs z-20">
             <a
               href="https://www.yuvanext.com/privacy-policy"
               target="_blank"
@@ -183,16 +170,13 @@ const SignUp = () => {
       {/* Right Side - Form */}
       <div className="flex-1 flex items-center justify-center bg-white px-4 sm:px-6">
         <div className="w-full max-w-[474px]">
-          {/* Card Container */}
           <div className="bg-white rounded-[15px] px-6 sm:px-12 md:px-[40px] py-8 sm:py-12 w-full">
-            {/* Header */}
             <div className="text-center mb-8">
               <h1
                 className="text-[24px] font-bold leading-[35px] mb-2"
                 style={{
                   color: "#1F2A37",
-                  fontFamily:
-                    "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                  fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                 }}
               >
                 Create your account
@@ -201,49 +185,55 @@ const SignUp = () => {
                 className="text-[14px] leading-[15px]"
                 style={{
                   color: "#9CA3AF",
-                  fontFamily:
-                    "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                  fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                 }}
               >
                 Please enter your details below
               </p>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Full Name / Company Name */}
+            <form
+              onSubmit={handleSubmit(onSubmit, onError)}
+              className="space-y-6"
+            >
+              {/* Full Name */}
               <div>
                 <label
                   htmlFor="fullName"
                   className="block text-[14px] leading-[11px] mb-2"
                   style={{
                     color: "#4B5563",
-                    fontFamily:
-                      "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                    fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                   }}
                 >
                   {isUnitRole ? "Company Name *" : "Full Name *"}
                 </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
+                <div
+                  className={`border rounded-lg h-8 px-4 py-4 flex items-center ${
+                    errors.fullName ? "border-red-500" : "border-[#D1D5DB]"
+                  }`}
+                >
                   <input
                     id="fullName"
                     type="text"
                     placeholder={
                       isUnitRole ? "Enter company name" : "Enter name"
                     }
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    {...register("fullName")}
                     className="w-full text-[13px] leading-[11px] outline-none bg-transparent placeholder-[#9CA3AF]"
                     style={{
-                      fontFamily:
-                        "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                      fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                     }}
-                    required
                   />
                 </div>
+                {errors.fullName && (
+                  <p className="text-red-500 text-[10px] mt-1">
+                    {errors.fullName.message}
+                  </p>
+                )}
               </div>
 
-              {/* Company Website (only for unit role) */}
+              {/* Company Website */}
               {isUnitRole && (
                 <div>
                   <label
@@ -251,57 +241,68 @@ const SignUp = () => {
                     className="block text-[14px] leading-[11px] mb-2"
                     style={{
                       color: "#4B5563",
-                      fontFamily:
-                        "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                      fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                     }}
                   >
                     Company Website
                   </label>
-                  <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
+                  <div
+                    className={`border rounded-lg h-8 px-4 py-4 flex items-center ${
+                      errors.companyWebsite
+                        ? "border-red-500"
+                        : "border-[#D1D5DB]"
+                    }`}
+                  >
                     <input
                       id="companyWebsite"
                       type="url"
                       placeholder="https://example.com"
-                      value={companyWebsite}
-                      onChange={(e) => setCompanyWebsite(e.target.value)}
+                      {...register("companyWebsite")}
                       className="w-full text-[13px] leading-[11px] outline-none bg-transparent placeholder-[#9CA3AF]"
                       style={{
-                        fontFamily:
-                          "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                        fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                       }}
                     />
                   </div>
+                  {errors.companyWebsite && (
+                    <p className="text-red-500 text-[10px] mt-1">
+                      {errors.companyWebsite.message}
+                    </p>
+                  )}
                 </div>
               )}
 
-              {/* Email Address */}
+              {/* Email */}
               <div>
                 <label
                   htmlFor="email"
                   className="block text-[14px] leading-[11px] mb-2"
                   style={{
                     color: "#4B5563",
-                    fontFamily:
-                      "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                    fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                   }}
                 >
                   Email Address *
                 </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center">
+                <div
+                  className={`border rounded-lg h-8 px-4 py-4 flex items-center ${
+                    errors.email ? "border-red-500" : "border-[#D1D5DB]"
+                  }`}
+                >
                   <input
                     id="email"
                     type="email"
                     placeholder="Enter email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    {...register("email")}
                     className="w-full text-[13px] leading-[11px] outline-none bg-transparent placeholder-[#9CA3AF]"
-                    style={{
-                      fontFamily:
-                        "'Lato', system-ui, -apple-system, sans-serif",
-                    }}
-                    required
+                    style={{ fontFamily: "'Lato', sans-serif" }}
                   />
                 </div>
+                {errors.email && (
+                  <p className="text-red-500 text-[10px] mt-1">
+                    {errors.email.message}
+                  </p>
+                )}
               </div>
 
               {/* Password */}
@@ -313,15 +314,17 @@ const SignUp = () => {
                 >
                   Password *
                 </label>
-                <div className="border border-[#D1D5DB] rounded-lg h-8 px-4 py-4 flex items-center gap-2">
+                <div
+                  className={`border rounded-lg h-8 px-4 py-4 flex items-center gap-2 ${
+                    errors.password ? "border-red-500" : "border-[#D1D5DB]"
+                  }`}
+                >
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    {...register("password")}
                     className="w-full text-[13px] outline-none bg-transparent placeholder-[#9CA3AF]"
-                    required
                   />
                   <button
                     type="button"
@@ -331,12 +334,10 @@ const SignUp = () => {
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
-
-                {/* Password strength checklist (2 columns) */}
-                {password && (
+                {passwordValue && (
                   <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
                     {passwordRules.map((rule, index) => {
-                      const passed = rule.test(password);
+                      const passed = rule.test(passwordValue);
                       return (
                         <li
                           key={index}
@@ -355,41 +356,41 @@ const SignUp = () => {
                     })}
                   </ul>
                 )}
+                {errors.password && (
+                  <p className="text-red-500 text-[10px] mt-1">
+                    {errors.password.message}
+                  </p>
+                )}
               </div>
 
-              {/* Sign Up Button */}
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full h-[35px] rounded-lg flex items-center justify-center text-[14px] font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
                 style={{
                   backgroundColor: "#76A9FA",
-                  fontFamily:
-                    "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                  fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                 }}
               >
                 {loading ? "Creating account..." : "Sign up"}
               </button>
             </form>
 
-            {/* Sign In Link */}
             <div className="text-center mt-6">
               <span
                 className="text-[13px] leading-4"
                 style={{
                   color: "#9CA3AF",
-                  fontFamily:
-                    "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                  fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                 }}
               >
                 Already have an account?{" "}
                 <Link
-                  to={`/auth/${role}/signin`}
+                  to={`/auth/${role || "student"}/signin`}
                   className="text-[14px] leading-4 font-medium hover:underline"
                   style={{
                     color: "#3F83F8",
-                    fontFamily:
-                      "'Neue Haas Grotesk Text Pro', system-ui, -apple-system, sans-serif",
+                    fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                   }}
                 >
                   Sign In

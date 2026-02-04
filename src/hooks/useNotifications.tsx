@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import axiosInstance from "@/config/platform-api";
 
 export interface Notification {
   id: string;
@@ -16,27 +15,17 @@ export const useNotifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
 
   const fetchNotifications = async () => {
-    if (!user) {
-      setNotifications([]);
-      setUnreadCount(0);
-      setLoading(false);
-      return;
-    }
-
     try {
-      const { data, error } = await supabase
-        .from("notifications")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(20);
+      setLoading(true);
 
-      if (error) throw error;
+      // GET /api/notifications (from provided endpoints)
+      const { data } = await axiosInstance.get("/notifications");
 
-      const typedData = (data || []).map((n) => ({
+      const typedData = (
+        Array.isArray(data) ? data : data.notifications || []
+      ).map((n: any) => ({
         ...n,
         type: n.type as "info" | "success" | "warning",
       }));
@@ -52,12 +41,8 @@ export const useNotifications = () => {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .eq("id", notificationId);
-
-      if (error) throw error;
+      // PUT /api/notifications/{id}/mark-read (from provided endpoints)
+      await axiosInstance.put(`/notifications/${notificationId}/mark-read`);
 
       setNotifications((prev) =>
         prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
@@ -69,16 +54,9 @@ export const useNotifications = () => {
   };
 
   const markAllAsRead = async () => {
-    if (!user) return;
-
     try {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .eq("user_id", user.id)
-        .eq("is_read", false);
-
-      if (error) throw error;
+      // PUT /api/notifications/mark-all-read (from provided endpoints)
+      await axiosInstance.put("/notifications/mark-all-read");
 
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setUnreadCount(0);
@@ -89,12 +67,8 @@ export const useNotifications = () => {
 
   const deleteNotification = async (notificationId: string) => {
     try {
-      const { error } = await supabase
-        .from("notifications")
-        .delete()
-        .eq("id", notificationId);
-
-      if (error) throw error;
+      // DEL /api/notifications/{id} (from provided endpoints)
+      await axiosInstance.delete(`/notifications/${notificationId}`);
 
       const deletedNotification = notifications.find(
         (n) => n.id === notificationId
@@ -111,33 +85,9 @@ export const useNotifications = () => {
 
   useEffect(() => {
     fetchNotifications();
-
-    // Subscribe to real-time notifications
-    if (user) {
-      const channel = supabase
-        .channel("notifications-changes")
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "notifications",
-            filter: `user_id=eq.${user.id}`,
-          },
-          (payload) => {
-            setNotifications((prev) =>
-              [payload.new as Notification, ...prev].slice(0, 20)
-            );
-            setUnreadCount((prev) => prev + 1);
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [user]);
+    // Note: Real-time subscriptions would need to be handled via WebSockets or polling
+    // if the backend supports it. For now, we'll rely on manual refetch.
+  }, []);
 
   return {
     notifications,

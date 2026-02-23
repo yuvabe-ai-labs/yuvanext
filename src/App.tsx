@@ -18,6 +18,7 @@ import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
 import UnitDashboard from "./pages/UnitDashboard";
+import MentorDashboard from "./pages/MentorDashboard";
 import Chatbot from "./pages/Chatbot";
 import Internships from "./pages/Internships";
 import Courses from "./pages/Courses";
@@ -38,6 +39,8 @@ import MyTasks from "./pages/MyTasks";
 import UnitCandidateTasks from "./pages/UnitCandidateTasks";
 import Settings from "./pages/Settings";
 import AcceptInvitation from "./pages/Acceptinvitation";
+import MenteesManagement from "./pages/MenteesManagement";
+import UnitsManagement from "./pages/UnitsManagement";
 import AuthCallback from "@/hooks/AuthCallback";
 import ScrollToTop from "@/components/ScrollToTop";
 import { useProfile } from "@/hooks/useProfile";
@@ -61,23 +64,23 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const isOnChatbot = currentPath === "/chatbot";
 
     // Check onboarding status
-    if (profile.onboardingCompleted === true) {
-      // Onboarding completed - redirect away from chatbot to dashboard
-      if (isOnChatbot) {
-        // Redirect based on role
-        if (profile.role === "candidate") {
-          navigate("/dashboard", { replace: true });
-        } else if (profile.role === "unit") {
-          navigate("/unit-dashboard", { replace: true });
-        } else {
-          navigate("/dashboard", { replace: true });
-        }
-      }
+    const DASHBOARD_MAP: Record<string, string> = {
+      candidate: "/dashboard",
+      unit: "/unit-dashboard",
+      mentor: "/mentor-dashboard",
+    };
+
+    const dashboard = DASHBOARD_MAP[profile.role];
+
+    if (profile.role === "mentor") {
+      navigate(dashboard, { replace: true });
+      return;
+    }
+
+    if (profile.onboardingCompleted) {
+      if (isOnChatbot) navigate(dashboard, { replace: true });
     } else {
-      // Onboarding NOT completed - redirect to chatbot
-      if (!isOnChatbot) {
-        navigate("/chatbot", { replace: true });
-      }
+      if (!isOnChatbot) navigate("/chatbot", { replace: true });
     }
   }, [
     session,
@@ -125,7 +128,10 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth/:role/signin" element={<SignIn />} />
             <Route path="/auth/:role/signup" element={<SignUp />} />
-            <Route path="/auth/accept-invitation/:id" element={<AcceptInvitation />} />
+            <Route
+              path="/auth/accept-invitation/:id"
+              element={<AcceptInvitation />}
+            />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
@@ -160,6 +166,30 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <UnitDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mentor-dashboard"
+              element={
+                <ProtectedRoute>
+                  <MentorDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mentees-management"
+              element={
+                <ProtectedRoute>
+                  <MenteesManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/units-management"
+              element={
+                <ProtectedRoute>
+                  <UnitsManagement />
                 </ProtectedRoute>
               }
             />

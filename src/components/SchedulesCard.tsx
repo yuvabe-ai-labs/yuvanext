@@ -1,5 +1,6 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { usePendingMeetings } from "@/hooks/useMeetings"; // Import your new hook
 
 interface ScheduleEvent {
   id: string;
@@ -11,170 +12,151 @@ interface ScheduleEvent {
 interface DaySchedule {
   dayName: string;
   date: number;
+  isToday: boolean;
   events: ScheduleEvent[];
 }
 
-interface ScheduleEventCardProps {
-  event: ScheduleEvent;
-}
+const EVENT_COLORS = [
+  "bg-blue-500",
+  "bg-purple-500",
+  "bg-green-500",
+  "bg-orange-500",
+  "bg-pink-500",
+];
 
-const ScheduleEventCard = ({ event }: ScheduleEventCardProps) => {
-  return (
-    <div
-      className={`${event.color} rounded-full px-3 py-1.5 flex items-center gap-2 mb-2`}
-    >
-      {event.avatarUrl && (
-        <div className="w-5 h-5 rounded-full bg-white overflow-hidden flex-shrink-0">
-          <img
-            src={event.avatarUrl}
-            alt={event.name}
-            className="w-full h-full object-cover"
-          />
-        </div>
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// Helper components remain the same
+const ScheduleEventCard = ({ event }: { event: ScheduleEvent }) => (
+  <div className={`${event.color} rounded-full px-3 py-1.5 flex items-center gap-2 mb-2`}>
+    {event.avatarUrl && (
+      <div className="w-5 h-5 rounded-full bg-white overflow-hidden flex-shrink-0">
+        <img src={event.avatarUrl} alt={event.name} className="w-full h-full object-cover" />
+      </div>
+    )}
+    <span className="text-xs font-medium text-white truncate">{event.name}</span>
+  </div>
+);
+
+const DayCard = ({ day }: { day: DaySchedule }) => (
+  <div className={`rounded-2xl p-4 min-h-[300px] ${day.isToday ? "bg-blue-50 border-2 border-blue-200" : "bg-gray-50"}`}>
+    <div className="text-center mb-4">
+      <p className="text-xs font-medium text-gray-600">{day.dayName}</p>
+      <p className="text-2xl font-bold text-gray-900">{day.date}</p>
+    </div>
+    <div className="space-y-2">
+      {day.events.length > 0 ? (
+        day.events.map((event) => <ScheduleEventCard key={event.id} event={event} />)
+      ) : (
+        <div className="text-center text-gray-400 text-xs mt-8">No events</div>
       )}
-      <span className="text-xs font-medium text-white truncate">
-        {event.name}
-      </span>
     </div>
-  );
-};
-
-interface DayCardProps {
-  day: DaySchedule;
-  isToday?: boolean;
-}
-
-const DayCard = ({ day, isToday }: DayCardProps) => {
-  return (
-    <div
-      className={`rounded-2xl p-4 min-h-[300px] ${
-        isToday ? "bg-blue-50 border-2 border-blue-200" : "bg-gray-50"
-      }`}
-    >
-      {/* Day Header */}
-      <div className="text-center mb-4">
-        <p className="text-xs font-medium text-gray-600">{day.dayName}</p>
-        <p className="text-2xl font-bold text-gray-900">{day.date}</p>
-      </div>
-
-      {/* Events */}
-      <div className="space-y-2">
-        {day.events.length > 0 ? (
-          day.events.map((event) => (
-            <ScheduleEventCard key={event.id} event={event} />
-          ))
-        ) : (
-          <div className="text-center text-gray-400 text-xs mt-8">
-            No events
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+  </div>
+);
 
 export default function SchedulesCard() {
-  // Hard-coded data - replace with API call in the future
-  // const { data: scheduleData, isLoading } = useScheduleData();
+  // 1. Fetch data from API
+  const { data: responseData, isLoading } = usePendingMeetings();
+  
+  // Extract the actual array of meetings from the response
+  const meetings = responseData?.data || [];
 
-  const HARD_CODED_SCHEDULE: DaySchedule[] = [
-    {
-      dayName: "Sunday",
-      date: 25,
-      events: [],
-    },
-    {
-      dayName: "Monday",
-      date: 26,
-      events: [
-        {
-          id: "1",
-          name: "Pankaj Sharma",
-          avatarUrl: "https://i.pravatar.cc/150?img=1",
-          color: "bg-blue-500",
-        },
-      ],
-    },
-    {
-      dayName: "Tuesday",
-      date: 27,
-      events: [
-        {
-          id: "2",
-          name: "Pankaj Sharma",
-          avatarUrl: "https://i.pravatar.cc/150?img=2",
-          color: "bg-blue-500",
-        },
-        {
-          id: "3",
-          name: "Roopan Singh",
-          avatarUrl: "https://i.pravatar.cc/150?img=3",
-          color: "bg-blue-600",
-        },
-      ],
-    },
-    {
-      dayName: "Wednesday",
-      date: 28,
-      events: [],
-    },
-    {
-      dayName: "Thursday",
-      date: 29,
-      events: [],
-    },
-    {
-      dayName: "Friday",
-      date: 30,
-      events: [],
-    },
-    {
-      dayName: "Saturday",
-      date: 31,
-      events: [],
-    },
-  ];
+  // 2. Manage Calendar State (Start with today's date)
+  const [currentDate, setCurrentDate] = useState(new Date());
 
-  const currentWeekRange = "Jan 25 - Jan 31, 2026";
-  const todayDate = 26; // Hardcoded for demo
+  // 3. Calculate the 7 days of the currently viewed week
+  const weekDays = useMemo(() => {
+    const startOfWeek = new Date(currentDate);
+    // Adjust to the previous Sunday
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
 
-  const scheduleData = useMemo(() => {
-    return HARD_CODED_SCHEDULE.map((day) => ({
-      ...day,
-      isToday: day.date === todayDate,
-    }));
-  }, []);
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(startOfWeek);
+      day.setDate(day.getDate() + i);
+      days.push(day);
+    }
+    return days;
+  }, [currentDate]);
 
+  // 4. Map the API Meetings into the 7 calculated days
+  const scheduleData: DaySchedule[] = useMemo(() => {
+    const today = new Date();
+
+    return weekDays.map((dayDate) => {
+      // Find all meetings that match this specific day
+      const dayEvents = meetings
+        .filter((m: any) => {
+          const mDate = new Date(m.scheduledAt);
+          return (
+            mDate.getDate() === dayDate.getDate() &&
+            mDate.getMonth() === dayDate.getMonth() &&
+            mDate.getFullYear() === dayDate.getFullYear()
+          );
+        })
+        .map((m: any, index: number) => ({
+          id: m.id,
+          name: m.candidate?.name || "Unknown Mentee",
+          avatarUrl: m.candidate?.avatarUrl,
+          // Cycle through colors so it looks nice
+          color: EVENT_COLORS[index % EVENT_COLORS.length], 
+        }));
+
+      return {
+        dayName: DAY_NAMES[dayDate.getDay()],
+        date: dayDate.getDate(),
+        isToday: dayDate.toDateString() === today.toDateString(),
+        events: dayEvents,
+      };
+    });
+  }, [weekDays, meetings]);
+
+  // 5. Generate Header String (e.g., "Feb 22 - Feb 28, 2026")
+  const currentWeekRange = useMemo(() => {
+    const start = weekDays[0];
+    const end = weekDays[6];
+    
+    const startStr = `${MONTH_NAMES[start.getMonth()]} ${start.getDate()}`;
+    const endStr = `${MONTH_NAMES[end.getMonth()]} ${end.getDate()}`;
+    return `${startStr} - ${endStr}, ${end.getFullYear()}`;
+  }, [weekDays]);
+
+  // 6. Navigation Handlers
   const handlePreviousWeek = () => {
-    // TODO: Implement navigation to previous week
-    console.log("Previous week");
+    const prev = new Date(currentDate);
+    prev.setDate(prev.getDate() - 7);
+    setCurrentDate(prev);
   };
 
   const handleNextWeek = () => {
-    // TODO: Implement navigation to next week
-    console.log("Next week");
+    const next = new Date(currentDate);
+    next.setDate(next.getDate() + 7);
+    setCurrentDate(next);
   };
 
   return (
     <div>
       {/* Header with navigation */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">Schedules</h2>
+        <h2 className="text-2xl font-bold flex items-center gap-3">
+          Schedules
+          {isLoading && <span className="text-sm text-gray-400 font-normal animate-pulse">Loading...</span>}
+        </h2>
         <div className="flex items-center gap-4">
           <button
             onClick={handlePreviousWeek}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Previous week"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <span className="text-xl font-semibold text-black-700 min-w-[180px] text-center">
+          <span className="text-xl font-semibold text-gray-700 min-w-[200px] text-center">
             {currentWeekRange}
           </span>
           <button
             onClick={handleNextWeek}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Next week"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -184,7 +166,7 @@ export default function SchedulesCard() {
       {/* Week Grid */}
       <div className="grid grid-cols-7 gap-4">
         {scheduleData.map((day) => (
-          <DayCard key={day.date} day={day} isToday={day.isToday} />
+          <DayCard key={`${day.date}-${day.dayName}`} day={day} />
         ))}
       </div>
     </div>

@@ -10,11 +10,13 @@ import unitIllustration from "@/assets/unit_illstration.png";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SignInFormValues, signInSchema } from "@/lib/authentication";
+import { useQueryClient } from "@tanstack/react-query";
 
 const SignIn = () => {
   const { role } = useParams<{ role: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -101,8 +103,14 @@ const SignIn = () => {
         description: "You have successfully signed in.",
       });
 
+      // queryClient.prefetchQuery({
+      //   queryKey: ['profile'], 
+      // });
+
       if (userRole === "unit") {
         navigate("/unit-dashboard");
+      } else if (userRole === "mentor") {
+          navigate("/mentor-dashboard");
       } else {
         navigate("/dashboard");
       }

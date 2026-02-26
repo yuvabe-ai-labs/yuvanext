@@ -8,7 +8,7 @@ import Pagination from "@/components/Pagination";
 import { Search, Users, ChevronLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useRecentMentees } from "@/hooks/useMentees";
+import { useMenteesApplications } from "@/hooks/useMentees";
 
 export default function MenteesManagement() {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ export default function MenteesManagement() {
   const pageSize = 6;
 
   // Fetch all mentees
-  const menteesQuery = useRecentMentees(page, pageSize);
+  const menteesQuery = useMenteesApplications();
 
   const rawItems = menteesQuery.data?.data ?? [];
   const pagination = menteesQuery.data?.pagination;

@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Navbar from "@/components/Navbar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,33 +7,43 @@ import Pagination from "@/components/Pagination";
 import { Search, Users, ChevronLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useMenteesApplications } from "@/hooks/useMentees";
+import { useMenteesApplicationsList } from "@/hooks/useMentees"; // Updated Hook
 
 export default function MenteesManagement() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const pageSize = 6;
 
-  // Fetch all mentees
-  const menteesQuery = useMenteesApplications();
-
-  const rawItems = menteesQuery.data?.data ?? [];
-  const pagination = menteesQuery.data?.pagination;
-
-  // Client-side filtering for search (API should handle this in production)
-  const items = searchQuery
-    ? rawItems.filter((item: any) =>
-        item.name?.toLowerCase().includes(searchQuery.toLowerCase()),
-      )
-    : rawItems;
+  // Search Debounce Logic
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSearch = (val: string) => {
     setSearchQuery(val);
-    setPage(1);
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    timerRef.current = setTimeout(() => {
+      setDebouncedSearch(val);
+      setPage(1); // Reset to page 1 on new search
+    }, 500);
   };
 
-  const getStatusColor = (status: string) => {
+  // Cleanup timer
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  // Fetch from API with server-side pagination & search
+  const menteesQuery = useMenteesApplicationsList(page, pageSize, debouncedSearch);
+
+  const items = menteesQuery.data?.data ?? [];
+  const pagination = menteesQuery.data?.pagination;
+
+  const getStatusColor = (status?: string) => {
+    if (!status) return "text-gray-800";
     switch (status.toLowerCase()) {
       case "hired":
         return "text-green-800";
@@ -51,11 +60,10 @@ export default function MenteesManagement() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* <Navbar /> */}
       <div className="w-full mx-auto px-4 sm:px-12 lg:px-40 py-6 lg:py-10">
-        <div className="relative flex items-center mb-6">
+        <div className="relative flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
           {/* Left */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 w-full sm:w-auto">
             <button
               onClick={() => navigate(-1)}
               className="flex items-center gap-1 text-md font-medium text-gray-600 hover:text-gray-900"
@@ -66,16 +74,16 @@ export default function MenteesManagement() {
           </div>
 
           {/* Center title */}
-          <h2 className="absolute left-1/2 -translate-x-1/2 text-2xl font-bold text-gray-600 whitespace-nowrap">
+          <h2 className="sm:absolute sm:left-1/2 sm:-translate-x-1/2 text-2xl font-bold text-gray-600 whitespace-nowrap">
             Mentees List
           </h2>
 
           {/* Right */}
-          <div className="ml-auto relative w-full sm:w-64">
+          <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search by names"
-              className="pl-10 rounded-full border-gray-300"
+              placeholder="Search by names or roles"
+              className="pl-10 rounded-full border-gray-300 w-full"
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
             />
@@ -85,33 +93,32 @@ export default function MenteesManagement() {
         <div className="px-2 lg:px-10">
           {/* Content Area */}
           {menteesQuery.isLoading ? (
-            <div className="text-center py-20 text-gray-400 font-medium">
-              Loading data...
+            <div className="text-center py-20 text-gray-400 font-medium animate-pulse">
+              Loading candidates...
             </div>
           ) : items.length === 0 ? (
             <div className="text-center py-20 flex flex-col items-center">
               <Users className="w-16 h-16 text-gray-200 mb-4" />
               <h3 className="text-lg font-semibold text-gray-400">
-                No Mentees Found
+                {debouncedSearch ? "No matching applications found" : "No Applications Found"}
               </h3>
             </div>
           ) : (
             <>
               {/* Mentees Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {items.map((mentee: any) => {
-                  const skills = Array.isArray(mentee.skills)
-                    ? mentee.skills
-                    : [];
-                  const interests = Array.isArray(mentee.interests)
-                    ? mentee.interests
-                    : [];
-                  const profileSummary =
-                    mentee.profileSummary || "No profile summary available.";
+                {items.map((application: any) => {
+                  // Destructure the nested backend response
+                  const candidate = application.candidate;
+                  const internship = application.internship;
+                  const unit = internship?.unit;
+
+                  const skills = Array.isArray(candidate?.skills) ? candidate.skills : [];
+                  const profileSummary = candidate?.profileSummary || "No profile summary available.";
 
                   return (
                     <Card
-                      key={mentee.candidateId}
+                      key={application.applicationId}
                       className="min-w-[350px] border border-border/50 hover:shadow-lg transition-shadow rounded-3xl flex flex-col"
                     >
                       <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5">
@@ -120,14 +127,14 @@ export default function MenteesManagement() {
                           {/* Avatar */}
                           <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500">
                             <AvatarImage
-                              src={mentee.avatarUrl ?? undefined}
-                              alt={mentee.name ?? "Candidate"}
+                              src={candidate?.avatarUrl ?? undefined}
+                              alt={candidate?.name ?? "Candidate"}
                               className="object-cover"
                             />
                             <AvatarFallback className="font-semibold bg-gray-200 text-gray-700">
-                              {mentee.name
+                              {candidate?.name
                                 ?.split(" ")
-                                .map((n) => n[0])
+                                .map((n: string) => n[0])
                                 .join("")
                                 .toUpperCase() || "C"}
                             </AvatarFallback>
@@ -136,24 +143,22 @@ export default function MenteesManagement() {
                           {/* Info */}
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-base sm:text-lg mb-1 text-gray-900 truncate">
-                              {mentee.name || "Unknown"}
+                              {candidate?.name || "Unknown"}
                             </h3>
 
                             <p className="text-xs sm:text-sm text-gray-700 mb-2 truncate">
-                              {mentee.internshipName || "No internship"}
+                              {internship?.title || "No internship"}
                             </p>
 
                             <span className="text-xs sm:text-sm font-medium capitalize">
                               <span
-                                className={getStatusColor(
-                                  mentee.applicationStatus,
-                                )}
+                                className={getStatusColor(application.status)}
                               >
-                                {mentee.applicationStatus}
+                                {application.status}
                               </span>
                               <span className="text-black-700">
                                 {" "}
-                                at {mentee.AppliedAt}
+                                at {unit?.name || "Unknown Unit"}
                               </span>
                             </span>
                           </div>
@@ -170,7 +175,7 @@ export default function MenteesManagement() {
                             <div className="flex gap-2 overflow-hidden">
                               {skills.length > 3 ? (
                                 <>
-                                  {skills.slice(0, 3).map((skill, i) => (
+                                  {skills.slice(0, 3).map((skill: string, i: number) => (
                                     <Badge
                                       key={i}
                                       variant="outline"
@@ -187,7 +192,7 @@ export default function MenteesManagement() {
                                   </Badge>
                                 </>
                               ) : (
-                                skills.map((skill, i) => (
+                                skills.map((skill: string, i: number) => (
                                   <Badge
                                     key={i}
                                     variant="outline"
@@ -197,19 +202,6 @@ export default function MenteesManagement() {
                                   </Badge>
                                 ))
                               )}
-                            </div>
-                          )}
-                          {skills.length === 0 && interests.length > 0 && (
-                            <div className="flex gap-2 overflow-hidden">
-                              {interests.slice(0, 3).map((interest, i) => (
-                                <Badge
-                                  key={i}
-                                  variant="outline"
-                                  className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                                >
-                                  {interest}
-                                </Badge>
-                              ))}
                             </div>
                           )}
                         </div>
@@ -222,7 +214,7 @@ export default function MenteesManagement() {
                           size="lg"
                           className="w-full border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full cursor-pointer"
                           onClick={() =>
-                            navigate(`/candidate/${mentee.applicationId}`)
+                            navigate(`/candidate/${application.applicationId}`)
                           }
                         >
                           View Profile
@@ -234,12 +226,14 @@ export default function MenteesManagement() {
               </div>
 
               {/* Pagination */}
-              <Pagination
-                currentPage={page}
-                totalPages={pagination?.totalPages || 1}
-                onPageChange={setPage}
-                className="mt-10"
-              />
+              {pagination && pagination.totalPages > 1 && (
+                <Pagination
+                  currentPage={page}
+                  totalPages={pagination.totalPages}
+                  onPageChange={setPage}
+                  className="mt-10"
+                />
+              )}
             </>
           )}
         </div>

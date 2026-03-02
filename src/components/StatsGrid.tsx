@@ -7,13 +7,13 @@ import {
   Book,
 } from "@/components/ui/custom-icons";
 import { useNavigate } from "react-router-dom";
-import { useAdminStatsOverview } from "@/hooks/useMentorStats";
+import { useMentorStats } from "@/hooks/useMentorStats";
 
 interface StatCardProps {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   label: string;
   value: number | string;
-  subtext: string;
+  newThisMonth: number;
   bgColor: string;
   isLoading?: boolean;
   onClick?: () => void;
@@ -23,7 +23,7 @@ const StatCard = ({
   icon: Icon,
   label,
   value,
-  subtext,
+  newThisMonth,
   bgColor,
   isLoading,
   onClick,
@@ -49,8 +49,15 @@ const StatCard = ({
         )}
       </div>
 
+      {/* "+N new this month" subtext */}
       <p className="text-xs text-green-600 font-medium mt-2">
-        {isLoading ? "Loading..." : subtext}
+        {isLoading ? (
+          <span className="inline-block h-3 w-24 bg-gray-200 animate-pulse rounded" />
+        ) : newThisMonth > 0 ? (
+          `+${newThisMonth} new this month`
+        ) : (
+          "No new additions this month"
+        )}
       </p>
     </div>
   );
@@ -58,62 +65,50 @@ const StatCard = ({
 
 export default function StatsGrid() {
   const navigate = useNavigate();
-  
-  // 1. Fetch data from your new hook
-  const { dashboard, units, meetings, isLoading } = useAdminStatsOverview();
-  console.log("Dashboard response:", dashboard);
-  console.log("Units response:", units);
-  console.log("Meetings response:", meetings);
+  const { stats, isLoading } = useMentorStats();
 
-  // 2. Map API data to the cards
-  const stats = useMemo(() => {
-    return [
+  const statCards = useMemo(
+    () => [
       {
         icon: DoubleUser,
         label: "Total Mentees",
-        value: dashboard?.totalAcceptedCandidates || 0,
-        subtext: "Current active mentees",
+        value: stats?.acceptedMentees.total ?? 0,
+        newThisMonth: stats?.acceptedMentees.newThisMonth ?? 0,
         bgColor: "bg-orange-50",
-        isLoading,
         onClick: () => navigate("/mentees-management"),
       },
       {
         icon: FoldedFile,
         label: "Mentees Units",
-        // Extracting from pagination
-        value: units?.pagination?.totalItems || 0,
-        subtext: "Units you are interacting with",
+        value: stats?.menteeUnitCount.total ?? 0,
+        newThisMonth: stats?.menteeUnitCount.newThisMonth ?? 0,
         bgColor: "bg-blue-50",
-        isLoading,
         onClick: () => navigate("/units-management"),
       },
       {
         icon: Handbag,
-        label: "Meetings",
-        // Extracting from pagination
-        value: meetings?.pagination?.totalItems || 0,
-       
-        subtext: "Total scheduled meetings",
+        label: "Upcoming Meetings",
+        value: stats?.upcomingMeetings.total ?? 0,
+        newThisMonth: stats?.upcomingMeetings.newThisMonth ?? 0,
         bgColor: "bg-yellow-50",
-        isLoading,
-        onClick: () => navigate("/internships"), // You might want to change this route to /meetings
+        onClick: () => navigate("/meetings"),
       },
       {
         icon: Book,
-        label: "Applications",
-        value: dashboard?.totalApplications || 0,
-        subtext: "Total mentee applications",
+        label: "Hired Applications",
+        value: stats?.hiredApplications.total ?? 0,
+        newThisMonth: stats?.hiredApplications.newThisMonth ?? 0,
         bgColor: "bg-indigo-50",
-        isLoading,
-        onClick: () => navigate("/courses"), // You might want to change this route
+        onClick: () => navigate("/mentees-activities"),
       },
-    ];
-  }, [navigate, dashboard, units, meetings, isLoading]);
+    ],
+    [navigate, stats]
+  );
 
   return (
     <div className="grid grid-cols-4 gap-4 mb-8">
-      {stats.map((stat) => (
-        <StatCard key={stat.label} {...stat} />
+      {statCards.map((card) => (
+        <StatCard key={card.label} {...card} isLoading={isLoading} />
       ))}
     </div>
   );

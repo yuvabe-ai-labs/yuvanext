@@ -3,6 +3,7 @@ export enum UserRole {
   CANDIDATE = "candidate",
   UNIT = "unit",
   ADMIN = "admin",
+  Mentor = "mentor",
 }
 
 export enum Gender {

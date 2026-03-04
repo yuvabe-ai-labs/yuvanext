@@ -45,9 +45,15 @@ const Navbar = () => {
     { name: "Internships", path: "/internships" },
     { name: "Courses", path: "/courses" },
     { name: "Units", path: "/units" },
+     { name: "Mentors", path: "/mentor-explorer" },
   ];
 
-  const navItems = userRole === UserRole.UNIT ? [] : allNavItems;
+  // 1. UPDATED: Hide nav items for both UNIT and MENTOR roles
+  const navItems =
+    userRole === UserRole.UNIT || userRole === UserRole.Mentor
+      ? []
+      : allNavItems;
+
   const isActive = (path: string) => location.pathname === path;
 
   // 4. Sign Out
@@ -81,10 +87,17 @@ const Navbar = () => {
   const dashboardLink =
     userRole === UserRole.UNIT ? "/unit-dashboard" : "/dashboard";
 
+  // 2. UPDATED: Dynamic wrapper classes to push items to the edges for mentors
+  const wrapperClasses =
+    userRole === UserRole.Mentor
+      ? "w-full h-16 px-4 sm:px-8 lg:px-12 flex items-center relative justify-between" // Edge-to-edge layout for mentors
+      : "container h-16 px-4 sm:px-6 md:px-8 lg:px-20 flex items-center relative justify-between"; // Standard constrained layout
+
   return (
     <>
       <nav className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/70 shadow-sm">
-        <div className="container h-16 px-4 sm:px-6 md:px-8 lg:px-20 flex items-center relative justify-between">
+        {/* Applied dynamic wrapper classes here */}
+        <div className={wrapperClasses}>
           {/* Logo */}
           <div className="flex w-full items-center">
             <div className="lg:hidden p-3 items-center justify-between">

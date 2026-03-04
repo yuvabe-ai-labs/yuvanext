@@ -106,6 +106,7 @@ const SignIn = () => {
       // queryClient.prefetchQuery({
       //   queryKey: ['profile'], 
       // });
+      await queryClient.invalidateQueries();
 
       if (userRole === "unit") {
         navigate("/unit-dashboard");

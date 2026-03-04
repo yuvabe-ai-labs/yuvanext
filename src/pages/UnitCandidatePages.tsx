@@ -1,5 +1,6 @@
+// src/pages/mentor/UnitCandidatesPage.tsx
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,10 +8,12 @@ import Pagination from "@/components/Pagination";
 import { Search, Users, ChevronLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useAcceptedCandidatesList, useMenteesApplicationsList } from "@/hooks/useMentees"; // Updated Hook
+import { useMentorUnitCandidatesList } from "@/hooks/useMentorsUnits";
 
-export default function MenteesManagement() {
+export default function UnitCandidatesPage() {
   const navigate = useNavigate();
+  const { unitId } = useParams(); // Get the unitId from the URL path
+  
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -37,10 +40,10 @@ export default function MenteesManagement() {
   }, []);
 
   // Fetch from API with server-side pagination & search
-  const menteesQuery = useAcceptedCandidatesList(page, pageSize, debouncedSearch);
+  const candidatesQuery = useMentorUnitCandidatesList(unitId as string, page, pageSize, debouncedSearch);
 
-  const items = menteesQuery.data?.data ?? [];
-  const pagination = menteesQuery.data?.pagination;
+  const items = candidatesQuery.data?.data ?? [];
+  const pagination = candidatesQuery.data?.pagination;
 
   const getStatusColor = (status?: string) => {
     if (!status) return "text-gray-800";
@@ -75,14 +78,14 @@ export default function MenteesManagement() {
 
           {/* Center title */}
           <h2 className="sm:absolute sm:left-1/2 sm:-translate-x-1/2 text-2xl font-bold text-gray-600 whitespace-nowrap">
-            Mentees List
+            Unit Candidates
           </h2>
 
           {/* Right */}
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search by names or roles"
+              placeholder="Search by candidate name"
               className="pl-10 rounded-full border-gray-300 w-full"
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
@@ -92,7 +95,7 @@ export default function MenteesManagement() {
 
         <div className="px-2 lg:px-10">
           {/* Content Area */}
-          {menteesQuery.isLoading ? (
+          {candidatesQuery.isLoading ? (
             <div className="text-center py-20 text-gray-400 font-medium animate-pulse">
               Loading candidates...
             </div>
@@ -100,18 +103,16 @@ export default function MenteesManagement() {
             <div className="text-center py-20 flex flex-col items-center">
               <Users className="w-16 h-16 text-gray-200 mb-4" />
               <h3 className="text-lg font-semibold text-gray-400">
-                {debouncedSearch ? "No matching applications found" : "No Applications Found"}
+                {debouncedSearch ? "No matching candidates found" : "No candidates applied to this unit"}
               </h3>
             </div>
           ) : (
             <>
-              {/* Mentees Grid */}
+              {/* Candidates Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {items.map((application: any) => {
-                  // Destructure the nested backend response
                   const candidate = application.candidate;
                   const internship = application.internship;
-                  const unit = internship?.unit;
 
                   const skills = Array.isArray(candidate?.skills) ? candidate.skills : [];
                   const profileSummary = candidate?.profileSummary || "No profile summary available.";
@@ -147,18 +148,12 @@ export default function MenteesManagement() {
                             </h3>
 
                             <p className="text-xs sm:text-sm text-gray-700 mb-2 truncate">
-                              {internship?.title || "No internship"}
+                              {internship?.title || "No internship title"}
                             </p>
 
                             <span className="text-xs sm:text-sm font-medium capitalize">
-                              <span
-                                className={getStatusColor(application.status)}
-                              >
-                                {application.status}
-                              </span>
-                              <span className="text-black-700">
-                                {" "}
-                                at {unit?.name || "Unknown Unit"}
+                              <span className={getStatusColor(application.applicationStatus)}>
+                                {application.applicationStatus}
                               </span>
                             </span>
                           </div>

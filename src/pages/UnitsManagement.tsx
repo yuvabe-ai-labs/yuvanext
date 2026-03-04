@@ -140,10 +140,10 @@ export default function UnitsManagement() {
                             className="text-[#0B5FFF] font-medium p-0 hover:text-blue-700"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/units/${unit.userId}`);
+                              navigate(`/units/${unit.userId}/candidates`);
                             }}
                           >
-                            View Details
+                            View Candidates
                           </Button>
                         </div>
                       </div>

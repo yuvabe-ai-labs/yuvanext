@@ -46,6 +46,10 @@ import ScrollToTop from "@/components/ScrollToTop";
 import { useProfile } from "@/hooks/useProfile";
 import EnvironmentIndicator from "@/components/EnvironmentIndicator";
 import MenteesActivities from "./pages/MenteesActivites";
+import MentorshipRequestsPage from "./pages/MentorShipRequestPage";
+import MentorExplorerPage from "./pages/MentorExplorePage";
+import MentorDetailsPage from "./pages/MentorDetailsPage";
+import UnitCandidatesPage from "./pages/UnitCandidatePages";
 // import AcceptedCandidates from "./pages/AcceptedCandidates";
 
 const queryClient = new QueryClient();
@@ -194,6 +198,30 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+             <Route
+              path="/mentor-explorer"
+              element={
+                <ProtectedRoute>
+                  <MentorExplorerPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mentor/:mentorId"
+              element={
+                <ProtectedRoute>
+                  <MentorDetailsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/units/:unitId/candidates"
+              element={
+                <ProtectedRoute>
+                  <UnitCandidatesPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/units-management"
               element={
@@ -274,6 +302,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CandidateTasks />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mentorship-respond"
+              element={
+                <ProtectedRoute>
+                  <MentorshipRequestsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/candidate-request"
+              element={
+                <ProtectedRoute>
+                  <MentorExplorerPage />
                 </ProtectedRoute>
               }
             />

@@ -190,10 +190,12 @@ export default function MenteesList() {
                       size="lg"
                       className="w-full border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full cursor-pointer"
                       onClick={() =>
-                        navigate(`/candidate/${application.applicationId}`)
+                        navigate(
+                          `/mentor/candidate-tasks/${application.applicationId}`
+                        )
                       }
                     >
-                      View Profile
+                      View Tasks
                     </Button>
                   </CardContent>
                 </Card>

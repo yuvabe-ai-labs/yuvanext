@@ -119,7 +119,11 @@ export default function MenteesActivities() {
                           <Button 
                             variant="outline" 
                             className="rounded-full text-teal-600 border-teal-200 hover:bg-teal-50 px-4 h-9 font-medium text-sm flex items-center gap-2"
-                            onClick={() => navigate(`/tasks/${application.applicationId}`)}
+                            onClick={() =>
+                              navigate(
+                                `/mentor/candidate-tasks/${application.applicationId}`
+                              )
+                            }
                           >
                             View Tasks
                             <ExternalLink className="w-4 h-4" />

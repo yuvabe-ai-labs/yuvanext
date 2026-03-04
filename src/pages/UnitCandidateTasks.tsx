@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { useCandidateTasks } from "@/hooks/useCandidateTasks";
@@ -13,6 +13,8 @@ import { format } from "date-fns";
 export default function UnitCandidateTasks() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isMentorView = location.pathname.startsWith("/mentor/candidate-tasks");
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
@@ -113,7 +115,7 @@ export default function UnitCandidateTasks() {
           {/* RIGHT SIDE: Tasks List Sidebar */}
           <div className="w-full md:w-80 bg-white p-6 shadow-inner flex flex-col overflow-hidden border-l-4 border-gray-300 min-h-[calc(100vh-80px)]">
             <h2 className="text-2xl font-semibold text-gray-900 mb-6 flex-shrink-0">
-              Tasks Overview
+              {isMentorView ? "Task Descriptions" : "Tasks Overview"}
             </h2>
 
             {tasks.length === 0 ? (
@@ -125,8 +127,14 @@ export default function UnitCandidateTasks() {
                 {tasks.map((task) => (
                   <div
                     key={task.taskId}
-                    onClick={() => handleTaskClick(task)}
-                    className="bg-white border border-gray-200 rounded-2xl p-4 cursor-pointer transition-all hover:shadow-md"
+                    onClick={
+                      isMentorView ? undefined : () => handleTaskClick(task)
+                    }
+                    className={`bg-white border border-gray-200 rounded-2xl p-4 ${
+                      isMentorView
+                        ? "cursor-default"
+                        : "cursor-pointer transition-all hover:shadow-md"
+                    }`}
                   >
                     <div className="flex items-start gap-3 mb-2">
                       <div
@@ -188,6 +196,7 @@ export default function UnitCandidateTasks() {
           isOpen={isViewModalOpen}
           onClose={handleCloseModal}
           task={selectedTask}
+          readOnly={isMentorView}
         />
       )}
     </div>

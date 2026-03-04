@@ -101,7 +101,7 @@ export default function StatsGrid() {
         value: stats?.upcomingMeetings.total ?? 0,
         newThisMonth: stats?.upcomingMeetings.newThisMonth ?? 0,
         bgColor: "bg-yellow-50",
-        onClick: () => navigate("/meetings"),
+        onClick: () => navigate("/scheduled-meetings"),
       },
       {
         icon: Book,

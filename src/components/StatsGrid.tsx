@@ -7,13 +7,15 @@ import {
   Book,
 } from "@/components/ui/custom-icons";
 import { useNavigate } from "react-router-dom";
-import { useAdminStatsOverview } from "@/hooks/useMentorStats";
+import { useMentorStats } from "@/hooks/useMentorStats";
+import { UserPlus } from "lucide-react";
+import { useIncomingRequests } from "@/hooks/useMentorShip";
 
 interface StatCardProps {
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>> | any; // allow lucide icons
   label: string;
   value: number | string;
-  subtext: string;
+  newThisMonth: number;
   bgColor: string;
   isLoading?: boolean;
   onClick?: () => void;
@@ -23,7 +25,7 @@ const StatCard = ({
   icon: Icon,
   label,
   value,
-  subtext,
+  newThisMonth,
   bgColor,
   isLoading,
   onClick,
@@ -35,10 +37,8 @@ const StatCard = ({
       }`}
       onClick={onClick}
     >
-      {/* Icon – top right, vertically centered */}
-      <Icon className="w-10 h-10 absolute right-4 top-1/2 -translate-y-1/2" />
+      <Icon className="w-10 h-10 absolute right-4 top-1/2 -translate-y-1/2 opacity-70" />
 
-      {/* Content */}
       <div>
         <p className="text-xs font-medium text-gray-600">{label}</p>
 
@@ -50,7 +50,13 @@ const StatCard = ({
       </div>
 
       <p className="text-xs text-green-600 font-medium mt-2">
-        {isLoading ? "Loading..." : subtext}
+        {isLoading ? (
+          <span className="inline-block h-3 w-24 bg-gray-200 animate-pulse rounded" />
+        ) : newThisMonth > 0 ? (
+          `+${newThisMonth} new this month`
+        ) : (
+          "No new additions this month"
+        )}
       </p>
     </div>
   );
@@ -58,62 +64,64 @@ const StatCard = ({
 
 export default function StatsGrid() {
   const navigate = useNavigate();
-  
-  // 1. Fetch data from your new hook
-  const { dashboard, units, meetings, isLoading } = useAdminStatsOverview();
-  console.log("Dashboard response:", dashboard);
-  console.log("Units response:", units);
-  console.log("Meetings response:", meetings);
+  const { stats, isLoading: isStatsLoading } = useMentorStats();
 
-  // 2. Map API data to the cards
-  const stats = useMemo(() => {
-    return [
+  // Fetch the total pending requests
+  const { data: requestsData, isLoading: isRequestsLoading } = useIncomingRequests(1, 1, "pending");
+
+  const statCards = useMemo(
+    () => [
+      {
+        icon: UserPlus, 
+        label: "Pending Requests",
+        value: requestsData?.pagination?.totalItems ?? 0, 
+        newThisMonth: 0, 
+        bgColor: "bg-purple-50", 
+        onClick: () => navigate("/mentorship-respond"),
+      },
       {
         icon: DoubleUser,
         label: "Total Mentees",
-        value: dashboard?.totalAcceptedCandidates || 0,
-        subtext: "Current active mentees",
+        value: stats?.acceptedMentees.total ?? 0,
+        newThisMonth: stats?.acceptedMentees.newThisMonth ?? 0,
         bgColor: "bg-orange-50",
-        isLoading,
         onClick: () => navigate("/mentees-management"),
       },
       {
         icon: FoldedFile,
         label: "Mentees Units",
-        // Extracting from pagination
-        value: units?.pagination?.totalItems || 0,
-        subtext: "Units you are interacting with",
+        value: stats?.menteeUnitCount.total ?? 0,
+        newThisMonth: stats?.menteeUnitCount.newThisMonth ?? 0,
         bgColor: "bg-blue-50",
-        isLoading,
         onClick: () => navigate("/units-management"),
       },
       {
         icon: Handbag,
-        label: "Meetings",
-        // Extracting from pagination
-        value: meetings?.pagination?.totalItems || 0,
-       
-        subtext: "Total scheduled meetings",
+        label: "Upcoming Meetings",
+        value: stats?.upcomingMeetings.total ?? 0,
+        newThisMonth: stats?.upcomingMeetings.newThisMonth ?? 0,
         bgColor: "bg-yellow-50",
-        isLoading,
-        onClick: () => navigate("/internships"), // You might want to change this route to /meetings
+        onClick: () => navigate("/meetings"),
       },
       {
         icon: Book,
-        label: "Applications",
-        value: dashboard?.totalApplications || 0,
-        subtext: "Total mentee applications",
+        label: "Hired Applications",
+        value: stats?.hiredApplications.total ?? 0,
+        newThisMonth: stats?.hiredApplications.newThisMonth ?? 0,
         bgColor: "bg-indigo-50",
-        isLoading,
-        onClick: () => navigate("/courses"), // You might want to change this route
+        onClick: () => navigate("/mentees-activities"),
       },
-    ];
-  }, [navigate, dashboard, units, meetings, isLoading]);
+    ],
+    [navigate, stats, requestsData] // Make sure requestsData is in the dependency array
+  );
+
+  const isLoading = isStatsLoading || isRequestsLoading;
 
   return (
-    <div className="grid grid-cols-4 gap-4 mb-8">
-      {stats.map((stat) => (
-        <StatCard key={stat.label} {...stat} />
+    // Changed to xl:grid-cols-5 to ensure 5 items fit exactly in one row on large screens
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
+      {statCards.map((card) => (
+        <StatCard key={card.label} {...card} isLoading={isLoading} />
       ))}
     </div>
   );

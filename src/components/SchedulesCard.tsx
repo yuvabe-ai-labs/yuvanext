@@ -30,11 +30,18 @@ const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Se
 // Helper components remain the same
 const ScheduleEventCard = ({ event }: { event: ScheduleEvent }) => (
   <div className={`${event.color} rounded-full px-3 py-1.5 flex items-center gap-2 mb-2`}>
-    {event.avatarUrl && (
-      <div className="w-5 h-5 rounded-full bg-white overflow-hidden flex-shrink-0">
+    
+    {/* Avatar or Fallback Initial */}
+    <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center overflow-hidden flex-shrink-0">
+      {event.avatarUrl ? (
         <img src={event.avatarUrl} alt={event.name} className="w-full h-full object-cover" />
-      </div>
-    )}
+      ) : (
+        <span className="text-[10px] font-bold text-gray-600">
+          {event.name ? event.name.charAt(0).toUpperCase() : "?"}
+        </span>
+      )}
+    </div>
+
     <span className="text-xs font-medium text-white truncate">{event.name}</span>
   </div>
 );
@@ -61,6 +68,8 @@ export default function SchedulesCard() {
   
   // Extract the actual array of meetings from the response
   const meetings = responseData?.data || [];
+
+  console.log("Meeting Data: ", meetings[0]);
 
   // 2. Manage Calendar State (Start with today's date)
   const [currentDate, setCurrentDate] = useState(new Date());

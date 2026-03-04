@@ -16,7 +16,7 @@ export default function MentorDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* <Navbar /> */}
+      <Navbar />
 
       <div className="w-full mx-auto px-4 sm:px-12 lg:px-40 py-6 lg:py-10">
         {/* Header */}

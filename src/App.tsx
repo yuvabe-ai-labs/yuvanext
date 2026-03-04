@@ -45,6 +45,12 @@ import AuthCallback from "@/hooks/AuthCallback";
 import ScrollToTop from "@/components/ScrollToTop";
 import { useProfile } from "@/hooks/useProfile";
 import EnvironmentIndicator from "@/components/EnvironmentIndicator";
+import MenteesActivities from "./pages/MenteesActivites";
+import MentorshipRequestsPage from "./pages/MentorShipRequestPage";
+import MentorExplorerPage from "./pages/MentorExplorePage";
+import MentorDetailsPage from "./pages/MentorDetailsPage";
+import UnitCandidatesPage from "./pages/UnitCandidatePages";
+// import AcceptedCandidates from "./pages/AcceptedCandidates";
 
 const queryClient = new QueryClient();
 
@@ -73,8 +79,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const dashboard = DASHBOARD_MAP[profile.role];
 
     if (profile.role === "mentor") {
-      navigate(dashboard, { replace: true });
-      return;
+      // Only redirect mentors if they are on the chatbot or the wrong dashboards
+      if (
+        isOnChatbot || 
+        currentPath === "/dashboard" || 
+        currentPath === "/unit-dashboard"
+      ) {
+        navigate(dashboard, { replace: true });
+      }
+      return; 
     }
 
     if (profile.onboardingCompleted) {
@@ -185,11 +198,43 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+             <Route
+              path="/mentor-explorer"
+              element={
+                <ProtectedRoute>
+                  <MentorExplorerPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mentor/:mentorId"
+              element={
+                <ProtectedRoute>
+                  <MentorDetailsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/units/:unitId/candidates"
+              element={
+                <ProtectedRoute>
+                  <UnitCandidatesPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/units-management"
               element={
                 <ProtectedRoute>
                   <UnitsManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mentees-activities"
+              element={
+                <ProtectedRoute>
+                  <MenteesActivities />
                 </ProtectedRoute>
               }
             />
@@ -257,6 +302,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CandidateTasks />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mentorship-respond"
+              element={
+                <ProtectedRoute>
+                  <MentorshipRequestsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/candidate-request"
+              element={
+                <ProtectedRoute>
+                  <MentorExplorerPage />
                 </ProtectedRoute>
               }
             />

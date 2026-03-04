@@ -1,36 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
-import { 
-  getMentorDashboardStats, 
-  getMentorUnits, 
-  getMentorMeetings 
-} from "@/services/mentor.service";
+import type { MentorStats } from "@/types/mentor.types";
+import { getMentorStats } from "@/services/mentor.service";
 
-export const useAdminStatsOverview = () => {
-  const dashboardQuery = useQuery({
-    queryKey: ["mentor-dashboard-stats"],
-    queryFn: getMentorDashboardStats,
+/**
+ * Fetches all four dashboard stat tiles in a single request:
+ *   acceptedMentees, menteeUnitCount, upcomingMeetings, hiredApplications
+ * Each tile has: { total, newThisMonth }
+ */
+export const useMentorStats = () => {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["mentor-stats"],
+    queryFn: getMentorStats,
   });
 
-  const unitsQuery = useQuery({
-    queryKey: ["mentor-units-stats"],
-    queryFn: getMentorUnits,
-  });
-
-  const meetingsQuery = useQuery({
-    queryKey: ["mentor-meetings-stats"],
-    queryFn: getMentorMeetings,
-  });
-
-  // Combine loading states so the skeletons show until EVERYTHING is ready
-  const isLoading = 
-    dashboardQuery.isLoading || 
-    unitsQuery.isLoading || 
-    meetingsQuery.isLoading;
+  const stats: MentorStats | undefined = data?.data;
 
   return {
-    dashboard: dashboardQuery.data,
-    units: unitsQuery.data,
-    meetings: meetingsQuery.data,
+    stats,
     isLoading,
+    isError,
   };
 };

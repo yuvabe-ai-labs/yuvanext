@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, Briefcase, UserCheck, Clock, CalendarDays, Globe, Users } from "lucide-react";
+import { ChevronLeft, Briefcase, UserCheck, Clock, CalendarDays, Globe, Users, CloudCog } from "lucide-react";
 
 import { useMentorDetails, useCandidateOwnRequestsList, useSendMentorshipRequest } from "@/hooks/useCandidateMentors";
 
@@ -18,6 +18,7 @@ export default function MentorDetailsPage() {
 
   // Queries
   const { data: mentorResponse, isLoading } = useMentorDetails(mentorId as string);
+  console.log("Mentor Details Response:", mentorResponse);
   const { data: requestsResponse } = useCandidateOwnRequestsList();
   const requestMutation = useSendMentorshipRequest();
 
@@ -66,7 +67,7 @@ export default function MentorDetailsPage() {
       <Navbar />
       
       {/* Banner */}
-      <div className="h-48 bg-gradient-to-r from-blue-600 to-indigo-700 w-full" />
+      <div className="h-48 bg-gradient-to-r from-primary to-primary-foreground w-full" />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20">
         <Card className="rounded-3xl shadow-lg border-0">
@@ -93,9 +94,9 @@ export default function MentorDetailsPage() {
                     <Briefcase className="w-4 h-4" />
                     {mentor.mentorType?.split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
                   </span>
-                  {mentor.timezone && (
+                  {mentor.availabilityTimeWindows && (
                     <span className="flex items-center gap-1.5">
-                      <Globe className="w-4 h-4" /> {mentor.timezone}
+                      <Globe className="w-4 h-4" /> {mentor.availabilityTimeWindows}
                     </span>
                   )}
                   {mentor.mentoringCapacity && (

@@ -94,7 +94,10 @@ export default function UnitsManagement() {
                   return (
                     <Card
                       key={unit.userId}
-                      className="relative overflow-hidden rounded-[20px] border border-[#C94100] bg-white shadow-sm transition-all duration-300 hover:shadow-md w-full max-w-[360px] h-[300px] p-1.5 mx-auto"
+                      // ADDED cursor-pointer here
+                      className="relative overflow-hidden rounded-[20px] border border-[#C94100] bg-white shadow-sm transition-all duration-300 hover:shadow-md w-full max-w-[360px] h-[300px] p-1.5 mx-auto cursor-pointer"
+                      // ADDED onClick to navigate to the unit details page
+                      onClick={() => navigate(`/units/${unit.userId}`)}
                     >
                       {/* Banner */}
                       <div className="relative w-full h-[100px] rounded-t-[18px] overflow-visible bg-blue-100">
@@ -139,6 +142,7 @@ export default function UnitsManagement() {
                             variant="link"
                             className="text-[#0B5FFF] font-medium p-0 hover:text-blue-700"
                             onClick={(e) => {
+                              // This prevents the card's click event from firing when the button is clicked
                               e.stopPropagation();
                               navigate(`/units/${unit.userId}/candidates`);
                             }}

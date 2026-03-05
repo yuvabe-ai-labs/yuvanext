@@ -33,6 +33,13 @@ interface ScheduleInterviewDialogProps {
   unitId?: string;
   studentId?: string;
   onSuccess?: () => void;
+  onSchedule?: (payload: {
+    title: string;
+    description: string;
+    date: string;
+    time: string;
+    guestEmails: string[];
+  }) => Promise<void> | void;
 }
 
 export default function ScheduleInterviewDialog({
@@ -41,6 +48,7 @@ export default function ScheduleInterviewDialog({
   candidateName,
   applicationId,
   onSuccess,
+  onSchedule,
 }: ScheduleInterviewDialogProps) {
   const { toast } = useToast();
 
@@ -65,6 +73,7 @@ export default function ScheduleInterviewDialog({
 
   // Guest emails state
   const [guestEmails, setGuestEmails] = useState<string[]>([]);
+  const [isScheduling, setIsScheduling] = useState(false);
 
   const addEmail = (email: string) => {
     const trimmed = email.trim();
@@ -90,7 +99,39 @@ export default function ScheduleInterviewDialog({
   };
 
   // 4. Submit Handler
-  const onSubmit = (data: ScheduleFormValues) => {
+  const onSubmit = async (data: ScheduleFormValues) => {
+    if (onSchedule) {
+      try {
+        setIsScheduling(true);
+        await onSchedule({
+          title: data.title,
+          description: data.description || "",
+          date: data.date,
+          time: data.time,
+          guestEmails,
+        });
+        toast({
+          title: "Meeting Scheduled",
+          description: `Invitation sent to ${candidateName}`,
+        });
+        onOpenChange(false);
+        onSuccess?.();
+        reset();
+        setGuestEmails([]);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : "Could not schedule meeting.";
+        toast({
+          title: "Scheduling Failed",
+          description: message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsScheduling(false);
+      }
+      return;
+    }
+
     // Combine Date & Time
     const scheduledDate = new Date(
       `${data.date}T${data.time}:00`
@@ -264,10 +305,13 @@ export default function ScheduleInterviewDialog({
           <div className="flex justify-end pt-2">
             <Button
               type="submit"
-              disabled={updateStatusMutation.isPending || isSubmitting}
+              disabled={
+                (onSchedule ? isScheduling : updateStatusMutation.isPending) ||
+                isSubmitting
+              }
               className="bg-[#2196F3] rounded-full text-white px-8 h-11 hover:bg-[#1976D2]"
             >
-              {updateStatusMutation.isPending
+              {(onSchedule ? isScheduling : updateStatusMutation.isPending)
                 ? "Scheduling..."
                 : "Schedule Interview"}
             </Button>

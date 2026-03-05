@@ -50,7 +50,7 @@ import MentorshipRequestsPage from "./pages/MentorShipRequestPage";
 import MentorExplorerPage from "./pages/MentorExplorePage";
 import MentorDetailsPage from "./pages/MentorDetailsPage";
 import UnitCandidatesPage from "./pages/UnitCandidatePages";
-// import AcceptedCandidates from "./pages/AcceptedCandidates";
+import ScheduledMeetings from "./pages/ScheduledMeetings";
 
 const queryClient = new QueryClient();
 
@@ -81,13 +81,13 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     if (profile.role === "mentor") {
       // Only redirect mentors if they are on the chatbot or the wrong dashboards
       if (
-        isOnChatbot || 
-        currentPath === "/dashboard" || 
+        isOnChatbot ||
+        currentPath === "/dashboard" ||
         currentPath === "/unit-dashboard"
       ) {
         navigate(dashboard, { replace: true });
       }
-      return; 
+      return;
     }
 
     if (profile.onboardingCompleted) {
@@ -238,6 +238,22 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/scheduled-meetings"
+              element={
+                <ProtectedRoute>
+                  <ScheduledMeetings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/meetings"
+              element={
+                <ProtectedRoute>
+                  <ScheduledMeetings />
+                </ProtectedRoute>
+              }
+            />
             {/* Common Resources */}
             <Route
               path="/internships"
@@ -349,6 +365,14 @@ const App = () => (
             />
             <Route
               path="/unit/candidate-tasks/:applicationId"
+              element={
+                <ProtectedRoute>
+                  <UnitCandidateTasks />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mentor/candidate-tasks/:applicationId"
               element={
                 <ProtectedRoute>
                   <UnitCandidateTasks />

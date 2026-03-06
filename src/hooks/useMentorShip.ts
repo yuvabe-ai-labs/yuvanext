@@ -1,10 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   getIncomingRequests, 
-  respondToMentorshipRequest, 
-  getAvailableMentors, 
-  sendMentorshipRequest 
+  respondToMentorshipRequest,  
 } from "@/services/mentorship.service";
+import { getAvailableMentors, sendMentorshipRequest } from "@/services/candidates.services";
 
 // Mentor Hooks
 export const useIncomingRequests = (page: number, limit: number, status = "pending", search = "") => {

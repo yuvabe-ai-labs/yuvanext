@@ -4,7 +4,7 @@ import { GetMentorsParams } from "@/types/candidates.types";
 
 export const getAvailableMentors = async (params: GetMentorsParams) => {
   try {
-    const response = await axiosInstance.get("/candidate/mentors", { params });
+    const response = await axiosInstance.get("/mentors", { params });
     return response.data;
   } catch (error) {
     return handleApiError(error, "Failed to fetch mentors");
@@ -13,7 +13,7 @@ export const getAvailableMentors = async (params: GetMentorsParams) => {
 
 export const sendMentorshipRequest = async (payload: { mentorId: string; message?: string }) => {
   try {
-    const response = await axiosInstance.post("/candidate/mentorship-requests", payload);
+    const response = await axiosInstance.post("/mentorship-requests", payload);
     return response.data;
   } catch (error) {
     // If it's a 409 Conflict (already requested/accepted), pass the message up
@@ -27,7 +27,7 @@ export const sendMentorshipRequest = async (payload: { mentorId: string; message
 
 export const getMentorById = async (mentorId: string) => {
   try {
-    const response = await axiosInstance.get(`/candidate/mentors/${mentorId}`);
+    const response = await axiosInstance.get(`/mentors/${mentorId}`);
     return response.data;
   } catch (error) {
     return handleApiError(error, "Failed to fetch mentor details");
@@ -36,7 +36,7 @@ export const getMentorById = async (mentorId: string) => {
 
 export const getCandidateOwnRequests = async (params?: { page?: number; limit?: number; status?: string }) => {
   try {
-    const response = await axiosInstance.get("/candidate/mentorship-requests", { params });
+    const response = await axiosInstance.get("/mentorship-requests", { params });
     return response.data;
   } catch (error) {
     return handleApiError(error, "Failed to fetch your requests");

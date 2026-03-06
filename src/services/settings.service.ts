@@ -50,3 +50,14 @@ export const updateNotificationSettings = async (
     return handleApiError(error, "Failed to update notification settings");
   }
 };
+
+
+export const getPendingMeetings = async () => {
+  try {
+    // Fetch pending meetings (limit 50 to safely cover a busy week)
+    const response = await axiosInstance.get("/meetings?status=pending&limit=50");
+    return response.data; // Returning raw response to access .data array
+  } catch (error) {
+    return handleApiError(error, "Failed to fetch pending meetings");
+  }
+};

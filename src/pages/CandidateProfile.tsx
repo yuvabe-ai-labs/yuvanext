@@ -53,13 +53,17 @@ import {
 } from "@/hooks/useCandidateProfile";
 import ScheduleInterviewDialog from "@/components/ScheduleInterviewDialog";
 
-import type {
-  CandidateInternship,
-  CandidateProject,
-  CandidateCourse,
-  CandidateEducation,
-  SocialLink,
+import {
+  type CandidateInternship,
+  type CandidateProject,
+  type CandidateCourse,
+  type CandidateEducation,
+  type SocialLink,
+  UserRole,
 } from "@/types/profiles.types";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+
 
 const safeParse = <T,>(data: any, fallback: T): T => {
   if (!data) return fallback;
@@ -87,7 +91,10 @@ const CandidateProfile = () => {
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { toast } = useToast();
-
+  
+  const { data: profileData, isLoading: profileLoading } = useProfile();
+  const profile = profileData;
+  const userRole = profile?.role || null;
   const { data, isLoading, error, refetch } = useCandidateProfile(id || "");
   const updateStatusMutation = useUpdateApplicationStatus();
 
@@ -455,7 +462,7 @@ const CandidateProfile = () => {
                         </>
                       )}
                     </Button>
-
+                    {userRole !== UserRole.Mentor && (
                     <Select
                       value={
                         application.status === "applied"
@@ -497,6 +504,7 @@ const CandidateProfile = () => {
                         </SelectItem>
                       </SelectContent>
                     </Select>
+                    )}
                   </div>
                 </div>
               </div>

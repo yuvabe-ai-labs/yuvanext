@@ -12,6 +12,7 @@ import {
   TaskStatus,
   UpdateTaskPayload,
 } from "@/types/candidateTasks.types";
+import { getHiredApplicants } from "@/services/hired.service";
 
 export const useCandidateTasks = (applicationId: string) => {
   return useQuery({
@@ -93,5 +94,13 @@ export const useReviewTask = () => {
         queryKey: ["candidateTasks"],
       });
     },
+  });
+};
+
+
+export const useHiredApplicantsList = () => {
+  return useQuery({
+    queryKey: ["hired-applicants-tasks-list"],
+    queryFn: getHiredApplicants,
   });
 };

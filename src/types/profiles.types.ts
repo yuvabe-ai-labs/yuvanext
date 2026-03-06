@@ -105,6 +105,7 @@ export interface CandidateEducation {
 }
 
 export interface Profile {
+  mentorType: any;
   id: string;
   userId: string;
   name: string;

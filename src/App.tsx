@@ -51,6 +51,7 @@ import MentorExplorerPage from "./pages/MentorExplorePage";
 import MentorDetailsPage from "./pages/MentorDetailsPage";
 import UnitCandidatesPage from "./pages/UnitCandidatePages";
 import ScheduledMeetings from "./pages/ScheduledMeetings";
+import MentorProfile from "./pages/MentorProfile";
 
 const queryClient = new QueryClient();
 
@@ -293,6 +294,13 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Profile />
+                </ProtectedRoute>
+              }
+            /><Route
+              path="/mentor-profile"
+              element={
+                <ProtectedRoute>
+                  <MentorProfile />
                 </ProtectedRoute>
               }
             />

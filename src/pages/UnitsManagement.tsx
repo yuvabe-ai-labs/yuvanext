@@ -7,6 +7,7 @@ import { Search, Building2, ChevronLeft, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useMentorUnitsList } from "@/hooks/useMentorsUnits"; // Use your new hook
 import type { MentorUnit } from "@/types/mentor.types";
+import Navbar from "@/components/Navbar";
 
 export default function UnitsManagement() {
   const navigate = useNavigate();
@@ -44,6 +45,8 @@ export default function UnitsManagement() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+                  <Navbar />
+
       <div className="w-full mx-auto px-4 sm:px-12 lg:px-40 py-6 lg:py-10">
         <div className="relative flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
           {/* Left */}

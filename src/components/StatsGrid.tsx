@@ -74,7 +74,7 @@ export default function StatsGrid() {
       {
         icon: UserPlus, 
         label: "Pending Requests",
-        value: requestsData?.pagination?.totalItems ?? 0, 
+        value: stats?.pendingRequests.total ?? 0, 
         newThisMonth: 0, 
         bgColor: "bg-purple-50", 
         onClick: () => navigate("/mentorship-respond"),

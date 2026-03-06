@@ -5,41 +5,26 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMenteesApplications } from "@/hooks/useMentees"; // Import your new hook
+import { useAcceptedCandidatesList } from "@/hooks/useMentees";
+import { log } from "console";
 
 export default function MenteesList() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  // 1. Fetch live data
-  const { data: responseData, isLoading } = useMenteesApplications();
-  
-  // Extract the array of applications from the response wrapper
+  // Fetch Page 1, limit to 10 items, empty search string.
+  const { data: responseData, isLoading } = useAcceptedCandidatesList(1, 10, "");
+  console.log("Fetched candidates data:", responseData); // Debug log to check the API response structure
+  // Extract the array of candidates
   const candidates = responseData?.data || [];
 
   const handleScroll = (direction: "left" | "right") => {
     if (!scrollRef.current) return;
-    const amount = 300;
+    const amount = 350;
     scrollRef.current.scrollBy({
       left: direction === "left" ? -amount : amount,
       behavior: "smooth",
     });
-  };
-
-  const getStatusColor = (status: string) => {
-    if (!status) return "text-gray-800";
-    switch (status.toLowerCase()) {
-      case "hired":
-        return "text-green-800";
-      case "interview":
-        return "text-blue-800";
-      case "applied":
-        return "text-yellow-800";
-      case "rejected":
-        return "text-red-800";
-      default:
-        return "text-gray-800";
-    }
   };
 
   return (
@@ -48,7 +33,7 @@ export default function MenteesList() {
         <h4 className="text-lg font-semibold">Mentees List</h4>
         <button
           className="text-blue-600 font-semibold text-sm hover:text-blue-800 cursor-pointer"
-          onClick={() => navigate("/candidate-management")}
+          onClick={() => navigate("/mentees-management")}
         >
           View all
         </button>
@@ -79,31 +64,37 @@ export default function MenteesList() {
             </div>
           ) : candidates.length === 0 ? (
             <div className="w-full text-center py-8 text-muted-foreground">
-              No applied candidates found.
+              No active candidates found.
             </div>
           ) : (
-            candidates.map((application: any) => {
-              // Extracting data dynamically based on your backend response structure
-              const candidate = application.candidate;
-              const internship = application.internship;
-              const unit = internship?.unit;
+            candidates.map((mentee: any) => {
+              // Extract data based on the new API response structure
+              const candidate = mentee.candidate;
+              const appInfo = mentee.application; // Can be null
               
-              const skills = candidate?.skills ?? [];
-              const interests = []; // Backend doesn't return interests currently
+              const internshipTitle = appInfo?.internshipTitle || "No active internship";
+              const status = appInfo?.status || "No active internship";
+              const unitName = appInfo?.unitName || "Unknown Unit";
+              const skills = Array.isArray(candidate?.skills) ? candidate.skills : [];
               const profileSummary =
-                candidate?.profileSummary ??
+                candidate?.profileSummary ||
                 "Passionate about creating user-centered digital experiences.";
+
+              // Navigation fallback just in case applicationId is null
+              const navId = appInfo?.applicationId || candidate?.userId;
 
               return (
                 <Card
-                  key={application.applicationId}
-                  className="min-w-[350px] border border-border/50 hover:shadow-lg transition-shadow rounded-3xl flex flex-col"
+                  key={mentee.requestId}
+                  // Added min-h-[380px] to force consistent heights
+                  className="min-w-[350px] max-w-[350px] min-h-[380px] border border-border/50 hover:shadow-lg transition-shadow rounded-3xl flex flex-col"
                 >
-                  <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5">
+                  {/* flex-1 and flex-col makes the content stretch to fill the card */}
+                  <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5 flex flex-col flex-1">
                     {/* Header */}
                     <div className="flex items-center gap-3 sm:gap-5">
                       {/* Avatar */}
-                      <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500">
+                      <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500 shrink-0">
                         <AvatarImage
                           src={candidate?.avatarUrl ?? undefined}
                           alt={candidate?.name ?? "Candidate"}
@@ -125,23 +116,22 @@ export default function MenteesList() {
                         </h3>
 
                         <p className="text-xs sm:text-sm text-gray-700 mb-2 truncate">
-                          {internship?.title || "No internship title"}
+                          {internshipTitle}
                         </p>
 
-                        <span className="text-xs sm:text-sm font-medium capitalize">
-                          <span className={getStatusColor(application.status)}>
-                            {application.status}
+                        <span className="text-xs sm:text-sm font-medium">
+                          <span className="text-green-800 capitalize">
+                           {status}
                           </span>
-                          <span className="text-black-700">
-                            {" "}
-                            at {unit?.name || "Unknown Unit"}
+                          <span className="text-gray-700">
+                            {" "}at {unitName}
                           </span>
                         </span>
                       </div>
                     </div>
 
-                    {/* Profile Summary */}
-                    <p className="text-sm sm:text-base text-gray-700 leading-relaxed line-clamp-3">
+                    {/* Profile Summary - flex-1 pushes everything below it to the bottom */}
+                    <p className="text-sm sm:text-base text-gray-700 leading-relaxed line-clamp-3 flex-1">
                       {profileSummary}
                     </p>
 
@@ -182,20 +172,16 @@ export default function MenteesList() {
                       )}
                     </div>
 
-                    <div className="border-t border-border/40"></div>
+                    <div className="border-t border-border/40 my-1"></div>
 
-                    {/* Button */}
+                    {/* Button - mt-auto ensures it anchors perfectly to the bottom of the card */}
                     <Button
                       variant="outline"
                       size="lg"
-                      className="w-full border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full cursor-pointer"
-                      onClick={() =>
-                        navigate(
-                          `/mentor/candidate-tasks/${application.applicationId}`
-                        )
-                      }
+                      className="w-full mt-auto border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full cursor-pointer"
+                      onClick={() => navigate(`/candidate/${navId}`)}
                     >
-                      View Tasks
+                      View Profile
                     </Button>
                   </CardContent>
                 </Card>

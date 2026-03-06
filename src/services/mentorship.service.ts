@@ -9,7 +9,7 @@ import type {
 
 export const getIncomingRequests = async (params?: { page?: number; limit?: number; search?: string; status?: string }) => {
   try {
-    const response = await axiosInstance.get<MentorIncomingRequestsResponse>("/mentor/mentorship-requests", { params });
+    const response = await axiosInstance.get<MentorIncomingRequestsResponse>("/mentorship-requests/incoming", { params });
     return response.data;
   } catch (error) {
     return handleApiError(error, "Failed to fetch mentorship requests");
@@ -18,7 +18,7 @@ export const getIncomingRequests = async (params?: { page?: number; limit?: numb
 
 export const respondToMentorshipRequest = async (payload: { requestId: string; action: "accept" | "reject"; rejectionReason?: string }) => {
   try {
-    const response = await axiosInstance.put("/mentor/mentorship-requests/respond", payload);
+    const response = await axiosInstance.put("/mentorship-requests/respond", payload);
     return response.data;
   } catch (error) {
     return handleApiError(error, "Failed to respond to request");
@@ -50,7 +50,33 @@ export const getMentorUnitCandidates = async (
   params?: { page?: number; limit?: number; search?: string; status?: string }
 ) => {
   try {
-    const response = await axiosInstance.get(`/mentor/units/${unitId}/candidates`, { params });
+    // Pass filter and unitId inside the params object so axios attaches them to the URL query string
+    const response = await axiosInstance.get(`/mentor/accepted-candidates`, { 
+      params: { 
+        ...params, 
+        filter: "unit", 
+        unitId: unitId 
+      } 
+    });
+    return response.data;
+  } catch (error) {
+    return handleApiError(error, "Failed to fetch unit candidates");
+  }
+};
+
+export const getMentorHiredCandidates = async (
+  unitId: string, 
+  params?: { page?: number; limit?: number; search?: string; status?: string }
+) => {
+  try {
+    // Pass filter and unitId inside the params object so axios attaches them to the URL query string
+    const response = await axiosInstance.get(`/mentor/accepted-candidates`, { 
+      params: { 
+        ...params, 
+        filter: "unit", 
+        unitId: unitId 
+      } 
+    });
     return response.data;
   } catch (error) {
     return handleApiError(error, "Failed to fetch unit candidates");

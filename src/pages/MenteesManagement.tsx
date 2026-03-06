@@ -7,7 +7,8 @@ import Pagination from "@/components/Pagination";
 import { Search, Users, ChevronLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useAcceptedCandidatesList, useMenteesApplicationsList } from "@/hooks/useMentees"; // Updated Hook
+import { useAcceptedCandidatesList } from "@/hooks/useMentees"; 
+import Navbar from "@/components/Navbar";
 
 export default function MenteesManagement() {
   const navigate = useNavigate();
@@ -42,25 +43,12 @@ export default function MenteesManagement() {
   const items = menteesQuery.data?.data ?? [];
   const pagination = menteesQuery.data?.pagination;
 
-  const getStatusColor = (status?: string) => {
-    if (!status) return "text-gray-800";
-    switch (status.toLowerCase()) {
-      case "hired":
-        return "text-green-800";
-      case "interview":
-        return "text-blue-800";
-      case "applied":
-        return "text-yellow-800";
-      case "rejected":
-        return "text-red-800";
-      default:
-        return "text-gray-800";
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="w-full mx-auto px-4 sm:px-12 lg:px-40 py-6 lg:py-10">
+            <Navbar />
+      
+      {/* Adjusted padding: lg:px-20 for laptops, xl:px-40 for large desktops */}
+      <div className="w-full mx-auto px-4 sm:px-8 lg:px-20 xl:px-40 py-6 lg:py-10">
         <div className="relative flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
           {/* Left */}
           <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -90,7 +78,7 @@ export default function MenteesManagement() {
           </div>
         </div>
 
-        <div className="px-2 lg:px-10">
+        <div className="px-2">
           {/* Content Area */}
           {menteesQuery.isLoading ? (
             <div className="text-center py-20 text-gray-400 font-medium animate-pulse">
@@ -100,32 +88,34 @@ export default function MenteesManagement() {
             <div className="text-center py-20 flex flex-col items-center">
               <Users className="w-16 h-16 text-gray-200 mb-4" />
               <h3 className="text-lg font-semibold text-gray-400">
-                {debouncedSearch ? "No matching applications found" : "No Applications Found"}
+                {debouncedSearch ? "No matching candidates found" : "No Candidates Found"}
               </h3>
             </div>
           ) : (
             <>
-              {/* Mentees Grid */}
+              {/* Mentees Grid - CSS Grid handles width automatically now */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {items.map((application: any) => {
-                  // Destructure the nested backend response
-                  const candidate = application.candidate;
-                  const internship = application.internship;
-                  const unit = internship?.unit;
+                {items.map((mentee: any) => {
+                  const candidate = mentee.candidate;
+                  const application = mentee.application; 
 
                   const skills = Array.isArray(candidate?.skills) ? candidate.skills : [];
                   const profileSummary = candidate?.profileSummary || "No profile summary available.";
+                  
+                  const profileId = application?.applicationId || candidate?.userId;
 
                   return (
                     <Card
-                      key={application.applicationId}
-                      className="min-w-[350px] border border-border/50 hover:shadow-lg transition-shadow rounded-3xl flex flex-col"
+                      key={mentee.requestId}
+                      // Removed min-w-[350px], added h-full
+                      className="h-full border border-border/50 hover:shadow-lg transition-shadow rounded-3xl flex flex-col"
                     >
-                      <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5">
+                      {/* Added flex flex-col flex-1 to fill the card */}
+                      <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5 flex flex-col flex-1">
                         {/* Header */}
                         <div className="flex items-center gap-3 sm:gap-5">
                           {/* Avatar */}
-                          <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500">
+                          <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500 shrink-0">
                             <AvatarImage
                               src={candidate?.avatarUrl ?? undefined}
                               alt={candidate?.name ?? "Candidate"}
@@ -143,29 +133,26 @@ export default function MenteesManagement() {
                           {/* Info */}
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-base sm:text-lg mb-1 text-gray-900 truncate">
-                              {candidate?.name || "Unknown"}
+                              {candidate?.name || "Unknown Candidate"}
                             </h3>
 
                             <p className="text-xs sm:text-sm text-gray-700 mb-2 truncate">
-                              {internship?.title || "No internship"}
+                              {application?.internshipTitle || "No active application"}
                             </p>
 
-                            <span className="text-xs sm:text-sm font-medium capitalize">
-                              <span
-                                className={getStatusColor(application.status)}
-                              >
-                                {application.status}
-                              </span>
-                              <span className="text-black-700">
-                                {" "}
-                                at {unit?.name || "Unknown Unit"}
-                              </span>
+                            <span className="text-xs sm:text-sm font-medium">
+                              <span className="text-green-800 capitalize">{application?.status || ""}</span>
+                              {application?.unitName && (
+                                <span className="text-gray-700">
+                                  {" "}at {application.unitName}
+                                </span>
+                              )}
                             </span>
                           </div>
                         </div>
 
-                        {/* Profile Summary */}
-                        <p className="text-sm sm:text-base text-gray-700 leading-relaxed line-clamp-3">
+                        {/* Profile Summary - flex-1 pushes everything below it down */}
+                        <p className="text-sm sm:text-base text-gray-700 leading-relaxed line-clamp-3 flex-1">
                           {profileSummary}
                         </p>
 
@@ -206,16 +193,14 @@ export default function MenteesManagement() {
                           )}
                         </div>
 
-                        <div className="border-t border-border/40"></div>
+                        <div className="border-t border-border/40 my-1"></div>
 
-                        {/* Button */}
+                        {/* Button - mt-auto locks it to the bottom */}
                         <Button
                           variant="outline"
                           size="lg"
-                          className="w-full border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full cursor-pointer"
-                          onClick={() =>
-                            navigate(`/candidate/${application.applicationId}`)
-                          }
+                          className="w-full mt-auto border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full cursor-pointer"
+                          onClick={() => navigate(`/candidate/${profileId}`)}
                         >
                           View Profile
                         </Button>

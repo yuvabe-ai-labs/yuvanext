@@ -262,7 +262,7 @@ const ScheduledMeetings = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
-      {/* <Navbar /> */}
+      <Navbar />
 
       <div className="w-full mx-auto px-4 sm:px-8 lg:px-24 py-6 lg:py-10">
         <div className="flex items-center justify-between mb-8">

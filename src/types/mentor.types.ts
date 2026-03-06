@@ -99,6 +99,7 @@ export interface MentorStats {
   menteeUnitCount: StatTile;
   upcomingMeetings: StatTile;
   hiredApplications: StatTile;
+  pendingRequests: StatTile;
 }
 
 /** Shape of the full API response from GET /mentor/stats */

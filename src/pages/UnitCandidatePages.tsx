@@ -1,4 +1,3 @@
-// src/pages/mentor/UnitCandidatesPage.tsx
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,10 +8,11 @@ import { Search, Users, ChevronLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMentorUnitCandidatesList } from "@/hooks/useMentorsUnits";
+import Navbar from "@/components/Navbar";
 
 export default function UnitCandidatesPage() {
   const navigate = useNavigate();
-  const { unitId } = useParams(); // Get the unitId from the URL path
+  const { unitId } = useParams(); 
   
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -28,44 +28,28 @@ export default function UnitCandidatesPage() {
 
     timerRef.current = setTimeout(() => {
       setDebouncedSearch(val);
-      setPage(1); // Reset to page 1 on new search
+      setPage(1); 
     }, 500);
   };
 
-  // Cleanup timer
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
 
-  // Fetch from API with server-side pagination & search
+  // Fetch from API
   const candidatesQuery = useMentorUnitCandidatesList(unitId as string, page, pageSize, debouncedSearch);
 
   const items = candidatesQuery.data?.data ?? [];
   const pagination = candidatesQuery.data?.pagination;
 
-  const getStatusColor = (status?: string) => {
-    if (!status) return "text-gray-800";
-    switch (status.toLowerCase()) {
-      case "hired":
-        return "text-green-800";
-      case "interview":
-        return "text-blue-800";
-      case "applied":
-        return "text-yellow-800";
-      case "rejected":
-        return "text-red-800";
-      default:
-        return "text-gray-800";
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="w-full mx-auto px-4 sm:px-12 lg:px-40 py-6 lg:py-10">
+        <Navbar />
+      {/* Responsive padding adjustments */}
+      <div className="w-full mx-auto px-4 sm:px-8 lg:px-20 xl:px-40 py-6 lg:py-10">
         <div className="relative flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
-          {/* Left */}
           <div className="flex items-center gap-4 w-full sm:w-auto">
             <button
               onClick={() => navigate(-1)}
@@ -76,12 +60,10 @@ export default function UnitCandidatesPage() {
             </button>
           </div>
 
-          {/* Center title */}
           <h2 className="sm:absolute sm:left-1/2 sm:-translate-x-1/2 text-2xl font-bold text-gray-600 whitespace-nowrap">
             Unit Candidates
           </h2>
 
-          {/* Right */}
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
@@ -93,8 +75,7 @@ export default function UnitCandidatesPage() {
           </div>
         </div>
 
-        <div className="px-2 lg:px-10">
-          {/* Content Area */}
+        <div className="px-2">
           {candidatesQuery.isLoading ? (
             <div className="text-center py-20 text-gray-400 font-medium animate-pulse">
               Loading candidates...
@@ -108,25 +89,28 @@ export default function UnitCandidatesPage() {
             </div>
           ) : (
             <>
-              {/* Candidates Grid */}
+              {/* CSS Grid handles responsive width naturally */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {items.map((application: any) => {
-                  const candidate = application.candidate;
-                  const internship = application.internship;
+                {items.map((mentee: any) => {
+                  const candidate = mentee.candidate;
+                  const appInfo = mentee.application; 
 
                   const skills = Array.isArray(candidate?.skills) ? candidate.skills : [];
                   const profileSummary = candidate?.profileSummary || "No profile summary available.";
+                  
+                  // Safe fallback for navigation
+                  const profileId = appInfo?.applicationId || candidate?.userId;
 
                   return (
                     <Card
-                      key={application.applicationId}
-                      className="min-w-[350px] border border-border/50 hover:shadow-lg transition-shadow rounded-3xl flex flex-col"
+                      key={mentee.requestId}
+                      // Uniform height for all cards
+                      className="h-full border border-border/50 hover:shadow-lg transition-shadow rounded-3xl flex flex-col"
                     >
-                      <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5">
-                        {/* Header */}
+                      <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5 flex flex-col flex-1">
                         <div className="flex items-center gap-3 sm:gap-5">
-                          {/* Avatar */}
-                          <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500">
+                          {/* shrink-0 prevents avatar from squishing */}
+                          <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500 shrink-0">
                             <AvatarImage
                               src={candidate?.avatarUrl ?? undefined}
                               alt={candidate?.name ?? "Candidate"}
@@ -141,30 +125,29 @@ export default function UnitCandidatesPage() {
                             </AvatarFallback>
                           </Avatar>
 
-                          {/* Info */}
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-base sm:text-lg mb-1 text-gray-900 truncate">
                               {candidate?.name || "Unknown"}
                             </h3>
 
                             <p className="text-xs sm:text-sm text-gray-700 mb-2 truncate">
-                              {internship?.title || "No internship title"}
+                              {appInfo?.internshipTitle || "No internship title"}
                             </p>
 
-                            <span className="text-xs sm:text-sm font-medium capitalize">
-                              <span className={getStatusColor(application.applicationStatus)}>
-                                {application.applicationStatus}
+                            <span className="text-xs sm:text-sm font-medium">
+                              <span className="text-green-800 capitalize">Accepted</span>
+                              <span className="text-gray-700">
+                                {" "}at {appInfo?.unitName || "Unknown Unit"}
                               </span>
                             </span>
                           </div>
                         </div>
 
-                        {/* Profile Summary */}
-                        <p className="text-sm sm:text-base text-gray-700 leading-relaxed line-clamp-3">
+                        {/* flex-1 pushes button to the bottom */}
+                        <p className="text-sm sm:text-base text-gray-700 leading-relaxed line-clamp-3 flex-1">
                           {profileSummary}
                         </p>
 
-                        {/* Skills */}
                         <div className="min-h-7">
                           {skills.length > 0 && (
                             <div className="flex gap-2 overflow-hidden">
@@ -201,16 +184,14 @@ export default function UnitCandidatesPage() {
                           )}
                         </div>
 
-                        <div className="border-t border-border/40"></div>
+                        <div className="border-t border-border/40 my-1"></div>
 
-                        {/* Button */}
+                        {/* mt-auto anchors button to the bottom */}
                         <Button
                           variant="outline"
                           size="lg"
-                          className="w-full border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full cursor-pointer"
-                          onClick={() =>
-                            navigate(`/candidate/${application.applicationId}`)
-                          }
+                          className="w-full mt-auto border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full cursor-pointer"
+                          onClick={() => navigate(`/candidate/${profileId}`)}
                         >
                           View Profile
                         </Button>
@@ -220,7 +201,6 @@ export default function UnitCandidatesPage() {
                 })}
               </div>
 
-              {/* Pagination */}
               {pagination && pagination.totalPages > 1 && (
                 <Pagination
                   currentPage={page}

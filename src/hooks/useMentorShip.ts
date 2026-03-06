@@ -22,6 +22,7 @@ export const useRespondToRequest = () => {
       // Refresh the requests list and mentor stats after an accept/reject
       queryClient.invalidateQueries({ queryKey: ["incoming-mentorship-requests"] });
       queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 };

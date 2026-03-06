@@ -885,15 +885,32 @@ const CandidateProfile = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Schedule Interview Dialog */}
+      
       <ScheduleInterviewDialog
         open={showScheduleDialog}
         onOpenChange={setShowScheduleDialog}
-        candidateName={candidate.name}
-        candidateEmail={candidate.email}
-        applicationId={application.id}
-        onSuccess={refetch}
-        candidateProfileId={candidate.userId}
+        // 1. Pass the current candidate formatted exactly how the dialog expects
+        candidatesList={
+          candidate
+            ? [
+                {
+                  id: candidate.userId,
+                  name: candidate.name || "Unknown Candidate",
+                  email: candidate.email || "",
+                  about: candidate.profileSummary || "",
+                },
+              ]
+            : []
+        }
+        // 2. Pass the mentor's ID from the profile hook
+        mentorId={profile?.id} 
+        onSuccess={() => {
+          // 3. Automatically move their application status to "interviewed" in the background
+          if (id) {
+            updateStatusMutation.mutate({ applicationId: id, status: "interviewed" });
+          }
+          refetch();
+        }}
       />
     </div>
   );

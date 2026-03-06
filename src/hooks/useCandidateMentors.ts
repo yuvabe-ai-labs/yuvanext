@@ -17,6 +17,7 @@ export const useSendMentorshipRequest = () => {
     onSuccess: () => {
       // Refresh any lists showing the candidate's active requests
       queryClient.invalidateQueries({ queryKey: ["candidate-own-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 };

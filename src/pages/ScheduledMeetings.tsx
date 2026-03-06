@@ -8,7 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+
 import ScheduleInterviewDialog from "@/components/ScheduleInterviewDialog";
+import { useAcceptedCandidatesList } from "@/hooks/useMentees"; 
 import { useToast } from "@/hooks/use-toast";
 import {
   useCancelMeeting,
@@ -76,24 +85,6 @@ const formatMeetingDateLabel = (date: Date) => {
   return format(date, "MMMM d, yyyy 'at' h:mmaaa");
 };
 
-const inferPurposeFromText = (text: string): MeetingPurpose => {
-  const normalized = text.toLowerCase();
-
-  if (normalized.includes("mid point") || normalized.includes("midpoint")) {
-    return "mid_point_evaluation";
-  }
-  if (normalized.includes("final")) {
-    return "final_assessment";
-  }
-  if (normalized.includes("progress")) {
-    return "progress_review";
-  }
-  if (normalized.includes("weekly") || normalized.includes("check")) {
-    return "weekly_check_in";
-  }
-  return "other";
-};
-
 const ScheduledMeetings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -103,6 +94,10 @@ const ScheduledMeetings = () => {
   const [searchValue, setSearchValue] = useState("");
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+
+  // --- NEW: Cancel Dialog State ---
+  const [cancelMeetingId, setCancelMeetingId] = useState<string | null>(null);
+  const [cancellationReason, setCancellationReason] = useState("Cancelled by mentor");
 
   const weekStart = useMemo(
     () => getWeekStartSunday(displayDate),
@@ -160,18 +155,6 @@ const ScheduledMeetings = () => {
     );
   }, [scheduledMeetings, selectedDayKey]);
 
-  const selectedDayMeetingForDialog = useMemo(() => {
-    if (selectedDayKey) {
-      const dayItems = scheduledMeetings.filter(
-        (meeting) => toDayKey(meetingDate(meeting)) === selectedDayKey,
-      );
-      if (dayItems.length > 0) {
-        return dayItems[0];
-      }
-    }
-    return scheduledMeetings[0];
-  }, [scheduledMeetings, selectedDayKey]);
-
   const getMeetingsByDay = (day: Date) => {
     const dayKey = toDayKey(day);
     return scheduledMeetings.filter(
@@ -184,65 +167,44 @@ const ScheduledMeetings = () => {
     setSelectedDayKey((prev) => (prev === key ? null : key));
   };
 
-  const handleScheduleMeeting = async ({
-    title,
-    description,
-    date,
-    time,
-  }: {
-    title: string;
-    description: string;
-    date: string;
-    time: string;
-    guestEmails: string[];
-  }) => {
-    const candidateId =
-      selectedDayMeetingForDialog?.candidate?.userId ||
-      selectedDayMeetingForDialog?.candidateId;
+  const { data: acceptedCandidatesResponse } = useAcceptedCandidatesList(1, 100, "");
 
-    if (!candidateId) {
-      throw new Error(
-        "No candidate available to schedule. Select a day with candidate meetings first.",
-      );
-    }
+  const allCandidatesList = useMemo(() => {
+    const candidatesArray = acceptedCandidatesResponse?.data || [];
 
-    const combinedText = `${title} ${description}`.trim();
-    const purpose = inferPurposeFromText(combinedText);
-    const meetingType =
-      combinedText.toLowerCase().includes("in person") ||
-      combinedText.toLowerCase().includes("in-person")
-        ? "in_person"
-        : "zoom";
+    return candidatesArray.map((item: any) => {
+      const userData = item.candidate || item.user || item;
 
-    const scheduledAt = new Date(`${date}T${time}:00`).toISOString();
-    const mentorId = session?.user?.id;
-
-    await createMeetingMutation.mutateAsync({
-      candidateId,
-      mentorId,
-      purpose,
-      meetingType,
-      scheduledAt,
-      description: description || undefined,
-      durationMinutes: 30,
-      location: meetingType === "in_person" ? "TBD" : undefined,
+      return {
+        id: userData.userId || userData.id || item.candidateId || item.id, 
+        name: userData.name || item.candidateName || item.name || "Unknown Candidate",
+        email: userData.email || item.candidateEmail || item.email || "",
+        about: userData.profileSummary || item.profileSummary || item.about || "",
+      };
     });
+  }, [acceptedCandidatesResponse]);
+
+  // --- NEW: Open Cancel Dialog Handler ---
+  const openCancelDialog = (meetingId: string) => {
+    setCancelMeetingId(meetingId);
+    setCancellationReason("Cancelled by mentor"); // Reset to default
   };
 
-  const handleCancelMeeting = async (meetingId: string) => {
-    const cancellationReason = window.prompt(
-      "Please provide a reason for cancellation:",
-      "Cancelled by mentor",
-    );
+  // --- NEW: Confirm Cancel Handler ---
+  const confirmCancelMeeting = async () => {
+    if (!cancelMeetingId || !cancellationReason.trim()) return;
 
-    if (!cancellationReason) {
-      return;
+    try {
+      await cancelMeetingMutation.mutateAsync({
+        meetingId: cancelMeetingId,
+        cancellationReason,
+      });
+      // Close dialog after success
+      setCancelMeetingId(null);
+      setCancellationReason("");
+    } catch (error) {
+      console.error(error);
     }
-
-    await cancelMeetingMutation.mutateAsync({
-      meetingId,
-      cancellationReason,
-    });
   };
 
   const handleJoinMeeting = (meeting: Meeting) => {
@@ -479,7 +441,7 @@ const ScheduledMeetings = () => {
                         <Button
                           variant="outline"
                           className="rounded-full border-red-300 text-red-500 hover:text-red-600"
-                          onClick={() => handleCancelMeeting(meeting.id)}
+                          onClick={() => openCancelDialog(meeting.id)} // <-- Connected to Custom Dialog
                           disabled={cancelMeetingMutation.isPending}
                         >
                           Cancel
@@ -503,11 +465,50 @@ const ScheduledMeetings = () => {
       <ScheduleInterviewDialog
         open={isScheduleOpen}
         onOpenChange={setIsScheduleOpen}
-        candidateName={selectedDayMeetingForDialog?.candidate?.name || "Mentee"}
-        applicationId={selectedDayMeetingForDialog?.id || "mentor-meeting"}
+        candidatesList={allCandidatesList}
+        mentorId={session?.user?.id}
         onSuccess={() => {}}
-        onSchedule={handleScheduleMeeting}
       />
+
+      {/* --- NEW: Cancel Meeting Dialog --- */}
+      <Dialog open={!!cancelMeetingId} onOpenChange={(open) => !open && setCancelMeetingId(null)}>
+        <DialogContent className="sm:max-w-md rounded-3xl p-6 bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-gray-900">Cancel Meeting</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Please provide a reason for cancelling this meeting. This will be sent to the mentee.
+            </p>
+            <Textarea
+              placeholder="Reason for cancellation..."
+              value={cancellationReason}
+              onChange={(e) => setCancellationReason(e.target.value)}
+              className="resize-none rounded-xl border-gray-200"
+              rows={3}
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setCancelMeetingId(null)} 
+              className="rounded-full px-6"
+            >
+              Keep Meeting
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmCancelMeeting}
+              disabled={!cancellationReason.trim() || cancelMeetingMutation.isPending}
+              className="rounded-full px-6"
+            >
+              {cancelMeetingMutation.isPending ? "Cancelling..." : "Cancel Meeting"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

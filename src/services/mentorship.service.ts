@@ -25,25 +25,6 @@ export const respondToMentorshipRequest = async (payload: { requestId: string; a
   }
 };
 
-// --- Candidate Services ---
-
-export const getAvailableMentors = async (params?: { page?: number; limit?: number; search?: string; mentorType?: string }) => {
-  try {
-    const response = await axiosInstance.get<MentorListResponse>("/candidate/mentors", { params });
-    return response.data;
-  } catch (error) {
-    return handleApiError(error, "Failed to fetch mentors");
-  }
-};
-
-export const sendMentorshipRequest = async (payload: { mentorId: string; message?: string }) => {
-  try {
-    const response = await axiosInstance.post("/candidate/mentorship-requests", payload);
-    return response.data;
-  } catch (error) {
-    return handleApiError(error, "Failed to send mentorship request");
-  }
-};
 
 export const getMentorUnitCandidates = async (
   unitId: string, 

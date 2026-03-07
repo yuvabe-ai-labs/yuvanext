@@ -72,7 +72,9 @@ const Navbar = () => {
   const handleProfileClick = () => {
     if (userRole === UserRole.UNIT) {
       navigate("/unit-profile");
-    } else {
+    } else if (userRole === UserRole.Mentor) {
+      navigate("/mentor-profile"); 
+    }else {
       navigate("/profile");
     }
     setMobileMenuOpen(false);

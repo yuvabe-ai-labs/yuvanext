@@ -12,14 +12,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { SignUpFormValues, signUpSchema } from "@/lib/authentication";
 
 const SignUp = () => {
-  const { role } = useParams<{ role: string }>();
+  const { role } = useParams<{ role: string }>(); // "unit", "candidate", or "mentor"
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Helper booleans
   const isUnitRole = role === "unit";
+  const isMentorRole = role === "mentor";
 
   // 3. Initialize React Hook Form
   const {
@@ -59,7 +61,7 @@ const SignUp = () => {
       name: data.fullName,
       callbackURL: `${import.meta.env.VITE_FRONTEND_URL}/chatbot`,
       metadata: {
-        role: role,
+        role: role || "candidate", // Fallback to candidate if undefined
         companyWebsite: isUnitRole ? data.companyWebsite : undefined,
       },
     });
@@ -68,8 +70,7 @@ const SignUp = () => {
       if (error.status === 409) {
         toast({
           title: "Account already exists",
-          description:
-            "This email is already registered. Please sign in instead.",
+          description: "This email is already registered. Please sign in instead.",
           variant: "destructive",
         });
       } else if (error.status === 429) {
@@ -88,12 +89,12 @@ const SignUp = () => {
     } else {
       toast({
         title: "Account created successfully!",
-        description:
-          "Please check your email to verify your account then sign in to continue.",
+        description: "Please check your email to verify your account then sign in to continue.",
       });
 
       setTimeout(() => {
-        navigate(`/auth/${role || "student"}/signin`);
+        // Changed "student" fallback to "candidate" to match your app structure
+        navigate(`/auth/${role || "candidate"}/signin`);
       }, 2000);
     }
 
@@ -108,9 +109,15 @@ const SignUp = () => {
     });
   };
 
-  const illustrationText = isUnitRole
-    ? "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role's requirements."
-    : "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
+  // Dynamic Illustration Text
+  let illustrationText = "";
+  if (isUnitRole) {
+    illustrationText = "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role's requirements.";
+  } else if (isMentorRole) {
+    illustrationText = "Guide the next generation of professionals. Share your expertise, provide valuable feedback, and shape the future of talented candidates.";
+  } else {
+    illustrationText = "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
+  }
 
   return (
     <div className="min-h-screen bg-white flex">
@@ -120,7 +127,7 @@ const SignUp = () => {
           {/* Background Image */}
           <img
             src={signupIllustrate}
-            alt="Signin Illustration"
+            alt="Signup Illustration"
             className="absolute inset-0 w-full h-full object-cover"
           />
 
@@ -135,10 +142,7 @@ const SignUp = () => {
 
             {isUnitRole && (
               <div className="relative flex items-center justify-center p-2 w-full shrink-1">
-                {/* FIX 1: Responsive sizing using vh/vw and max constraints */}
                 <Arrow className="absolute w-[80%] h-auto max-h-[50vh] text-white opacity-95 bottom-0" />
-
-                {/* FIX 2: Responsive Image height (max-h-[40vh]) ensures it scales down on short screens */}
                 <img
                   src={unitIllustration}
                   alt="Unit Illustration"
@@ -146,6 +150,14 @@ const SignUp = () => {
                 />
               </div>
             )}
+
+            {/* Placeholder for Mentor Illustration if you ever add one
+            {isMentorRole && (
+              <div className="relative flex items-center justify-center p-2 w-full shrink-1">
+                 <img src={mentorIllustration} alt="Mentor Illustration" className="..." />
+              </div>
+            )}
+            */}
 
             {/* Text */}
             <p className="text-white text-base font-medium max-w-xl leading-relaxed shrink-0">
@@ -196,7 +208,7 @@ const SignUp = () => {
               onSubmit={handleSubmit(onSubmit, onError)}
               className="space-y-6"
             >
-              {/* Full Name */}
+              {/* Full Name / Company Name */}
               <div>
                 <label
                   htmlFor="fullName"
@@ -233,7 +245,7 @@ const SignUp = () => {
                 )}
               </div>
 
-              {/* Company Website */}
+              {/* Company Website (Unit Only) */}
               {isUnitRole && (
                 <div>
                   <label
@@ -386,7 +398,7 @@ const SignUp = () => {
               >
                 Already have an account?{" "}
                 <Link
-                  to={`/auth/${role || "student"}/signin`}
+                  to={`/auth/${role || "candidate"}/signin`}
                   className="text-[14px] leading-4 font-medium hover:underline"
                   style={{
                     color: "#3F83F8",

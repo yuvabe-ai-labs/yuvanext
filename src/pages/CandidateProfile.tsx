@@ -53,13 +53,17 @@ import {
 } from "@/hooks/useCandidateProfile";
 import ScheduleInterviewDialog from "@/components/ScheduleInterviewDialog";
 
-import type {
-  CandidateInternship,
-  CandidateProject,
-  CandidateCourse,
-  CandidateEducation,
-  SocialLink,
+import {
+  type CandidateInternship,
+  type CandidateProject,
+  type CandidateCourse,
+  type CandidateEducation,
+  type SocialLink,
+  UserRole,
 } from "@/types/profiles.types";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+
 
 const safeParse = <T,>(data: any, fallback: T): T => {
   if (!data) return fallback;
@@ -87,7 +91,10 @@ const CandidateProfile = () => {
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { toast } = useToast();
-
+  
+  const { data: profileData, isLoading: profileLoading } = useProfile();
+  const profile = profileData;
+  const userRole = profile?.role || null;
   const { data, isLoading, error, refetch } = useCandidateProfile(id || "");
   const updateStatusMutation = useUpdateApplicationStatus();
 
@@ -455,7 +462,7 @@ const CandidateProfile = () => {
                         </>
                       )}
                     </Button>
-
+                    {userRole !== UserRole.Mentor && (
                     <Select
                       value={
                         application.status === "applied"
@@ -497,6 +504,7 @@ const CandidateProfile = () => {
                         </SelectItem>
                       </SelectContent>
                     </Select>
+                    )}
                   </div>
                 </div>
               </div>
@@ -877,15 +885,32 @@ const CandidateProfile = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Schedule Interview Dialog */}
+      
       <ScheduleInterviewDialog
         open={showScheduleDialog}
         onOpenChange={setShowScheduleDialog}
-        candidateName={candidate.name}
-        candidateEmail={candidate.email}
-        applicationId={application.id}
-        onSuccess={refetch}
-        candidateProfileId={candidate.userId}
+        // 1. Pass the current candidate formatted exactly how the dialog expects
+        candidatesList={
+          candidate
+            ? [
+                {
+                  id: candidate.userId,
+                  name: candidate.name || "Unknown Candidate",
+                  email: candidate.email || "",
+                  about: candidate.profileSummary || "",
+                },
+              ]
+            : []
+        }
+        // 2. Pass the mentor's ID from the profile hook
+        mentorId={profile?.id} 
+        onSuccess={() => {
+          // 3. Automatically move their application status to "interviewed" in the background
+          if (id) {
+            updateStatusMutation.mutate({ applicationId: id, status: "interviewed" });
+          }
+          refetch();
+        }}
       />
     </div>
   );

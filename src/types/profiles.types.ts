@@ -3,6 +3,7 @@ export enum UserRole {
   CANDIDATE = "candidate",
   UNIT = "unit",
   ADMIN = "admin",
+  Mentor = "mentor",
 }
 
 export enum Gender {
@@ -104,6 +105,7 @@ export interface CandidateEducation {
 }
 
 export interface Profile {
+  mentorType: any;
   id: string;
   userId: string;
   name: string;

@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { X, Eye, EyeOff } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { updateEmailSchema } from "@/lib/schemas";
+import { env } from "@/env";
 
 type UpdateEmailFormData = z.infer<typeof updateEmailSchema>;
 
@@ -73,7 +74,7 @@ export default function UpdateEmailModal({
       // The email will NOT change until the link in that email is clicked.
       const { error: changeError } = await authClient.changeEmail({
         newEmail: data.newEmail,
-        callbackURL: `${import.meta.env.VITE_FRONTEND_URL}/settings`,
+        callbackURL: `${env.VITE_FRONTEND_URL}/settings`,
       });
 
       if (changeError) {

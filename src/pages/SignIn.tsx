@@ -7,20 +7,22 @@ import signinLogo from "@/assets/signinLogo.svg";
 import { Eye, EyeOff } from "lucide-react";
 import { Arrow } from "@/components/ui/custom-icons";
 import unitIllustration from "@/assets/unit_illstration.png";
+// import mentorIllustration from "@/assets/mentor_illustration.png"; // Uncomment if you add a specific mentor graphic
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SignInFormValues, signInSchema } from "@/lib/authentication";
+import { useQueryClient } from "@tanstack/react-query";
 
 const SignIn = () => {
-  const { role } = useParams<{ role: string }>();
+  const { role } = useParams<{ role: string }>(); // "unit", "candidate", or "mentor"
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [keepLoggedIn, setKeepLoggedIn] = useState(false);
 
-  // 3. Initialize React Hook Form
   const {
     register,
     handleSubmit,
@@ -33,7 +35,6 @@ const SignIn = () => {
     },
   });
 
-  // 4. Submit Handler
   const onSubmit = async (data: SignInFormValues) => {
     setLoading(true);
 
@@ -44,16 +45,13 @@ const SignIn = () => {
     });
 
     if (error) {
-      let errorMessage =
-        error.message || "Something went wrong. Please try again.";
+      let errorMessage = error.message || "Something went wrong. Please try again.";
       let errorTitle = "Sign in failed";
 
       if (error.status === 401) {
-        errorMessage =
-          "Incorrect email or password. Please check your credentials.";
+        errorMessage = "Incorrect email or password. Please check your credentials.";
       } else if (error.status === 403) {
-        errorMessage =
-          "Please check your email and verify your account before signing in.";
+        errorMessage = "Please check your email and verify your account before signing in.";
         errorTitle = "Verification Required";
       } else if (error.status === 429) {
         errorMessage = "Too many login attempts. Please try again later.";
@@ -65,44 +63,45 @@ const SignIn = () => {
         variant: "destructive",
       });
     } else {
-      // --- LOGIC CHANGE STARTS HERE ---
       const userRole = authData?.user?.role;
-      const currentRouteRole = role; // Comes from useParams
+      const currentRouteRole = role; 
 
-      // Scenario 1: User is on the UNIT login page, but logged in as a CANDIDATE
-      if (currentRouteRole === "unit" && userRole !== "unit") {
-        await authClient.signOut(); // Important: Kill the session immediately
+      // --- DYNAMIC ROLE VERIFICATION ---
+      // Ensure the user logs into the correct portal matching their account role
+      if (currentRouteRole && userRole && currentRouteRole !== userRole) {
+        
+        // Note: If candidates are saved simply as "user" in your DB, uncomment this bypass:
+        // const isCandidateBypass = currentRouteRole === "candidate" && userRole === "user";
+        // if (!isCandidateBypass) {
+        
+        await authClient.signOut(); // Kill session
+        
+        const formatRole = (r: string) => r.charAt(0).toUpperCase() + r.slice(1);
+        
         toast({
           title: "Access Denied",
-          description:
-            "This is the Unit login portal. Please use the Candidate login.",
+          description: `This is the ${formatRole(currentRouteRole)} portal. You are trying to log in with a ${formatRole(userRole)} account.`,
           variant: "destructive",
         });
+        
         setLoading(false);
         return;
+        
+        // } // close bypass bracket if used
       }
 
-      // Scenario 2: User is on the CANDIDATE login page, but logged in as a UNIT
-      if (currentRouteRole !== "unit" && userRole === "unit") {
-        await authClient.signOut(); // Important: Kill the session immediately
-        toast({
-          title: "Access Denied",
-          description:
-            "You are a Unit account. Please sign in via the Unit portal.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
-      // If checks pass, proceed with success logic
       toast({
         title: "Welcome back!",
         description: "You have successfully signed in.",
       });
 
+      await queryClient.invalidateQueries();
+
+      // Routing based on successful role check
       if (userRole === "unit") {
         navigate("/unit-dashboard");
+      } else if (userRole === "mentor") {
+        navigate("/mentor-dashboard");
       } else {
         navigate("/dashboard");
       }
@@ -111,11 +110,15 @@ const SignIn = () => {
     setLoading(false);
   };
 
-  // Helper for UI
-  const illustrationText =
-    role === "unit"
-      ? "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role’s requirements."
-      : "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
+  // Helper for UI Text based on URL param
+  let illustrationText = "";
+  if (role === "unit") {
+    illustrationText = "AI-driven analysis identifies the candidate whose skills, experience, and behavioral traits most closely align with the role’s requirements.";
+  } else if (role === "mentor") {
+    illustrationText = "Guide the next generation of professionals. Share your expertise, provide valuable feedback, and shape the future of talented candidates.";
+  } else {
+    illustrationText = "At YuvaNext, we focus on helping young adults take their next step through internships, courses, and real-world opportunities.";
+  }
 
   return (
     <div className="min-h-screen bg-white flex">
@@ -138,12 +141,10 @@ const SignIn = () => {
               className="w-32 h-auto shrink-0"
             />
 
+            {/* Conditional Graphics based on role */}
             {role === "unit" && (
               <div className="relative flex items-center justify-center p-2 w-full shrink-1">
-                {/* FIX 1: Responsive Arrow sizing */}
                 <Arrow className="absolute w-[80%] h-auto max-h-[50vh] text-white opacity-95 bottom-0" />
-
-                {/* FIX 2: Responsive Image height (max-h-[40vh]) */}
                 <img
                   src={unitIllustration}
                   alt="Unit Illustration"
@@ -151,6 +152,13 @@ const SignIn = () => {
                 />
               </div>
             )}
+            
+            {/* {role === "mentor" && (
+              <div className="relative flex items-center justify-center p-2 w-full shrink-1">
+                // Add your mentor illustration here if you want a specific image for mentors
+              </div>
+            )} 
+            */}
 
             {/* Text */}
             <p className="text-white text-base font-medium max-w-xl leading-relaxed shrink-0">
@@ -181,8 +189,7 @@ const SignIn = () => {
                 className="text-[24px] font-bold leading-[35px] mb-2"
                 style={{
                   color: "#1F2A37",
-                  fontFamily:
-                    "'Neue Haas Grotesk Text Pro', system-ui, sans-serif",
+                  fontFamily: "'Neue Haas Grotesk Text Pro', system-ui, sans-serif",
                 }}
               >
                 Sign in to your account
@@ -191,8 +198,7 @@ const SignIn = () => {
                 className="text-[14px] leading-[15px]"
                 style={{
                   color: "#9CA3AF",
-                  fontFamily:
-                    "'Neue Haas Grotesk Text Pro', system-ui, sans-serif",
+                  fontFamily: "'Neue Haas Grotesk Text Pro', system-ui, sans-serif",
                 }}
               >
                 Welcome back! Please enter your details below

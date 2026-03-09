@@ -51,7 +51,7 @@ import {
   useCandidateProfile,
   useUpdateApplicationStatus,
 } from "@/hooks/useCandidateProfile";
-import ScheduleInterviewDialog from "@/components/ScheduleInterviewDialog";
+import ScheduleInterviewDialogUnit from "@/components/InterviewScheduleUnit";
 
 import {
   type CandidateInternship,
@@ -886,31 +886,14 @@ const CandidateProfile = () => {
       </AlertDialog>
 
       
-      <ScheduleInterviewDialog
+      <ScheduleInterviewDialogUnit
         open={showScheduleDialog}
         onOpenChange={setShowScheduleDialog}
-        // 1. Pass the current candidate formatted exactly how the dialog expects
-        candidatesList={
-          candidate
-            ? [
-                {
-                  id: candidate.userId,
-                  name: candidate.name || "Unknown Candidate",
-                  email: candidate.email || "",
-                  about: candidate.profileSummary || "",
-                },
-              ]
-            : []
-        }
-        // 2. Pass the mentor's ID from the profile hook
-        mentorId={profile?.id} 
-        onSuccess={() => {
-          // 3. Automatically move their application status to "interviewed" in the background
-          if (id) {
-            updateStatusMutation.mutate({ applicationId: id, status: "interviewed" });
-          }
-          refetch();
-        }}
+        candidateName={candidate.name}
+        candidateEmail={candidate.email}
+        applicationId={application.id}
+        onSuccess={refetch}
+        candidateProfileId={candidate.userId}
       />
     </div>
   );

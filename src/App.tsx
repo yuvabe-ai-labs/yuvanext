@@ -71,30 +71,25 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const isOnChatbot = currentPath === "/chatbot";
 
     // Check onboarding status
-    const DASHBOARD_MAP: Record<string, string> = {
-      candidate: "/dashboard",
-      unit: "/unit-dashboard",
-      mentor: "/mentor-dashboard",
-    };
-
-    const dashboard = DASHBOARD_MAP[profile.role];
-
-    if (profile.role === "mentor") {
-      // Only redirect mentors if they are on the chatbot or the wrong dashboards
-      if (
-        isOnChatbot ||
-        currentPath === "/dashboard" ||
-        currentPath === "/unit-dashboard"
-      ) {
-        navigate(dashboard, { replace: true });
+    if (profile.onboardingCompleted === true) {
+      // Onboarding completed - redirect away from chatbot to dashboard
+      if (isOnChatbot) {
+        // Redirect based on role
+        if (profile.role === "candidate") {
+          navigate("/dashboard", { replace: true });
+        } else if (profile.role === "unit") {
+          navigate("/unit-dashboard", { replace: true });
+        } else if (profile.role === "mentor") {
+          navigate("/mentor-dashboard", { replace: true }); // <-- Mentor added here
+        } else {
+          navigate("/dashboard", { replace: true });
+        }
       }
-      return;
-    }
-
-    if (profile.onboardingCompleted) {
-      if (isOnChatbot) navigate(dashboard, { replace: true });
     } else {
-      if (!isOnChatbot) navigate("/chatbot", { replace: true });
+      // Onboarding NOT completed - redirect to chatbot
+      if (!isOnChatbot) {
+        navigate("/chatbot", { replace: true });
+      }
     }
   }, [
     session,

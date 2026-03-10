@@ -6,6 +6,7 @@ export interface MentorProfileData {
   phone?: string;
   location?: string;
   avatarUrl?: string;
+  bannerUrl?: string;
   image?: string;
   mentorType?: string;
   experienceSnapshot?: string;

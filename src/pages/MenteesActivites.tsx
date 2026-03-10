@@ -147,16 +147,47 @@ function HiredCandidateCard({ application }: { application: any }) {
 }
 
 // --- Main Page Component ---
+// --- Main Page Component ---
 export default function MenteesActivities() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState("all"); // 1. Added filter state
   const pageSize = 8; 
 
   const { data: allItems = [], isLoading } = useHiredApplicantsList();
 
-  const totalItems = allItems.length;
+  // 2. Filter the array BEFORE applying pagination
+  const filteredItems = useMemo(() => {
+    return allItems.filter((application: any) => {
+      if (filter === "all") return true;
+
+      // ⚠️ IMPORTANT: Adjust this logic to match your API's properties!
+      // Example A: If your API returns a status string
+      if (filter === "active") {
+        return application.status === "active" || application.status === "ongoing";
+      }
+      if (filter === "completed") {
+        return application.status === "completed";
+      }
+
+      // Example B: If your API returns a progress number
+      // if (filter === "active") return application.progress < 100;
+      // if (filter === "completed") return application.progress === 100;
+
+      return true;
+    });
+  }, [allItems, filter]);
+
+  // 3. Calculate pagination based on the FILTERED items
+  const totalItems = filteredItems.length;
   const totalPages = Math.ceil(totalItems / pageSize) || 1;
-  const currentItems = allItems.slice((page - 1) * pageSize, page * pageSize);
+  const currentItems = filteredItems.slice((page - 1) * pageSize, page * pageSize);
+
+  // 4. Handle filter changes and reset the page
+  const handleFilterChange = (value: string) => {
+    setFilter(value);
+    setPage(1); // Crucial: Reset to page 1 so you don't get stuck on an empty page
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -180,7 +211,8 @@ export default function MenteesActivities() {
           </h2>
 
           <div className="w-full sm:w-48 z-10">
-            <Select defaultValue="all">
+            {/* 5. Bind the Select component to your state */}
+            <Select value={filter} onValueChange={handleFilterChange}>
               <SelectTrigger className="w-full rounded-full border-gray-300 text-gray-600 bg-white">
                 <SelectValue placeholder="Select Matches" />
               </SelectTrigger>
@@ -203,7 +235,9 @@ export default function MenteesActivities() {
             <div className="text-center py-20 flex flex-col items-center">
               <Users className="w-16 h-16 text-gray-200 mb-4" />
               <h3 className="text-lg font-semibold text-gray-400">
-                No active mentee activities found
+                {filter === "all" 
+                  ? "No active mentee activities found" 
+                  : `No ${filter} projects found`}
               </h3>
             </div>
           ) : (

@@ -9,10 +9,16 @@ import { Mail, Pen, Camera, Briefcase, CalendarDays, Clock, Users, Globe } from 
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 
-// Custom Mentor Hooks & Dialogs
+// Custom Hooks & Dialogs
 import { useMentorProfile } from "@/hooks/useMentorProfile";
 import { useMentorAvatarOperations } from "@/hooks/useMentorAvatar";
-import { MentorExperienceDialog, MentorExpertiseDialog, MentorSettingsDialog } from "@/components/MentorEditDialogs";
+import {useMentorBannerOperations} from "@/hooks/useMentorBannerOperatons";
+import { 
+  MentorExperienceDialog, 
+  MentorExpertiseDialog, 
+  MentorSettingsDialog,
+  MentorBasicInfoDialog 
+} from "@/components/MentorEditDialogs";
 
 // Reused components for Links and Images
 import { ImageUploadDialog } from "@/components/ImageUploadDialog";
@@ -21,19 +27,26 @@ import AIEditIcon from "@/components/ui/custom-icons";
 const MentorProfile = () => {
   const { data: session } = useSession();
   
-  // 1. Use pure Mentor hooks
-  const { data: profileData, isLoading, refetch } = useMentorProfile();
-  console.log("Fetched mentor profile data:", profileData); // Debug log to check the API response structure
+  // 1. Fetch Mentor Data 
+  const { data: mentorData, isLoading: isMentorLoading, refetch: refetchMentor } = useMentorProfile();
+  
+  // 2. Fetch Base Profile Data (For Avatar & Banner)
+  const { data: baseProfile, isLoading: isBaseLoading, refetch: refetchBase } = useMentorProfile();
+  
+  
+  // Mutations
   const { uploadAvatar, deleteAvatar } = useMentorAvatarOperations();
+  const { uploadBanner, deleteBanner } = useMentorBannerOperations();
   
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+  const [isBannerDialogOpen, setIsBannerDialogOpen] = useState(false);
 
-  // 2. Safely extract your DB schema variables
-  const expertiseAreas = profileData?.expertiseAreas ?? [];
-  const availabilityDays = profileData?.availabilityDays ?? [];
-  const communicationModes = profileData?.communicationModes ?? [];
+  // Safely extract mentor schema variables
+  const expertiseAreas = mentorData?.expertiseAreas ?? [];
+  const availabilityDays = mentorData?.availabilityDays ?? [];
+  const communicationModes = mentorData?.communicationModes ?? [];
 
-  const rawWindows = profileData?.availabilityTimeWindows as any;
+  const rawWindows = mentorData?.availabilityTimeWindows as any;
   let availabilityTimeWindows: any[] = [];
   let legacyTimeStr = "";
 
@@ -43,11 +56,11 @@ const MentorProfile = () => {
     if (rawWindows.trim().startsWith("[")) {
       try { availabilityTimeWindows = JSON.parse(rawWindows); } catch(e) {}
     } else {
-      legacyTimeStr = rawWindows; // Captures "9 AM - 12 PM"
+      legacyTimeStr = rawWindows;
     }
   }
 
-  if (isLoading) {
+  if (isMentorLoading || isBaseLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -63,20 +76,37 @@ const MentorProfile = () => {
     <div className="min-h-screen bg-background pb-20">
       <Navbar />
 
-      <div className="relative h-[17.625rem] bg-gradient-to-r from-primary to-primary-foreground" />
+      
+      <div className="relative h-48 sm:h-56 md:h-64 lg:h-72 bg-gradient-to-r from-primary to-primary-foreground group overflow-hidden">
+        {mentorData?.bannerUrl ? (
+          <img 
+            src={mentorData.bannerUrl} 
+            alt="Profile Banner" 
+            className="w-full h-full object-cover" 
+          />
+        ) : (
+          <div className="absolute inset-0 bg-black/20" />
+        )}
+        
+        <button
+          onClick={() => setIsBannerDialogOpen(true)}
+          className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        >
+          <Camera className="w-4 h-4 sm:w-5 sm:h-5" />
+        </button>
+      </div>
 
       {/* FULL SCREEN WRAPPER */}
-      <div className="-mt-[8.25rem] pt-0 container px-4 sm:px-6 lg:px-[7.5rem] py-4 lg:py-10">
-        
+<div className="-mt-[8.25rem] pt-0 container px-4 sm:px-6 lg:px-[7.5rem] py-4 lg:py-10">        
         {/* Header Profile Card */}
         <Card className="relative mb-2 min-h-[185px] h-auto border-gray-200 bg-white rounded-3xl shadow-sm">
           <CardContent className="p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
               
-              {/* Profile Avatar (Progress Ring Removed) */}
+              {/* Profile Avatar - Now reads from baseProfile */}
               <div className="relative group">
                 <Avatar className="h-24 w-24 border-4 border-white shadow-sm">
-                  <AvatarImage src={profileData?.avatarUrl || ""} className="object-cover" />
+                  <AvatarImage src={baseProfile?.avatarUrl || ""} className="object-cover" />
                   <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
                     {session?.user?.name?.charAt(0).toUpperCase() || "M"}
                   </AvatarFallback>
@@ -90,19 +120,27 @@ const MentorProfile = () => {
               </div>
 
               <div className="flex-1">
-                <h1 className="text-3xl font-bold mb-2 text-gray-900">
-                  {session?.user?.name || "Mentor Name"}
-                </h1>
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    {session?.user?.name || baseProfile?.name || "Mentor Name"}
+                  </h1>
+                  <MentorBasicInfoDialog session={session} profileData={mentorData}>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full text-gray-400 hover:text-primary hover:bg-blue-50">
+                      <Pen className="w-4 h-4" />
+                    </Button>
+                  </MentorBasicInfoDialog>
+                </div>
+                
                 <p className="text-muted-foreground font-medium mb-3 flex items-center gap-2">
                   <Briefcase className="w-4 h-4" /> 
-                  {profileData?.mentorType ? profileData.mentorType.replace(/_/g, ' ') : "Professional Mentor"}
+                  {mentorData?.mentorType ? mentorData.mentorType.replace(/_/g, ' ') : "Professional Mentor"}
                 </p>
                 <div className="flex items-center gap-2 text-sm text-gray-600 font-medium">
                   <Mail className="w-4 h-4" />
                   <span>{session?.user?.email}</span>
                 </div>
                 <p className="text-muted-foreground text-xs text-gray-400 mt-3">
-                  {`Last updated - ${profileData?.updatedAt ? formatDistanceToNow(new Date(profileData.updatedAt), { addSuffix: true }) : "recently"}`}
+                  {`Last updated - ${mentorData?.updatedAt ? formatDistanceToNow(new Date(mentorData.updatedAt), { addSuffix: true }) : "recently"}`}
                 </p>
               </div>
             </div>
@@ -117,7 +155,7 @@ const MentorProfile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="font-semibold text-lg text-gray-900">Capacity & Comms</h3>
-                  <MentorSettingsDialog profileData={profileData}>
+                  <MentorSettingsDialog profileData={mentorData}>
                     <Button variant="ghost" size="sm" className="text-gray-500 hover:text-primary bg-gray-50 hover:bg-blue-50 rounded-full h-8 w-8 p-0">
                       <Pen className="w-4 h-4" />
                     </Button>
@@ -128,7 +166,7 @@ const MentorProfile = () => {
                   <div>
                     <p className="text-gray-500 flex items-center gap-2 mb-2 font-medium"><Users className="w-4 h-4"/> Capacity</p>
                     <p className="font-semibold text-gray-900 bg-gray-50 px-3 py-1.5 rounded-lg inline-block border border-gray-100">
-                      {profileData?.mentoringCapacity || "Not set"}
+                      {mentorData?.mentoringCapacity || "Not set"}
                     </p>
                   </div>
                   <div>
@@ -182,7 +220,7 @@ const MentorProfile = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-gray-900">Experience Snapshot</h3>
-                  <MentorExperienceDialog currentText={profileData?.experienceSnapshot || ""}>
+                  <MentorExperienceDialog currentText={mentorData?.experienceSnapshot || ""}>
                     <Button variant="ghost" size="sm" className="text-gray-500 hover:text-primary bg-gray-50 hover:bg-blue-50 rounded-full h-8 w-8 p-0">
                       <Pen className="w-4 h-4" />
                     </Button>
@@ -190,7 +228,7 @@ const MentorProfile = () => {
                 </div>
                 <div className="border border-gray-100 bg-gray-50/50 rounded-2xl p-5 min-h-[120px]">
                   <div className="text-gray-700 whitespace-pre-wrap leading-relaxed text-[15px]">
-                    {profileData?.experienceSnapshot || (
+                    {mentorData?.experienceSnapshot || (
                       <div className="flex items-center gap-2 text-muted-foreground italic">
                         <AIEditIcon /> Add a snapshot of your experience to help mentees understand your background.
                       </div>
@@ -229,21 +267,35 @@ const MentorProfile = () => {
         </div>
       </div>
 
-      {profileData && (
-        <ImageUploadDialog
-          isOpen={isAvatarDialogOpen}
-          onClose={() => setIsAvatarDialogOpen(false)}
-          currentImageUrl={profileData.avatarUrl}
-          userId={profileData.userId}
-          userName={session?.user?.name || "Mentor"}
-          imageType="avatar"
-          entityType="mentor" 
-          onSuccess={() => refetch()} 
-          onUpload={(file) => uploadAvatar.mutateAsync(file)}
-          onDelete={() => deleteAvatar.mutateAsync()}
-          isProcessing={uploadAvatar.isPending || deleteAvatar.isPending}
-        />
-      )}
+      {/* Avatar Dialog */}
+      <ImageUploadDialog
+        isOpen={isAvatarDialogOpen}
+        onClose={() => setIsAvatarDialogOpen(false)}
+        currentImageUrl={baseProfile?.avatarUrl}
+        userId={mentorData?.userId}
+        userName={session?.user?.name || "Mentor"}
+        imageType="avatar"
+        entityType="mentor" 
+        onSuccess={() => refetchBase()} // Refetch base profile on success
+        onUpload={(file) => uploadAvatar.mutateAsync(file)}
+        onDelete={() => deleteAvatar.mutateAsync()}
+        isProcessing={uploadAvatar.isPending || deleteAvatar.isPending}
+      />
+
+      {/* Banner Upload Dialog */}
+      <ImageUploadDialog
+        isOpen={isBannerDialogOpen}
+        onClose={() => setIsBannerDialogOpen(false)}
+        currentImageUrl={baseProfile?.bannerUrl}
+        userId={mentorData?.userId}
+        userName={session?.user?.name || "Mentor"}
+        imageType="banner"
+        entityType="mentor" 
+        onSuccess={() => refetchBase()} // Refetch base profile on success
+        onUpload={(file) => uploadBanner.mutateAsync(file)} 
+        onDelete={() => deleteBanner.mutateAsync()}
+        isProcessing={uploadBanner.isPending || deleteBanner.isPending}
+      />
     </div>
   );
 };

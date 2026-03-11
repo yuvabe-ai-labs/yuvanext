@@ -180,7 +180,7 @@ const ScheduleInterviewDialog: React.FC<ScheduleInterviewDialogProps> = ({
       onOpenChange(isOpen);
       if (!isOpen) resetForm();
     }}>
-      <DialogContent className="max-w-md p-6 bg-white rounded-2xl border-0 shadow-lg gap-6">
+      <DialogContent className="w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto p-6 bg-white rounded-2xl border-0 shadow-lg gap-6">       
         <DialogHeader className="flex flex-row items-center justify-between space-y-0">
           <DialogTitle className="text-xl font-semibold text-[#1F2937]">Schedule Meeting</DialogTitle>
           <DialogClose className="text-gray-400 hover:text-gray-600">

@@ -97,7 +97,7 @@ export default function StatsGrid() {
       },
       {
         icon: Handbag,
-        label: "Upcoming Meetings",
+        label: "Meetings",
         value: stats?.upcomingMeetings.total ?? 0,
         newThisMonth: stats?.upcomingMeetings.newThisMonth ?? 0,
         bgColor: "bg-yellow-50",
@@ -105,7 +105,7 @@ export default function StatsGrid() {
       },
       {
         icon: Book,
-        label: "Hired Applications",
+        label: "Activities",
         value: stats?.hiredApplications.total ?? 0,
         newThisMonth: stats?.hiredApplications.newThisMonth ?? 0,
         bgColor: "bg-indigo-50",

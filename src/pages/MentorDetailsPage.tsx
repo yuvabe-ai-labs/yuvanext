@@ -33,15 +33,24 @@ export default function MentorDetailsPage() {
   // Logic Check
   const acceptedRequest = ownRequests.find((r: any) => r.status === "accepted");
   const hasActiveMentor = !!acceptedRequest;
-  const isCurrentMentor = acceptedRequest?.mentorUserId === mentorId;
+  const isCurrentMentor = mentor?.isCurrentMentor || (acceptedRequest?.mentorUserId === mentorId);
   const isPending = ownRequests.some((r: any) => r.status === "pending" && r.mentorUserId === mentorId);
 
   // Button UI derivation
+ // Button UI derivation
   let buttonText = "Request Mentorship";
   let isDisabled = false;
-  if (isCurrentMentor) { buttonText = "Current Mentor"; isDisabled = true; }
-  else if (isPending) { buttonText = "Request Pending"; isDisabled = true; }
-  else if (hasActiveMentor) { buttonText = "You already have a mentor"; isDisabled = true; }
+  
+  if (isCurrentMentor) { 
+    buttonText = "I am your mentor "; 
+    isDisabled = true; 
+  } else if (isPending) { 
+    buttonText = "Request Pending"; 
+    isDisabled = true; 
+  } else if (hasActiveMentor) { 
+    buttonText = "You already have a mentor"; 
+    isDisabled = true; 
+  }
 
   const handleSendRequest = async () => {
     if (!mentorId) return;
@@ -94,11 +103,12 @@ export default function MentorDetailsPage() {
                     <Briefcase className="w-4 h-4" />
                     {mentor.mentorType?.split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
                   </span>
-                  {mentor.availabilityTimeWindows && (
-                    <span className="flex items-center gap-1.5">
-                      <Globe className="w-4 h-4" /> {mentor.availabilityTimeWindows}
-                    </span>
-                  )}
+                  {mentor.availabilityTimeWindows && mentor.availabilityTimeWindows.length > 0 && (
+                      <span className="flex items-center gap-1.5">
+                        <Globe className="w-4 h-4" /> 
+                        {mentor.availabilityTimeWindows.map((window: any) => `${window.start} - ${window.end}`).join(", ")}
+                      </span>
+                    )}
                   {mentor.mentoringCapacity && (
                     <span className="flex items-center gap-1.5">
                       <Users className="w-4 h-4" /> Capacity: {mentor.mentoringCapacity}

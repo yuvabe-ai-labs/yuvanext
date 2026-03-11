@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import Pagination from "@/components/Pagination";
 import { Search, Users, ChevronLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useAcceptedCandidatesList } from "@/hooks/useMentees"; 
+import { useAcceptedCandidatesList } from "@/hooks/useMentees";
 import Navbar from "@/components/Navbar";
 
 export default function MenteesManagement() {
@@ -16,17 +16,19 @@ export default function MenteesManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const pageSize = 6;
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   // Search Debounce Logic
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSearch = (val: string) => {
     setSearchQuery(val);
+    setPage(1);
+
     if (timerRef.current) clearTimeout(timerRef.current);
 
     timerRef.current = setTimeout(() => {
-      setDebouncedSearch(val);
-      setPage(1); // Reset to page 1 on new search
+      setDebouncedSearch(val.trim());
     }, 500);
   };
 
@@ -38,15 +40,47 @@ export default function MenteesManagement() {
   }, []);
 
   // Fetch from API with server-side pagination & search
-  const menteesQuery = useAcceptedCandidatesList(page, pageSize, debouncedSearch);
+  const menteesQuery = useAcceptedCandidatesList(
+    page,
+    pageSize,
+    debouncedSearch,
+  );
 
   const items = menteesQuery.data?.data ?? [];
   const pagination = menteesQuery.data?.pagination;
 
+  const filteredItems = useMemo(() => {
+    const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return items;
+    }
+
+    return items.filter((mentee: any) => {
+      const candidate = mentee.candidate;
+      const application = mentee.application;
+
+      const searchableFields = [
+        candidate?.name,
+        candidate?.email,
+        candidate?.experienceLevel,
+        application?.internshipTitle,
+        application?.status,
+        application?.unitName,
+      ];
+
+      return searchableFields.some((value) =>
+        String(value ?? "")
+          .toLowerCase()
+          .includes(normalizedQuery),
+      );
+    });
+  }, [items, deferredSearchQuery]);
+
   return (
     <div className="min-h-screen bg-gray-50">
-            <Navbar />
-      
+      <Navbar />
+
       {/* Adjusted padding: lg:px-20 for laptops, xl:px-40 for large desktops */}
       <div className="w-full mx-auto px-4 sm:px-8 lg:px-20 xl:px-40 py-6 lg:py-10">
         <div className="relative flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
@@ -70,7 +104,7 @@ export default function MenteesManagement() {
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search by names or roles"
+              placeholder="Search by name"
               className="pl-10 rounded-full border-gray-300 w-full"
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
@@ -80,29 +114,48 @@ export default function MenteesManagement() {
 
         <div className="px-2">
           {/* Content Area */}
-          {menteesQuery.isLoading ? (
+          {menteesQuery.isLoading && !menteesQuery.data ? (
             <div className="text-center py-20 text-gray-400 font-medium animate-pulse">
               Loading candidates...
             </div>
-          ) : items.length === 0 ? (
+          ) : menteesQuery.isFetching &&
+            searchQuery.trim() &&
+            filteredItems.length === 0 ? (
+            <div className="text-center py-20 text-gray-400 font-medium animate-pulse">
+              Updating results...
+            </div>
+          ) : filteredItems.length === 0 ? (
             <div className="text-center py-20 flex flex-col items-center">
               <Users className="w-16 h-16 text-gray-200 mb-4" />
               <h3 className="text-lg font-semibold text-gray-400">
-                {debouncedSearch ? "No matching candidates found" : "No Candidates Found"}
+                {searchQuery.trim()
+                  ? "No matching candidates found"
+                  : "No Candidates Found"}
               </h3>
             </div>
           ) : (
             <>
+              {menteesQuery.isFetching && searchQuery.trim() ? (
+                <p className="mb-4 text-sm text-gray-400">
+                  Updating results...
+                </p>
+              ) : null}
+
               {/* Mentees Grid - CSS Grid handles width automatically now */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {items.map((mentee: any) => {
+                {filteredItems.map((mentee: any) => {
                   const candidate = mentee.candidate;
-                  const application = mentee.application; 
+                  const application = mentee.application;
 
-                  const skills = Array.isArray(candidate?.skills) ? candidate.skills : [];
-                  const profileSummary = candidate?.profileSummary || "No profile summary available.";
-                  
-                  const profileId = application?.applicationId || candidate?.userId;
+                  const skills = Array.isArray(candidate?.skills)
+                    ? candidate.skills
+                    : [];
+                  const profileSummary =
+                    candidate?.profileSummary ||
+                    "No profile summary available.";
+
+                  const profileId =
+                    application?.applicationId || candidate?.userId;
 
                   return (
                     <Card
@@ -137,14 +190,18 @@ export default function MenteesManagement() {
                             </h3>
 
                             <p className="text-xs sm:text-sm text-gray-700 mb-2 truncate">
-                              {application?.internshipTitle || "No active application"}
+                              {application?.internshipTitle ||
+                                "No active application"}
                             </p>
 
                             <span className="text-xs sm:text-sm font-medium">
-                              <span className="text-green-800 capitalize">{application?.status || ""}</span>
+                              <span className="text-green-800 capitalize">
+                                {application?.status || ""}
+                              </span>
                               {application?.unitName && (
                                 <span className="text-gray-700">
-                                  {" "}at {application.unitName}
+                                  {" "}
+                                  at {application.unitName}
                                 </span>
                               )}
                             </span>
@@ -162,15 +219,17 @@ export default function MenteesManagement() {
                             <div className="flex gap-2 overflow-hidden">
                               {skills.length > 3 ? (
                                 <>
-                                  {skills.slice(0, 3).map((skill: string, i: number) => (
-                                    <Badge
-                                      key={i}
-                                      variant="outline"
-                                      className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                                    >
-                                      {skill}
-                                    </Badge>
-                                  ))}
+                                  {skills
+                                    .slice(0, 3)
+                                    .map((skill: string, i: number) => (
+                                      <Badge
+                                        key={i}
+                                        variant="outline"
+                                        className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
+                                      >
+                                        {skill}
+                                      </Badge>
+                                    ))}
                                   <Badge
                                     variant="outline"
                                     className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"

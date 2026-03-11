@@ -36,7 +36,17 @@ export default function MentorDetailsPage() {
   const isCurrentMentor = mentor?.isCurrentMentor || (acceptedRequest?.mentorUserId === mentorId);
   const isPending = ownRequests.some((r: any) => r.status === "pending" && r.mentorUserId === mentorId);
 
-  // Button UI derivation
+  let timeWindows: {start: string, end: string}[] = [];
+  const rawWindows = mentor?.availabilityTimeWindows;
+  if (Array.isArray(rawWindows)) {
+    timeWindows = rawWindows;
+  } else if (typeof rawWindows === "string" && rawWindows.trim().startsWith("[")) {
+    try { 
+      timeWindows = JSON.parse(rawWindows); 
+    } catch(e) {
+      console.error("Failed to parse availabilityTimeWindows", e);
+    }
+  }
  // Button UI derivation
   let buttonText = "Request Mentorship";
   let isDisabled = false;
@@ -103,10 +113,10 @@ export default function MentorDetailsPage() {
                     <Briefcase className="w-4 h-4" />
                     {mentor.mentorType?.split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
                   </span>
-                  {mentor.availabilityTimeWindows && mentor.availabilityTimeWindows.length > 0 && (
+                  {timeWindows && timeWindows.length > 0 && (
                       <span className="flex items-center gap-1.5">
                         <Globe className="w-4 h-4" /> 
-                        {mentor.availabilityTimeWindows.map((window: any) => `${window.start} - ${window.end}`).join(", ")}
+                        {timeWindows.map((window: any) => `${window.start} - ${window.end}`).join(", ")}
                       </span>
                     )}
                   {mentor.mentoringCapacity && (

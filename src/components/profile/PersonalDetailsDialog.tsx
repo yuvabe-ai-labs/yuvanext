@@ -29,12 +29,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { X } from "lucide-react";
-import { Profile, Language, Gender, MaritalStatus, UpdateProfilePayload } from "@/types/profiles.types";
+import {
+  Profile,
+  Language,
+  Gender,
+  MaritalStatus,
+  UpdateProfilePayload,
+} from "@/types/profiles.types";
 import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { personalDetailsSchema } from "@/lib/schemas";
+import { cn } from "@/lib/utils";
 
 type PersonalDetailsForm = z.infer<typeof personalDetailsSchema>;
 
@@ -53,8 +59,16 @@ const MARITAL_STATUS_OPTIONS = [
 ];
 
 const AVAILABLE_LANGUAGES = [
-  "English", "Hindi", "Tamil", "French", "Spanish", 
-  "German", "Mandarin", "Arabic", "Portuguese", "Russian",
+  "English",
+  "Hindi",
+  "Tamil",
+  "French",
+  "Spanish",
+  "German",
+  "Mandarin",
+  "Arabic",
+  "Portuguese",
+  "Russian",
 ];
 
 export const PersonalDetailsDialog = ({
@@ -89,8 +103,10 @@ export const PersonalDetailsDialog = ({
   useEffect(() => {
     if (open && profile) {
       const nameParts = profile.name?.split(" ") ?? [""];
-      const dateOfBirthObj = profile.dateOfBirth ? new Date(profile.dateOfBirth) : null;
-      
+      const dateOfBirthObj = profile.dateOfBirth
+        ? new Date(profile.dateOfBirth)
+        : null;
+
       form.reset({
         first_name: nameParts[0] || "",
         last_name: nameParts.slice(1).join(" ") || "",
@@ -100,11 +116,13 @@ export const PersonalDetailsDialog = ({
         gender: profile.gender as Gender,
         marital_status: profile.maritalStatus as MaritalStatus,
         birth_date: dateOfBirthObj ? String(dateOfBirthObj.getDate()) : "",
-        birth_month: dateOfBirthObj ? String(dateOfBirthObj.getMonth() + 1) : "",
+        birth_month: dateOfBirthObj
+          ? String(dateOfBirthObj.getMonth() + 1)
+          : "",
         birth_year: dateOfBirthObj ? String(dateOfBirthObj.getFullYear()) : "",
         is_differently_abled: profile.isDifferentlyAbled ?? false,
         has_career_break: profile.hasCareerBreak ?? false,
-        language: (profile.language ?? []).map(l => ({
+        language: (profile.language ?? []).map((l) => ({
           name: l.name,
           read: !!l.read,
           write: !!l.write,
@@ -123,12 +141,12 @@ export const PersonalDetailsDialog = ({
     try {
       const fullName = `${data.first_name} ${data.last_name || ""}`.trim();
       let dateOfBirth: string | null = null;
-      
+
       if (data.birth_date && data.birth_month && data.birth_year) {
         const date = new Date(
           parseInt(data.birth_year),
           parseInt(data.birth_month) - 1,
-          parseInt(data.birth_date)
+          parseInt(data.birth_date),
         );
         dateOfBirth = date.toISOString();
       }
@@ -149,9 +167,16 @@ export const PersonalDetailsDialog = ({
       await refetch();
       onUpdate();
       setOpen(false);
-      toast({ title: "Success", description: "Personal details updated successfully" });
+      toast({
+        title: "Success",
+        description: "Personal details updated successfully",
+      });
     } catch (error) {
-      toast({ title: "Error", description: "Failed to update", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Failed to update",
+        variant: "destructive",
+      });
     }
   };
 
@@ -160,16 +185,20 @@ export const PersonalDetailsDialog = ({
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-[700px] h-[90vh] overflow-hidden flex flex-col rounded-3xl p-0">
         <DialogHeader className="p-6 pb-2">
-          <DialogTitle className="text-2xl font-bold">Personal Details</DialogTitle>
+          <DialogTitle className="text-2xl font-bold">
+            Personal Details
+          </DialogTitle>
           <p className="text-sm text-muted-foreground">
             This information is important for employers to know you better
           </p>
         </DialogHeader>
 
         <Form {...form}>
-          {/* Use flex-1 to make the ScrollArea take up all remaining space between Header and Footer */}
-          <ScrollArea className="flex-1 w-full">
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 px-6 py-4">
+          <div className="flex-1 overflow-y-auto">
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-6 px-6 py-4"
+            >
               {/* Name Fields */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -178,7 +207,13 @@ export const PersonalDetailsDialog = ({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>First Name</FormLabel>
-                      <FormControl><Input className="rounded-full" placeholder="Enter Name" {...field} /></FormControl>
+                      <FormControl>
+                        <Input
+                          className="rounded-full"
+                          placeholder="Enter Name"
+                          {...field}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -189,7 +224,13 @@ export const PersonalDetailsDialog = ({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Last Name</FormLabel>
-                      <FormControl><Input className="rounded-full" placeholder="Enter Name" {...field} /></FormControl>
+                      <FormControl>
+                        <Input
+                          className="rounded-full"
+                          placeholder="Enter Name"
+                          {...field}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -204,7 +245,14 @@ export const PersonalDetailsDialog = ({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Email address</FormLabel>
-                      <FormControl><Input className="rounded-full" type="email" placeholder="email@gmail.com" {...field} /></FormControl>
+                      <FormControl>
+                        <Input
+                          className="rounded-full"
+                          type="email"
+                          placeholder="email@gmail.com"
+                          {...field}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -215,7 +263,13 @@ export const PersonalDetailsDialog = ({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Contact details</FormLabel>
-                      <FormControl><Input className="rounded-full" placeholder="+91 98765 43210" {...field} /></FormControl>
+                      <FormControl>
+                        <Input
+                          className="rounded-full"
+                          placeholder="+91 98765 43210"
+                          {...field}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -237,7 +291,9 @@ export const PersonalDetailsDialog = ({
                       </FormControl>
                       <SelectContent>
                         {LOCATIONS.map((loc) => (
-                          <SelectItem key={loc} value={loc.toLowerCase()}>{loc}</SelectItem>
+                          <SelectItem key={loc} value={loc.toLowerCase()}>
+                            {loc}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -254,17 +310,33 @@ export const PersonalDetailsDialog = ({
                   <FormItem className="space-y-3">
                     <FormLabel>Gender</FormLabel>
                     <FormControl>
-                      <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-3 mt-2">
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        className="flex gap-3 mt-2"
+                      >
                         {[
                           { value: Gender.MALE, label: "Male" },
                           { value: Gender.FEMALE, label: "Female" },
                           { value: Gender.OTHER, label: "Other" },
                         ].map((item) => (
-                          <div key={item.value} className="flex items-center">
-                            <RadioGroupItem value={item.value} id={`gender-${item.value}`} className="peer sr-only" />
+                          <div
+                            key={item.value}
+                            className="relative flex items-center"
+                          >
+                            <RadioGroupItem
+                              value={item.value}
+                              id={`gender-${item.value}`}
+                              className="absolute opacity-0 pointer-events-none"
+                            />
                             <Label
                               htmlFor={`gender-${item.value}`}
-                              className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
+                              className={cn(
+                                "px-4 py-2 rounded-full border cursor-pointer text-sm transition-colors",
+                                field.value === item.value
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-white text-foreground border-input",
+                              )}
                             >
                               {item.label}
                             </Label>
@@ -277,7 +349,9 @@ export const PersonalDetailsDialog = ({
                 )}
               />
 
-              <div className="pt-4 border-t"><h3 className="font-semibold mb-2">More Information</h3></div>
+              <div className="pt-4 border-t">
+                <h3 className="font-semibold mb-2">More Information</h3>
+              </div>
 
               {/* Marital Status */}
               <FormField
@@ -287,13 +361,29 @@ export const PersonalDetailsDialog = ({
                   <FormItem className="space-y-3">
                     <FormLabel>Marital status</FormLabel>
                     <FormControl>
-                      <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap gap-3 mt-2">
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        className="flex flex-wrap gap-3 mt-2"
+                      >
                         {MARITAL_STATUS_OPTIONS.map((status) => (
-                          <div key={status.value} className="flex items-center">
-                            <RadioGroupItem value={status.value} id={`marital-${status.value}`} className="peer sr-only" />
+                          <div
+                            key={status.value}
+                            className="relative flex items-center"
+                          >
+                            <RadioGroupItem
+                              value={status.value}
+                              id={`marital-${status.value}`}
+                              className="absolute opacity-0 pointer-events-none"
+                            />
                             <Label
                               htmlFor={`marital-${status.value}`}
-                              className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
+                              className={cn(
+                                "px-4 py-2 rounded-full border cursor-pointer text-sm transition-colors",
+                                field.value === status.value
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-white text-foreground border-input",
+                              )}
                             >
                               {status.label}
                             </Label>
@@ -314,9 +404,24 @@ export const PersonalDetailsDialog = ({
                     control={form.control}
                     name="birth_date"
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="rounded-full"><SelectValue placeholder="Date" /></SelectTrigger></FormControl>
-                        <SelectContent>{Array.from({ length: 31 }, (_, i) => String(i + 1)).map(d => (<SelectItem key={d} value={d}>{d}</SelectItem>))}</SelectContent>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="rounded-full">
+                            <SelectValue placeholder="Date" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {Array.from({ length: 31 }, (_, i) =>
+                            String(i + 1),
+                          ).map((d) => (
+                            <SelectItem key={d} value={d}>
+                              {d}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
                       </Select>
                     )}
                   />
@@ -324,9 +429,35 @@ export const PersonalDetailsDialog = ({
                     control={form.control}
                     name="birth_month"
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="rounded-full"><SelectValue placeholder="Month" /></SelectTrigger></FormControl>
-                        <SelectContent>{["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (<SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>))}</SelectContent>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="rounded-full">
+                            <SelectValue placeholder="Month" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {[
+                            "January",
+                            "February",
+                            "March",
+                            "April",
+                            "May",
+                            "June",
+                            "July",
+                            "August",
+                            "September",
+                            "October",
+                            "November",
+                            "December",
+                          ].map((m, i) => (
+                            <SelectItem key={m} value={String(i + 1)}>
+                              {m}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
                       </Select>
                     )}
                   />
@@ -334,9 +465,24 @@ export const PersonalDetailsDialog = ({
                     control={form.control}
                     name="birth_year"
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="rounded-full"><SelectValue placeholder="Year" /></SelectTrigger></FormControl>
-                        <SelectContent>{Array.from({ length: 100 }, (_, i) => String(new Date().getFullYear() - i)).map(y => (<SelectItem key={y} value={y}>{y}</SelectItem>))}</SelectContent>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="rounded-full">
+                            <SelectValue placeholder="Year" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {Array.from({ length: 100 }, (_, i) =>
+                            String(new Date().getFullYear() - i),
+                          ).map((y) => (
+                            <SelectItem key={y} value={y}>
+                              {y}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
                       </Select>
                     )}
                   />
@@ -344,95 +490,131 @@ export const PersonalDetailsDialog = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="is_differently_abled"
-                render={({ field }) => (
-                  <FormItem className="space-y-3">
-                    <FormLabel>Are you differently abled?</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={(val) => field.onChange(val === "true")}
-                        value={field.value?.toString()}
-                        className="flex gap-3"
-                      >
-                        {[
-                          { value: "true", label: "Yes" },
-                          { value: "false", label: "No" },
-                        ].map((item) => (
-                          <div key={item.value} className="flex items-center">
-                            <RadioGroupItem value={item.value} id={`abled-${item.value}`} className="peer sr-only" />
-                            <Label
-                              htmlFor={`abled-${item.value}`}
-                              className="px-6 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
+                <FormField
+                  control={form.control}
+                  name="is_differently_abled"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Are you differently abled?</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={(val) =>
+                            field.onChange(val === "true")
+                          }
+                          value={field.value?.toString()}
+                          className="flex gap-3"
+                        >
+                          {[
+                            { value: "true", label: "Yes" },
+                            { value: "false", label: "No" },
+                          ].map((item) => (
+                            <div
+                              key={item.value}
+                              className="relative flex items-center"
                             >
-                              {item.label}
-                            </Label>
-                          </div>
-                        ))}
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                              <RadioGroupItem
+                                value={item.value}
+                                id={`abled-${item.value}`}
+                                className="absolute opacity-0 pointer-events-none"
+                              />
+                              <Label
+                                htmlFor={`abled-${item.value}`}
+                                className={cn(
+                                  "px-6 py-2 rounded-full border cursor-pointer text-sm transition-colors",
+                                  field.value?.toString() === item.value
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-white text-foreground border-input",
+                                )}
+                              >
+                                {item.label}
+                              </Label>
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="has_career_break"
-                render={({ field }) => (
-                  <FormItem className="space-y-3">
-                    <FormLabel>Have you taken a career break?</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={(val) => field.onChange(val === "true")}
-                        value={field.value?.toString()}
-                        className="flex gap-3"
-                      >
-                        {[
-                          { value: "true", label: "Yes" },
-                          { value: "false", label: "No" },
-                        ].map((item) => (
-                          <div key={item.value} className="flex items-center">
-                            <RadioGroupItem value={item.value} id={`break-${item.value}`} className="peer sr-only" />
-                            <Label
-                              htmlFor={`break-${item.value}`}
-                              className="px-6 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
+                <FormField
+                  control={form.control}
+                  name="has_career_break"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Have you taken a career break?</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={(val) =>
+                            field.onChange(val === "true")
+                          }
+                          value={field.value?.toString()}
+                          className="flex gap-3"
+                        >
+                          {[
+                            { value: "true", label: "Yes" },
+                            { value: "false", label: "No" },
+                          ].map((item) => (
+                            <div
+                              key={item.value}
+                              className="relative flex items-center"
                             >
-                              {item.label}
-                            </Label>
-                          </div>
-                        ))}
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                              <RadioGroupItem
+                                value={item.value}
+                                id={`break-${item.value}`}
+                                className="absolute opacity-0 pointer-events-none"
+                              />
+                              <Label
+                                htmlFor={`break-${item.value}`}
+                                className={cn(
+                                  "px-6 py-2 rounded-full border cursor-pointer text-sm transition-colors",
+                                  field.value?.toString() === item.value
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-white text-foreground border-input",
+                                )}
+                              >
+                                {item.label}
+                              </Label>
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               {/* Language Section */}
               <div className="space-y-4">
                 <Label className="block mb-2">Language Proficiency</Label>
-                
+
                 <div className="space-y-4">
                   {fields.map((field, index) => (
-                    <div key={field.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3 border rounded-xl bg-muted/30">
+                    <div
+                      key={field.id}
+                      className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3 border rounded-xl bg-muted/30"
+                    >
                       <div className="flex-1 w-full">
                         <FormField
                           control={form.control}
                           name={`language.${index}.name`}
                           render={({ field }) => (
                             <FormItem>
-                              <Select onValueChange={field.onChange} value={field.value}>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                              >
                                 <FormControl>
                                   <SelectTrigger className="rounded-full bg-background">
                                     <SelectValue placeholder="Select Language" />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  {AVAILABLE_LANGUAGES.map(lang => (
-                                    <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+                                  {AVAILABLE_LANGUAGES.map((lang) => (
+                                    <SelectItem key={lang} value={lang}>
+                                      {lang}
+                                    </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
@@ -463,10 +645,10 @@ export const PersonalDetailsDialog = ({
                           />
                         ))}
                       </div>
-                      <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
                         className="rounded-full hover:bg-destructive/10 hover:text-destructive"
                         onClick={() => remove(index)}
                       >
@@ -477,31 +659,52 @@ export const PersonalDetailsDialog = ({
                 </div>
 
                 <div className="mt-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     size="sm"
-                    onClick={() => append({ name: "", read: false, write: false, speak: false })} 
+                    onClick={() =>
+                      append({
+                        name: "",
+                        read: false,
+                        write: false,
+                        speak: false,
+                      })
+                    }
                     className="rounded-full"
                   >
                     + Add language
                   </Button>
                 </div>
 
-                {form.formState.errors.language && !Array.isArray(form.formState.errors.language) && (
-                  <p className="text-sm text-destructive">{form.formState.errors.language.message}</p>
-                )}
+                {form.formState.errors.language &&
+                  !Array.isArray(form.formState.errors.language) && (
+                    <p className="text-sm text-destructive">
+                      {form.formState.errors.language.message}
+                    </p>
+                  )}
               </div>
 
               {/* Footer Actions */}
               <div className="flex justify-end space-x-2 pt-4 pb-2">
-                <Button type="button" variant="outline" onClick={() => setOpen(false)} className="rounded-full">Cancel</Button>
-                <Button type="submit" disabled={isPending} className="rounded-full">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setOpen(false)}
+                  className="rounded-full"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isPending}
+                  className="rounded-full"
+                >
                   {isPending ? "Saving..." : "Save"}
                 </Button>
               </div>
             </form>
-          </ScrollArea>
+          </div>
         </Form>
       </DialogContent>
     </Dialog>

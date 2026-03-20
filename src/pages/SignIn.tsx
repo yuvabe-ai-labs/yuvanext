@@ -62,32 +62,20 @@ const SignIn = () => {
         description: errorMessage,
         variant: "destructive",
       });
-    } else {
-      const userRole = authData?.user?.role;
-      const currentRouteRole = role; 
+    }else {
+      const userRole = authData?.user?.role?.toLowerCase();
+      const currentRouteRole = role?.toLowerCase(); 
 
       // --- DYNAMIC ROLE VERIFICATION ---
-      // Ensure the user logs into the correct portal matching their account role
       if (currentRouteRole && userRole && currentRouteRole !== userRole) {
-        
-        // Note: If candidates are saved simply as "user" in your DB, uncomment this bypass:
-        // const isCandidateBypass = currentRouteRole === "candidate" && userRole === "user";
-        // if (!isCandidateBypass) {
-        
-        await authClient.signOut(); // Kill session
-        
-        const formatRole = (r: string) => r.charAt(0).toUpperCase() + r.slice(1);
-        
+        await authClient.signOut(); 
         toast({
           title: "Access Denied",
-          description: `This is the ${formatRole(currentRouteRole)} portal. You are trying to log in with a ${formatRole(userRole)} account.`,
+          description: `You are trying to log in with a different account type.`,
           variant: "destructive",
         });
-        
         setLoading(false);
         return;
-        
-        // } // close bypass bracket if used
       }
 
       toast({
@@ -95,12 +83,16 @@ const SignIn = () => {
         description: "You have successfully signed in.",
       });
 
-      await queryClient.invalidateQueries();
+      // 1. Force React Query to wait for the fresh data BEFORE navigating
+      await queryClient.refetchQueries(); 
 
-      // Routing based on successful role check
-      if (userRole === "unit") {
+      // 2. The Fix: If the auth response is missing the role, fallback to the URL role
+      const finalDestinationRole = userRole || currentRouteRole;
+
+      // 3. Route correctly based on the fallback
+      if (finalDestinationRole === "unit") {
         navigate("/unit-dashboard");
-      } else if (userRole === "mentor") {
+      } else if (finalDestinationRole === "mentor") {
         navigate("/mentor-dashboard");
       } else {
         navigate("/dashboard");

@@ -86,8 +86,12 @@ const Navbar = () => {
   };
 
   // Dynamic dashboard link based on role
-  const dashboardLink =
-    userRole === UserRole.UNIT ? "/unit-dashboard" : "/dashboard";
+ const dashboardLink = 
+    userRole === UserRole.UNIT 
+      ? "/unit-dashboard" 
+      : userRole === UserRole.Mentor 
+      ? "/mentor-dashboard" 
+      : "/dashboard";
 
   // 2. UPDATED: Dynamic wrapper classes to push items to the edges for mentors
   const wrapperClasses =

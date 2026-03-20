@@ -38,11 +38,11 @@ export const updateUnitProfile = async (
 
 // Get Candidate Profile by Application ID
 export const getCandidateProfile = async (
-  applicationId: string,
+  candidateId: string,
 ): Promise<CandidateProfileData> => {
   try {
     const response = await axiosInstance.get(
-      `/unit/applications/${applicationId}`,
+      `/mentor/candidates/${candidateId}`,
     );
     return handleApiResponse<CandidateProfileData>(
       response,

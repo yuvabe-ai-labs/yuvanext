@@ -93,8 +93,11 @@ const Chatbot = () => {
   }, [messages, isLoading]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, streamingMessage]);
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  }, [messages.length, streamingMessage, selectedOptions.length]); 
+  
 
   useEffect(() => {
     if (onboardingCompleted) {
@@ -244,20 +247,22 @@ const Chatbot = () => {
             );
           })}
         </div>
-        {isMultiSelect && selectedOptions.length > 0 && (
-          <div className="flex gap-2 items-center">
+        {isMultiSelect && (
+          <div className="flex gap-2 items-center mt-3 pt-2">
             <Button
               onClick={handleSubmitMultiSelect}
-              disabled={isLoading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-full text-sm font-medium hover:bg-blue-700"
+              // Disable the button if nothing is selected or if it's loading
+              disabled={isLoading || selectedOptions.length === 0}
+              className="px-6 py-2 bg-blue-600 text-white rounded-full text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
               size="sm"
             >
-              Submit ({selectedOptions.length} selected)
+              Submit {selectedOptions.length > 0 ? `(${selectedOptions.length} selected)` : ""}
             </Button>
             <Button
               onClick={() => setSelectedOptions([])}
-              disabled={isLoading}
-              className="px-4 py-2 border border-gray-300 text-gray-600 rounded-full text-sm"
+              // Disable clear if nothing is selected
+              disabled={isLoading || selectedOptions.length === 0}
+              className="px-4 py-2 border border-gray-300 text-gray-600 rounded-full text-sm disabled:opacity-50"
               variant="ghost"
               size="sm"
             >

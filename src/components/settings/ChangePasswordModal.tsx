@@ -104,7 +104,7 @@ export default function ChangePasswordModal({
               onClick={() => setShowCurrent(!showCurrent)}
               className="absolute right-3 top-9"
             >
-              {showCurrent ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showCurrent ? <Eye size={18} /> : <EyeOff size={18} />}
             </button>
             {errors.currentPassword && (
               <p className="text-red-500 text-xs mt-1">
@@ -128,7 +128,7 @@ export default function ChangePasswordModal({
               onClick={() => setShowNew(!showNew)}
               className="absolute right-3 top-9"
             >
-              {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showNew ? <Eye size={18} /> : <EyeOff size={18} />}
             </button>
             {errors.newPassword && (
               <p className="text-red-500 text-xs mt-1">
@@ -152,7 +152,7 @@ export default function ChangePasswordModal({
               onClick={() => setShowConfirm(!showConfirm)}
               className="absolute right-3 top-9"
             >
-              {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showConfirm ? <Eye size={18} /> : <EyeOff size={18} />}
             </button>
             {errors.confirmNewPassword && (
               <p className="text-red-500 text-xs mt-1">

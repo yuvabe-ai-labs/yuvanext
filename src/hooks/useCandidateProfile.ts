@@ -6,11 +6,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { UpdateApplicationStatusPayload } from "@/types/profiles.types";
 
-export const useCandidateProfile = (applicationId: string) => {
+export const useCandidateProfile = (candidateId: string) => {
   return useQuery({
-    queryKey: ["candidateProfile", applicationId],
-    queryFn: () => getCandidateProfile(applicationId),
-    enabled: !!applicationId,
+    queryKey: ["candidateProfile", candidateId],
+    queryFn: () => getCandidateProfile(candidateId),
+    enabled: !!candidateId,
     retry: 1,
   });
 };

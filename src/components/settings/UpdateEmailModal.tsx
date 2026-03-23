@@ -176,7 +176,7 @@ export default function UpdateEmailModal({
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-9 text-gray-500"
             >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
             </button>
             {errors.password && (
               <p className="text-red-600 text-xs mt-1">

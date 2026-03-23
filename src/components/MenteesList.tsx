@@ -80,8 +80,8 @@ export default function MenteesList() {
                 candidate?.profileSummary ||
                 "Passionate about creating user-centered digital experiences.";
 
-              // Navigation fallback just in case applicationId is null
-              const navId = appInfo?.applicationId || candidate?.userId;
+              
+              const navId =  candidate?.userId;
 
               return (
                 <Card

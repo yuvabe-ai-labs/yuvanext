@@ -14,6 +14,13 @@ export default function MentorDashboard() {
   const today = new Date();
   const formattedDate = format(today, "EEEE, dd MMMM yyyy");
 
+  const isNewUser = user?.createdAt 
+    ? (new Date().getTime() - new Date(user.createdAt).getTime()) < 24 * 60 * 60 * 1000 
+    : false;
+
+
+    const greeting = isNewUser ? "Welcome" : "Welcome back";
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -23,7 +30,7 @@ export default function MentorDashboard() {
         <div className="mb-8">
           <p className="text-lg text-muted-foreground">{formattedDate}</p>
           <h1 className="text-3xl font-bold">
-            Welcome back, {user?.name || user?.email?.split("@")[0] || "Mentor"}
+            {greeting}, {user?.name || user?.email?.split("@")[0] || "Mentor"}
           </h1>
         </div>
 

@@ -25,6 +25,12 @@ import { useState } from "react";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
 import logo from "@/assets/YuvaNext.svg";
 import logoName from "@/assets/YuvaNext_name.svg";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const Navbar = () => {
   const { data: session } = authClient.useSession();
@@ -33,6 +39,8 @@ const Navbar = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [showSignOutDialog, setShowSignOutDialog] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Extract profile data
   const profile = profileData;
@@ -57,16 +65,21 @@ const Navbar = () => {
   const isActive = (path: string) => location.pathname === path;
 
   // 4. Sign Out
-  const handleSignOut = async () => {
+  const confirmSignOut = async () => {
+    setIsSigningOut(true);
     await authClient.signOut();
 
     if (userRole === UserRole.UNIT) {
       navigate("/auth/unit/signin");
+    } else if (userRole === UserRole.Mentor) {
+      navigate("/auth/mentor/signin"); 
     } else {
       navigate("/auth/candidate/signin");
     }
 
     setMobileMenuOpen(false);
+    setShowSignOutDialog(false);
+    setIsSigningOut(false);
   };
 
   const handleProfileClick = () => {
@@ -86,8 +99,12 @@ const Navbar = () => {
   };
 
   // Dynamic dashboard link based on role
-  const dashboardLink =
-    userRole === UserRole.UNIT ? "/unit-dashboard" : "/dashboard";
+ const dashboardLink = 
+    userRole === UserRole.UNIT 
+      ? "/unit-dashboard" 
+      : userRole === UserRole.Mentor 
+      ? "/mentor-dashboard" 
+      : "/dashboard";
 
   // 2. UPDATED: Dynamic wrapper classes to push items to the edges for mentors
   const wrapperClasses =
@@ -223,7 +240,7 @@ const Navbar = () => {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={handleSignOut}
+                    onClick={() => setShowSignOutDialog(true)}
                     className="cursor-pointer text-red-600 focus:bg-transparent focus:text-red-600"
                   >
                     <LogOut className="mr-2 h-4 w-4" />
@@ -351,7 +368,7 @@ const Navbar = () => {
                   Settings
                 </button>
                 <button
-                  onClick={handleSignOut}
+                  onClick={() => setShowSignOutDialog(true)}
                   className="w-full text-left px-6 py-3 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center justify-center mt-4"
                 >
                   <LogOut className="mr-2 h-5 w-5" />
@@ -362,6 +379,39 @@ const Navbar = () => {
           </div>
         </div>
       )}
+
+      <Dialog open={showSignOutDialog} onOpenChange={setShowSignOutDialog}>
+        <DialogContent className="sm:max-w-md rounded-3xl p-6 bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-gray-900">Sign Out</DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-2">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to sign out of your account?
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-3 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowSignOutDialog(false)} 
+              className="rounded-full px-6"
+              disabled={isSigningOut}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmSignOut}
+              disabled={isSigningOut}
+              className="rounded-full px-6"
+            >
+              {isSigningOut ? "Signing out..." : "Sign Out"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { X, Eye, EyeOff } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { updateEmailSchema } from "@/lib/schemas";
+import { env } from "@/env";
 
 type UpdateEmailFormData = z.infer<typeof updateEmailSchema>;
 
@@ -73,7 +74,7 @@ export default function UpdateEmailModal({
       // The email will NOT change until the link in that email is clicked.
       const { error: changeError } = await authClient.changeEmail({
         newEmail: data.newEmail,
-        callbackURL: `${import.meta.env.VITE_FRONTEND_URL}/settings`,
+        callbackURL: `${env.VITE_FRONTEND_URL}/settings`,
       });
 
       if (changeError) {
@@ -175,7 +176,7 @@ export default function UpdateEmailModal({
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-9 text-gray-500"
             >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
             </button>
             {errors.password && (
               <p className="text-red-600 text-xs mt-1">

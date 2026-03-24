@@ -51,15 +51,19 @@ import {
   useCandidateProfile,
   useUpdateApplicationStatus,
 } from "@/hooks/useCandidateProfile";
-import ScheduleInterviewDialog from "@/components/ScheduleInterviewDialog";
+import ScheduleInterviewDialogUnit from "@/components/InterviewScheduleUnit";
 
-import type {
-  CandidateInternship,
-  CandidateProject,
-  CandidateCourse,
-  CandidateEducation,
-  SocialLink,
+import {
+  type CandidateInternship,
+  type CandidateProject,
+  type CandidateCourse,
+  type CandidateEducation,
+  type SocialLink,
+  UserRole,
 } from "@/types/profiles.types";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+
 
 const safeParse = <T,>(data: any, fallback: T): T => {
   if (!data) return fallback;
@@ -87,7 +91,10 @@ const CandidateProfile = () => {
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { toast } = useToast();
-
+  
+  const { data: profileData, isLoading: profileLoading } = useProfile();
+  const profile = profileData;
+  const userRole = profile?.role || null;
   const { data, isLoading, error, refetch } = useCandidateProfile(id || "");
   const updateStatusMutation = useUpdateApplicationStatus();
 
@@ -229,29 +236,31 @@ const CandidateProfile = () => {
     );
   }
 
-  // --- DATA MAPPING ---
-  const { candidate, internship, application } = data;
+ const candidate = data?.candidate || data || {}; 
+  const internship = data?.internship || {};
+  const application = data?.application || {};
 
-  const skills = safeParse<(string | { name: string })[]>(candidate.skills, []);
-  const interests = safeParse<string[]>(candidate.interests, []);
+  // Add optional chaining (?.) to safely parse the properties
+  const skills = safeParse<(string | { name: string })[]>(candidate?.skills, []);
+  const interests = safeParse<string[]>(candidate?.interests, []);
   const candidateProjects = safeParse<CandidateProject[]>(
-    candidate.projects,
+    candidate?.projects,
     []
   );
-  const candidateCourses = safeParse<CandidateCourse[]>(candidate.course, []);
+  const candidateCourses = safeParse<CandidateCourse[]>(candidate?.course, []);
   const candidateInternships = safeParse<CandidateInternship[]>(
-    candidate.internship,
+    candidate?.internship,
     []
   );
   const candidateEducation = safeParse<CandidateEducation[]>(
-    candidate.education,
+    candidate?.education,
     []
   );
 
-  const rawLinks = safeParse<SocialLink[]>(candidate.socialLinks, []);
+  const rawLinks = safeParse<SocialLink[]>(candidate?.socialLinks, []);
   const links = Array.isArray(rawLinks) ? rawLinks : [];
 
-  const matchScore = application.profileScore || 0;
+  const matchScore = application?.profileScore || 0;
   const dialogContent = pendingStatus ? getDialogContent(pendingStatus) : null;
 
   // 2. Updated Helper function for social icons
@@ -336,9 +345,6 @@ const CandidateProfile = () => {
           >
             <ArrowLeft className="w-4 h-4" /> Back
           </Button>
-          <h1 className="text-2xl font-bold text-center flex-1">
-            Applied for "{internship.title || "Internship"}"
-          </h1>
           {/* <div className="flex items-center gap-2">
             <span className="text-l font-medium">Profile Match</span>
             <div className="relative w-10 h-10">
@@ -455,7 +461,7 @@ const CandidateProfile = () => {
                         </>
                       )}
                     </Button>
-
+                    {userRole !== UserRole.Mentor && (
                     <Select
                       value={
                         application.status === "applied"
@@ -497,6 +503,7 @@ const CandidateProfile = () => {
                         </SelectItem>
                       </SelectContent>
                     </Select>
+                    )}
                   </div>
                 </div>
               </div>
@@ -877,8 +884,8 @@ const CandidateProfile = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Schedule Interview Dialog */}
-      <ScheduleInterviewDialog
+      
+      <ScheduleInterviewDialogUnit
         open={showScheduleDialog}
         onOpenChange={setShowScheduleDialog}
         candidateName={candidate.name}

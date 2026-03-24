@@ -28,12 +28,14 @@ interface ViewTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   task: Task;
+  readOnly?: boolean;
 }
 
 export default function ViewTaskModal({
   isOpen,
   onClose,
   task,
+  readOnly = false,
 }: ViewTaskModalProps) {
   const reviewTaskMutation = useReviewTask();
 
@@ -182,14 +184,17 @@ export default function ViewTaskModal({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-sm text-gray-700 font-medium">
-                    Remarks
+                    {readOnly ? "Review Remarks" : "Remarks"}
                   </FormLabel>
                   <FormControl>
                     <Textarea
                       {...field}
-                      placeholder="Add review remarks"
+                      placeholder={
+                        readOnly ? "No review remarks added" : "Add review remarks"
+                      }
                       rows={4}
                       className="resize-none text-sm rounded-xl"
+                      disabled={readOnly}
                     />
                   </FormControl>
                 </FormItem>
@@ -197,25 +202,40 @@ export default function ViewTaskModal({
             />
 
             {/* Action Buttons */}
-            <div className="flex justify-end gap-3 pt-2">
-              <Button
-                type="button"
-                onClick={form.handleSubmit(handleSend)}
-                disabled={reviewTaskMutation.isPending || !remarks?.trim()}
-                className="bg-indigo-600 hover:bg-indigo-700 rounded-full px-6"
-              >
-                {reviewTaskMutation.isPending ? "Sending..." : "Send"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={form.handleSubmit(handleCloseTask)}
-                disabled={reviewTaskMutation.isPending}
-                className="rounded-full px-6"
-              >
-                {reviewTaskMutation.isPending ? "Processing..." : "Close Task"}
-              </Button>
-            </div>
+            {readOnly ? (
+              <div className="flex justify-end pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClose}
+                  className="rounded-full px-6"
+                >
+                  Close
+                </Button>
+              </div>
+            ) : (
+              <div className="flex justify-end gap-3 pt-2">
+                <Button
+                  type="button"
+                  onClick={form.handleSubmit(handleSend)}
+                  disabled={reviewTaskMutation.isPending || !remarks?.trim()}
+                  className="bg-indigo-600 hover:bg-indigo-700 rounded-full px-6"
+                >
+                  {reviewTaskMutation.isPending ? "Sending..." : "Send"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={form.handleSubmit(handleCloseTask)}
+                  disabled={reviewTaskMutation.isPending}
+                  className="rounded-full px-6"
+                >
+                  {reviewTaskMutation.isPending
+                    ? "Processing..."
+                    : "Close Task"}
+                </Button>
+              </div>
+            )}
           </div>
         </Form>
       </DialogContent>

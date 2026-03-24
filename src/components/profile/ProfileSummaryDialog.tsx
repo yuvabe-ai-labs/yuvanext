@@ -30,12 +30,14 @@ interface ProfileSummaryDialogProps {
   children: React.ReactNode;
   summary: string;
   onSave?: () => void;
+  saveKey?: "profileSummary" | "experienceSnapshot"; 
 }
 
 export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
   children,
   summary,
   onSave,
+  saveKey = "profileSummary",
 }) => {
   const [open, setOpen] = React.useState(false);
   const { toast } = useToast();
@@ -89,7 +91,7 @@ export const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
   const onSubmit = async (data: SummaryFormData) => {
     try {
       await updateProfile({
-        profileSummary: data.profileSummary,
+        [saveKey]: data.profileSummary,
       });
 
       toast({

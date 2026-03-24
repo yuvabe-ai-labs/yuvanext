@@ -260,8 +260,12 @@ export const PersonalDetailsDialog = ({
                           { value: Gender.FEMALE, label: "Female" },
                           { value: Gender.OTHER, label: "Other" },
                         ].map((item) => (
-                          <div key={item.value} className="flex items-center">
-                            <RadioGroupItem value={item.value} id={`gender-${item.value}`} className="peer sr-only" />
+                          <div key={item.value} className="relative flex items-center">
+                            <RadioGroupItem
+                              value={item.value}
+                              id={`gender-${item.value}`}
+                              className="absolute opacity-0 pointer-events-none"
+                            />
                             <Label
                               htmlFor={`gender-${item.value}`}
                               className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
@@ -289,8 +293,12 @@ export const PersonalDetailsDialog = ({
                     <FormControl>
                       <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap gap-3 mt-2">
                         {MARITAL_STATUS_OPTIONS.map((status) => (
-                          <div key={status.value} className="flex items-center">
-                            <RadioGroupItem value={status.value} id={`marital-${status.value}`} className="peer sr-only" />
+                          <div key={status.value} className="relative flex items-center">
+                            <RadioGroupItem
+                              value={status.value}
+                              id={`marital-${status.value}`}
+                              className="absolute opacity-0 pointer-events-none"
+                            />
                             <Label
                               htmlFor={`marital-${status.value}`}
                               className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
@@ -360,11 +368,20 @@ export const PersonalDetailsDialog = ({
                           { value: "true", label: "Yes" },
                           { value: "false", label: "No" },
                         ].map((item) => (
-                          <div key={item.value} className="flex items-center">
-                            <RadioGroupItem value={item.value} id={`abled-${item.value}`} className="peer sr-only" />
+                          <div key={item.value} className="relative flex items-center">
+                            <RadioGroupItem
+                              value={item.value}
+                              id={`abled-${item.value}`}
+                              className="absolute opacity-0 pointer-events-none"
+                            />
                             <Label
                               htmlFor={`abled-${item.value}`}
-                              className="px-6 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
+                              className={cn(
+                                "px-6 py-2 rounded-full border cursor-pointer text-sm transition-colors",
+                                field.value?.toString() === item.value
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-white text-foreground border-input",
+                              )}
                             >
                               {item.label}
                             </Label>
@@ -393,11 +410,20 @@ export const PersonalDetailsDialog = ({
                           { value: "true", label: "Yes" },
                           { value: "false", label: "No" },
                         ].map((item) => (
-                          <div key={item.value} className="flex items-center">
-                            <RadioGroupItem value={item.value} id={`break-${item.value}`} className="peer sr-only" />
+                          <div key={item.value} className="relative flex items-center">
+                            <RadioGroupItem
+                              value={item.value}
+                              id={`break-${item.value}`}
+                              className="absolute opacity-0 pointer-events-none"
+                            />
                             <Label
                               htmlFor={`break-${item.value}`}
-                              className="px-6 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
+                              className={cn(
+                                "px-6 py-2 rounded-full border cursor-pointer text-sm transition-colors",
+                                field.value?.toString() === item.value
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-white text-foreground border-input",
+                              )}
                             >
                               {item.label}
                             </Label>

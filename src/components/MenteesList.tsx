@@ -1,26 +1,45 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAcceptedCandidatesList } from "@/hooks/useMentees";
-import { log } from "console";
 
-export default function MenteesList() {
+const STATUS_STYLES: Record<string, { label: string; className: string }> = {
+  applied: { label: "Applied", className: "bg-amber-400 text-white" },
+  shortlisted: { label: "Shortlisted", className: "bg-emerald-500 text-white" },
+  not_shortlisted: {
+    label: "Not Shortlisted",
+    className: "bg-red-500 text-white",
+  },
+  interviewed: { label: "Interviewed", className: "bg-blue-500 text-white" },
+  hired: { label: "Hired", className: "bg-teal-600 text-white" },
+};
+
+const FALLBACK_STATUS = {
+  label: "No application",
+  className: "bg-gray-200 text-gray-600",
+};
+
+interface MenteesListProps {
+  /** Filters the list server-side by candidate name. */
+  search?: string;
+}
+
+export default function MenteesList({ search = "" }: MenteesListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  // Fetch Page 1, limit to 10 items, empty search string.
-  const { data: responseData, isLoading } = useAcceptedCandidatesList(1, 10, "");
-  console.log("Fetched candidates data:", responseData); // Debug log to check the API response structure
-  // Extract the array of candidates
+  const { data: responseData, isLoading } = useAcceptedCandidatesList(
+    1,
+    10,
+    search
+  );
   const candidates = responseData?.data || [];
 
   const handleScroll = (direction: "left" | "right") => {
     if (!scrollRef.current) return;
-    const amount = 350;
+    const amount = 370;
     scrollRef.current.scrollBy({
       left: direction === "left" ? -amount : amount,
       behavior: "smooth",
@@ -28,168 +47,145 @@ export default function MenteesList() {
   };
 
   return (
-    <Card className="border border-border rounded-3xl p-8 mt-6 scrollbar-none">
-      <div className="flex items-center justify-between">
-        <h4 className="text-lg font-semibold">Mentees List</h4>
+    <section className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-8">
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-xl font-bold text-gray-900">Mentees List</h2>
         <button
-          className="text-blue-600 font-semibold text-sm hover:text-blue-800 cursor-pointer"
+          className="text-sm font-semibold text-blue-600 hover:text-blue-800"
           onClick={() => navigate("/mentees-management")}
         >
           View all
         </button>
       </div>
 
-      <div className="relative mt-4 group">
-        <button
-          onClick={() => handleScroll("left")}
-          className="absolute -left-4 top-1/2 -translate-y-1/2 bg-white shadow-md p-2 rounded-full z-10 hover:bg-gray-50 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
+      <div className="relative mt-6">
+        {candidates.length > 0 && (
+          <>
+            <button
+              aria-label="Scroll mentees left"
+              onClick={() => handleScroll("left")}
+              className="absolute left-0 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2.5 shadow-sm transition-colors hover:bg-gray-50 md:block"
+            >
+              <ChevronLeft className="h-4 w-4 text-gray-500" />
+            </button>
 
-        <button
-          onClick={() => handleScroll("right")}
-          className="absolute -right-4 top-1/2 -translate-y-1/2 bg-white shadow-md p-2 rounded-full z-10 hover:bg-gray-50 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
+            <button
+              aria-label="Scroll mentees right"
+              onClick={() => handleScroll("right")}
+              className="absolute right-0 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2.5 shadow-sm transition-colors hover:bg-gray-50 md:block"
+            >
+              <ChevronRight className="h-4 w-4 text-gray-500" />
+            </button>
+          </>
+        )}
 
         <div
           ref={scrollRef}
-          className="flex gap-6 overflow-x-auto scrollbar-hide py-4 px-2"
+          className="scrollbar-hide flex gap-6 overflow-x-auto py-2 md:px-14"
         >
           {isLoading ? (
-            <div className="w-full text-center py-8 text-muted-foreground animate-pulse">
-              Loading candidates...
+            <div className="w-full animate-pulse py-16 text-center text-sm text-gray-400">
+              Loading mentees...
             </div>
           ) : candidates.length === 0 ? (
-            <div className="w-full text-center py-8 text-muted-foreground">
-              No active candidates found.
+            <div className="w-full py-16 text-center text-sm text-gray-400">
+              {search
+                ? `No mentees match "${search}".`
+                : "No active mentees found."}
             </div>
           ) : (
             candidates.map((mentee: any) => {
-              // Extract data based on the new API response structure
               const candidate = mentee.candidate;
-              const appInfo = mentee.application; // Can be null
-              
-              const internshipTitle = appInfo?.internshipTitle || "No active internship";
-              const status = appInfo?.status || "No active internship";
-              const unitName = appInfo?.unitName || "Unknown Unit";
-              const skills = Array.isArray(candidate?.skills) ? candidate.skills : [];
+              const appInfo = mentee.application;
+
+              const internshipTitle =
+                appInfo?.internshipTitle || "No active internship";
+              const status = appInfo?.status
+                ? STATUS_STYLES[appInfo.status] ?? {
+                    label: appInfo.status,
+                    className: "bg-gray-200 text-gray-600",
+                  }
+                : FALLBACK_STATUS;
+              const skills = Array.isArray(candidate?.skills)
+                ? candidate.skills
+                : [];
               const profileSummary =
                 candidate?.profileSummary ||
                 "Passionate about creating user-centered digital experiences.";
 
-              
-              const navId =  candidate?.userId;
-
               return (
-                <Card
+                <article
                   key={mentee.requestId}
-                  // Added min-h-[380px] to force consistent heights
-                  className="min-w-[350px] max-w-[350px] min-h-[380px] border border-border/50 hover:shadow-lg transition-shadow rounded-3xl flex flex-col"
+                  className="flex min-h-[360px] w-[330px] min-w-[330px] flex-col rounded-3xl border border-gray-200 p-6 transition-shadow hover:shadow-lg"
                 >
-                  {/* flex-1 and flex-col makes the content stretch to fill the card */}
-                  <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5 flex flex-col flex-1">
-                    {/* Header */}
-                    <div className="flex items-center gap-3 sm:gap-5">
-                      {/* Avatar */}
-                      <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500 shrink-0">
-                        <AvatarImage
-                          src={candidate?.avatarUrl ?? undefined}
-                          alt={candidate?.name ?? "Candidate"}
-                          className="object-cover"
-                        />
-                        <AvatarFallback className="font-semibold bg-gray-200 text-gray-700">
-                          {candidate?.name
-                            ?.split(" ")
-                            .map((n: string) => n[0])
-                            .join("")
-                            .toUpperCase() || "C"}
-                        </AvatarFallback>
-                      </Avatar>
+                  {/* Header */}
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-16 w-16 shrink-0 ring-2 ring-blue-500 ring-offset-2">
+                      <AvatarImage
+                        src={candidate?.avatarUrl ?? undefined}
+                        alt={candidate?.name ?? "Mentee"}
+                        className="object-cover"
+                      />
+                      <AvatarFallback className="bg-gray-200 font-semibold text-gray-700">
+                        {candidate?.name
+                          ?.split(" ")
+                          .map((n: string) => n[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase() || "M"}
+                      </AvatarFallback>
+                    </Avatar>
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-base sm:text-lg mb-1 text-gray-900 truncate">
-                          {candidate?.name || "Unknown"}
-                        </h3>
-
-                        <p className="text-xs sm:text-sm text-gray-700 mb-2 truncate">
-                          {internshipTitle}
-                        </p>
-
-                        <span className="text-xs sm:text-sm font-medium">
-                          <span className="text-green-800 capitalize">
-                           {status}
-                          </span>
-                          <span className="text-gray-700">
-                            {" "}at {unitName}
-                          </span>
-                        </span>
-                      </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-lg font-bold text-gray-900">
+                        {candidate?.name || "Unknown"}
+                      </h3>
+                      <p className="mt-0.5 truncate text-sm text-gray-500">
+                        {internshipTitle}
+                      </p>
+                      <span
+                        className={`mt-2 inline-block rounded-full px-3 py-1 text-[11px] font-medium ${status.className}`}
+                      >
+                        {status.label}
+                      </span>
                     </div>
+                  </div>
 
-                    {/* Profile Summary - flex-1 pushes everything below it to the bottom */}
-                    <p className="text-sm sm:text-base text-gray-700 leading-relaxed line-clamp-3 flex-1">
-                      {profileSummary}
-                    </p>
+                  {/* Summary */}
+                  <p className="mt-5 line-clamp-3 flex-1 text-sm leading-relaxed text-gray-600">
+                    {profileSummary}
+                  </p>
 
-                    {/* Skills */}
-                    <div className="min-h-7">
-                      {skills.length > 0 && (
-                        <div className="flex gap-2 overflow-hidden">
-                          {skills.length > 3 ? (
-                            <>
-                              {skills.slice(0, 3).map((skill: string, i: number) => (
-                                <Badge
-                                  key={i}
-                                  variant="outline"
-                                  className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                                >
-                                  {skill}
-                                </Badge>
-                              ))}
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                              >
-                                +{skills.length - 3}
-                              </Badge>
-                            </>
-                          ) : (
-                            skills.map((skill: string, i: number) => (
-                              <Badge
-                                key={i}
-                                variant="outline"
-                                className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                              >
-                                {skill}
-                              </Badge>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
+                  {/* Skills */}
+                  <div className="mt-4 flex min-h-7 flex-wrap gap-2 overflow-hidden">
+                    {skills.slice(0, 3).map((skill: string, i: number) => (
+                      <span
+                        key={i}
+                        className="whitespace-nowrap rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                    {skills.length > 3 && (
+                      <span className="whitespace-nowrap rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600">
+                        +{skills.length - 3}
+                      </span>
+                    )}
+                  </div>
 
-                    <div className="border-t border-border/40 my-1"></div>
-
-                    {/* Button - mt-auto ensures it anchors perfectly to the bottom of the card */}
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="w-full mt-auto border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full cursor-pointer"
-                      onClick={() => navigate(`/candidate/${navId}`)}
-                    >
-                      View Profile
-                    </Button>
-                  </CardContent>
-                </Card>
+                  <Button
+                    variant="outline"
+                    className="mt-6 w-full rounded-full border-teal-600 py-5 text-sm font-semibold text-teal-700 hover:bg-teal-50 hover:text-teal-700"
+                    onClick={() => navigate(`/candidate/${candidate?.userId}`)}
+                  >
+                    View Profile
+                  </Button>
+                </article>
               );
             })
           )}
         </div>
       </div>
-    </Card>
+    </section>
   );
 }

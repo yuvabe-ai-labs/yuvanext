@@ -1,8 +1,8 @@
 // components/RecentMenteeActivity.tsx
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Briefcase } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UnitIcon } from "@/components/ui/custom-icons";
 import { useHiredApplicantsList } from "@/hooks/useCandidateTasks";
 import { calculateOverallTaskProgress } from "@/utils/taskProgress";
 import type { Task } from "@/types/candidateTasks.types";
@@ -94,7 +94,7 @@ export default function RecentMenteeActivity() {
                     {row.name}
                   </p>
                   <div className="mt-1 flex items-center gap-2">
-                    <Briefcase className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                    <UnitIcon className="shrink-0 text-gray-500" />
                     <span className="truncate text-sm text-gray-500">
                       {row.unitName}
                     </span>

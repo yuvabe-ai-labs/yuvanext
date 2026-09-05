@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { differenceInCalendarDays, format, isToday, isTomorrow } from "date-fns";
 import { MapPin, Video } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UnitIcon } from "@/components/ui/custom-icons";
 import { useMeetings } from "@/hooks/useMeetingsManagement";
 import type { Meeting, MeetingPurpose } from "@/types/meetings.types";
 
@@ -85,6 +86,10 @@ export default function UpcomingMeetings() {
             const name = meeting.candidate?.name || "Unknown Mentee";
             const scheduledAt = new Date(meeting.scheduledAt);
             const isZoom = meeting.meetingType === "zoom";
+            // Prefer the unit the mentee belongs to; fall back to the venue.
+            const subtitle =
+              meeting.unitName ||
+              (isZoom ? "Zoom meeting" : meeting.location || "In person");
 
             return (
               <button
@@ -108,15 +113,15 @@ export default function UpcomingMeetings() {
                     {name}
                   </p>
                   <div className="mt-1 flex items-center gap-2">
-                    {isZoom ? (
+                    {meeting.unitName ? (
+                      <UnitIcon className="shrink-0 text-gray-500" />
+                    ) : isZoom ? (
                       <Video className="h-3.5 w-3.5 shrink-0 text-gray-400" />
                     ) : (
                       <MapPin className="h-3.5 w-3.5 shrink-0 text-gray-400" />
                     )}
                     <span className="truncate text-sm text-gray-500">
-                      {isZoom
-                        ? "Zoom meeting"
-                        : meeting.location || "In person"}
+                      {subtitle}
                     </span>
                   </div>
                 </div>

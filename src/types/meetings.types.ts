@@ -35,6 +35,8 @@ export interface Meeting {
   zoomStartUrl: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Unit behind the candidate's most recent application; null if they have none. */
+  unitName?: string | null;
   candidate?: MeetingCandidate | null;
 }
 

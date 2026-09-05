@@ -87,6 +87,8 @@ export interface HiredCandidateDTO {
   applicantName: string;
   unitName: string;
   candidateAvatarUrl: string | null;
+  /** When the application became "hired" — the internship start proxy. */
+  hiredAt?: string | null;
   tasks: Array<{
     taskId: string;
     taskStatus: string;

@@ -1,6 +1,4 @@
-import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { Search } from "lucide-react";
 
 import { useSession } from "@/lib/auth-client";
 import Navbar from "@/components/Navbar";
@@ -13,14 +11,6 @@ import MenteesList from "@/components/MenteesList";
 export default function MentorDashboard() {
   const { data: session } = useSession();
   const user = session?.user;
-
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 350);
-    return () => clearTimeout(timer);
-  }, [search]);
 
   const formattedDate = format(new Date(), "EEEE, dd MMMM yyyy");
 
@@ -44,18 +34,6 @@ export default function MentorDashboard() {
               {greeting}, {user?.name || user?.email?.split("@")[0] || "Mentor"}
             </h1>
           </div>
-
-          <div className="relative w-full sm:w-80">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search"
-              aria-label="Search mentees"
-              className="h-12 w-full rounded-full border border-gray-200 bg-white pl-11 pr-4 text-sm text-gray-700 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-400"
-            />
-          </div>
         </div>
 
         {/* Overview + activity */}
@@ -76,7 +54,7 @@ export default function MentorDashboard() {
 
         {/* Mentees */}
         <div className="mt-6">
-          <MenteesList search={debouncedSearch} />
+          <MenteesList />
         </div>
       </div>
     </div>

@@ -17,23 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useMeetings } from "@/hooks/useMeetingsManagement";
-import type { Meeting } from "@/types/meetings.types";
-
-const MONTH_LABELS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
+import { useMenteeGrowth } from "@/hooks/useMentorStats";
 
 const RANGE_OPTIONS = [
   { value: "6", label: "Last 6 Months" },
@@ -65,7 +49,7 @@ const ChartTooltip = ({ active, payload }: any) => {
     <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-md">
       <p className="text-xs font-semibold text-gray-900">{point.label}</p>
       <p className="text-xs text-gray-500">
-        {point.value} {point.value === 1 ? "meeting" : "meetings"}
+        {point.value} {point.value === 1 ? "mentee" : "mentees"} joined
       </p>
     </div>
   );
@@ -74,47 +58,43 @@ const ChartTooltip = ({ active, payload }: any) => {
 export default function PerformanceChart() {
   const [range, setRange] = useState("6");
 
-  // Meetings are the only mentor-side activity series the API exposes, so the
-  // performance curve plots scheduled/held meetings per month.
-  const { data, isLoading } = useMeetings({ page: 1, limit: 200 });
+  // How many mentees joined each month. The API aggregates server-side and
+  // returns a dense series, so no client-side bucketing or row cap is needed.
+  const { data, isLoading } = useMenteeGrowth(Number(range));
 
   const chartData: MonthPoint[] = useMemo(() => {
-    const months = Number(range);
-    const now = new Date();
-    const buckets: MonthPoint[] = [];
+    const months = data?.months ?? [];
 
-    for (let i = months - 1; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      buckets.push({
-        label: MONTH_LABELS[d.getMonth()],
-        value: 0,
-        isCurrent: i === 0,
-      });
-    }
-
-    const start = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
-
-    (data?.data ?? []).forEach((meeting: Meeting) => {
-      if (meeting.status === "cancelled") return;
-      const scheduled = new Date(meeting.scheduledAt);
-      if (Number.isNaN(scheduled.getTime()) || scheduled < start) return;
-
-      const index =
-        (scheduled.getFullYear() - start.getFullYear()) * 12 +
-        (scheduled.getMonth() - start.getMonth());
-
-      if (index >= 0 && index < buckets.length) buckets[index].value += 1;
-    });
-
-    return buckets;
-  }, [data, range]);
+    return months.map((point, index) => ({
+      label: point.label,
+      value: point.count,
+      isCurrent: index === months.length - 1,
+    }));
+  }, [data]);
 
   const currentLabel = chartData.find((p) => p.isCurrent)?.label;
+
+  // Axis runs 0-20 in steps of 2. It still grows if a month ever exceeds 20,
+  // widening the step so the label count stays roughly constant.
+  const axisMax = useMemo(() => {
+    const dataMax = chartData.reduce((max, p) => Math.max(max, p.value), 0);
+    return Math.max(20, Math.ceil(dataMax * 1.25));
+  }, [chartData]);
+
+  const axisTicks = useMemo(() => {
+    const step = Math.max(2, Math.ceil(axisMax / 10));
+    const ticks: number[] = [];
+    for (let value = 0; value <= axisMax; value += step) ticks.push(value);
+    return ticks;
+  }, [axisMax]);
 
   return (
     <div>
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-xl font-bold text-gray-900">Performance</h2>
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Performance</h2>
+          <p className="mt-0.5 text-sm text-gray-500">Mentees joined per month</p>
+        </div>
 
         <Select value={range} onValueChange={setRange}>
           <SelectTrigger className="h-9 w-auto gap-2 rounded-lg border-gray-300 bg-white px-3 text-sm font-medium text-gray-700">
@@ -181,7 +161,9 @@ export default function PerformanceChart() {
                 width={44}
                 tick={{ fill: "#9CA3AF", fontSize: 12 }}
                 allowDecimals={false}
-                domain={[0, (max: number) => Math.max(4, Math.ceil(max * 1.25))]}
+                interval={0}
+                domain={[0, axisMax]}
+                ticks={axisTicks}
               />
 
               <Tooltip content={<ChartTooltip />} cursor={false} />

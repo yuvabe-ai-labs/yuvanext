@@ -62,8 +62,15 @@ export interface MentorAcceptedCandidate {
     avatarUrl: string | null;
     profileSummary: string | null;
     skills: string[] | null;
-    experienceLevel: string | null;
+    experienceLevel?: string | null;
   };
+  /** null when the candidate has not applied anywhere yet */
+  application: {
+    applicationId: string;
+    status: string | null;
+    internshipTitle: string | null;
+    unitName: string | null;
+  } | null;
 }
 
 // types/mentor.types.ts
@@ -87,6 +94,19 @@ export interface MentorHiredCandidate {
   };
   // Progress might not be in the immediate backend yet, but we define it for the UI
   projectsProgress?: number; 
+}
+
+/** One month of the dashboard mentee-growth series. */
+export interface MenteeGrowthPoint {
+  month: string;
+  label: string;
+  year: number;
+  count: number;
+}
+
+export interface MenteeGrowthData {
+  months: MenteeGrowthPoint[];
+  total: number;
 }
 
 export interface StatTile {

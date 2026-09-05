@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/custom-icons";
 import { useNavigate } from "react-router-dom";
 import { useMentorStats } from "@/hooks/useMentorStats";
+import { useHiredApplicantsList } from "@/hooks/useCandidateTasks";
+import { needsAttention } from "@/lib/internship-attention";
 import { UserPlus, ChevronRight } from "lucide-react";
 
 interface StatTileProps {
@@ -19,6 +21,10 @@ interface StatTileProps {
   emptyCaption: string;
   /** Tailwind text colour for the empty caption */
   emptyTone: string;
+  /** Caption rendered at all times, replacing the new/empty pair entirely. */
+  staticCaption?: string;
+  /** Tailwind text colour for the always-on caption */
+  staticTone?: string;
   bgColor: string;
   isLoading?: boolean;
   onClick?: () => void;
@@ -31,6 +37,8 @@ const StatTile = ({
   newThisMonth,
   emptyCaption,
   emptyTone,
+  staticCaption,
+  staticTone = "text-gray-500",
   bgColor,
   isLoading,
   onClick,
@@ -73,6 +81,8 @@ const StatTile = ({
       <p className="text-xs font-medium mt-3">
         {isLoading ? (
           <span className="inline-block h-3 w-24 bg-white/70 animate-pulse rounded" />
+        ) : staticCaption ? (
+          <span className={staticTone}>{staticCaption}</span>
         ) : newThisMonth > 0 ? (
           <span className="text-emerald-600">
             +{newThisMonth} new this month
@@ -90,6 +100,20 @@ export default function StatsGrid() {
   const { stats, isLoading } = useMentorStats();
 
   const pendingRequests = stats?.pendingRequests.total ?? 0;
+
+  // Mentees in the final month of their internship. Counted from the same
+  // list the Activities page renders, so the tile and that page agree.
+  const { data: hiredApplicants = [] } = useHiredApplicantsList();
+  const attentionCount = useMemo(
+    () =>
+      hiredApplicants.filter((entry) =>
+        needsAttention({
+          hiredAt: entry.hiredAt,
+          internshipDuration: entry.internshipDuration,
+        }),
+      ).length,
+    [hiredApplicants],
+  );
 
   const statTiles = useMemo(
     () => [
@@ -116,6 +140,7 @@ export default function StatsGrid() {
       {
         icon: Handbag,
         label: "Meetings",
+        // Total meetings held/scheduled, with this month's count underneath.
         value: stats?.upcomingMeetings.total ?? 0,
         newThisMonth: stats?.upcomingMeetings.newThisMonth ?? 0,
         emptyCaption: "Nothing scheduled this month",
@@ -126,15 +151,21 @@ export default function StatsGrid() {
       {
         icon: Book,
         label: "Activities",
-        value: stats?.hiredApplications.total ?? 0,
-        newThisMonth: stats?.hiredApplications.newThisMonth ?? 0,
+        // The number is the count of mentees in their last internship month,
+        // and the tile opens the activities list filtered to just those.
+        value: attentionCount,
+        newThisMonth: attentionCount,
         emptyCaption: "Needs more attention",
         emptyTone: "text-red-500",
+        staticCaption: "Needs more attention",
+        staticTone: "text-red-500",
         bgColor: "bg-[#FDFDEA]",
-        onClick: () => navigate("/mentees-activities"),
+        // Always filtered, including when the count is 0 — the list the tile
+        // opens must match the number the tile shows.
+        onClick: () => navigate("/mentees-activities?filter=attention"),
       },
     ],
-    [navigate, stats]
+    [navigate, stats, attentionCount]
   );
 
   return (

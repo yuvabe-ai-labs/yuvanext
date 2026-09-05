@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { getNextPageParam } from "@/lib/infinite-query";
 import { getAcceptedCandidates, getAcceptedCandidatesApplications, getAcceptedCandidatesApplicationsList, getMentorHiredCandidates } from "@/services/mentor.service";
 
 export const useMenteesApplications = () => {
@@ -14,6 +15,17 @@ export const useAcceptedCandidatesList = (page: number, limit: number, search: s
     queryKey: ["mentor-accepted-candidates-list", page, limit, search],
     queryFn: () => getAcceptedCandidates({ page, limit, search }),
     placeholderData: (previousData) => previousData, 
+  });
+};
+
+/** Infinite-scroll variant of useAcceptedCandidatesList. */
+export const useInfiniteAcceptedCandidates = (limit: number, search: string) => {
+  return useInfiniteQuery({
+    queryKey: ["mentor-accepted-candidates-list", "infinite", limit, search],
+    queryFn: ({ pageParam }) =>
+      getAcceptedCandidates({ page: pageParam, limit, search }),
+    initialPageParam: 1,
+    getNextPageParam,
   });
 };
 

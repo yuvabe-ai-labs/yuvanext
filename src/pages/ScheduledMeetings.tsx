@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { UnitIcon } from "@/components/ui/custom-icons";
 import {
   Dialog,
   DialogContent,
@@ -405,8 +406,11 @@ const ScheduledMeetings = () => {
                             <h3 className="text-xl font-semibold text-[#111827]">
                               {candidateName}
                             </h3>
-                            <p className="text-sm text-muted-foreground">
-                              {meeting.candidate?.email || "YuvaNext"}
+                            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                              <UnitIcon className="shrink-0 text-gray-500" />
+                              <span className="truncate">
+                                {meeting.unitName || "YuvaNext"}
+                              </span>
                             </p>
                           </div>
                         </div>

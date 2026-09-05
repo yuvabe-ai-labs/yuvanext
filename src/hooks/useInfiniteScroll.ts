@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface UseInfiniteScrollProps {
   loading: boolean;
@@ -13,7 +13,6 @@ export const useInfiniteScroll = ({ loading, hasMore, onLoadMore }: UseInfiniteS
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !loading) {
-          console.log('[InfiniteScroll] Loading more items...');
           onLoadMore();
         }
       },

@@ -52,6 +52,7 @@ export interface ApplicationTasks {
   applicantEmail: string | null;
   candidateAvatarUrl: string | null;
   candidatePhoneNumber: string | null;
+  candidateLocation: string | null;
   internshipId: string;
   internshipName: string | null;
   internshipCreatedAt: string;

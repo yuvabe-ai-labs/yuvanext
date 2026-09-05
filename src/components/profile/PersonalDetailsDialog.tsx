@@ -29,12 +29,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { X } from "lucide-react";
 import { Profile, Language, Gender, MaritalStatus, UpdateProfilePayload } from "@/types/profiles.types";
 import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { personalDetailsSchema } from "@/lib/schemas";
-import { cn } from "@/lib/utils";
 
 type PersonalDetailsForm = z.infer<typeof personalDetailsSchema>;
 
@@ -167,7 +167,8 @@ export const PersonalDetailsDialog = ({
         </DialogHeader>
 
         <Form {...form}>
-          <div className="flex-1 overflow-y-auto">
+          {/* Use flex-1 to make the ScrollArea take up all remaining space between Header and Footer */}
+          <ScrollArea className="flex-1 w-full">
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 px-6 py-4">
               {/* Name Fields */}
               <div className="grid grid-cols-2 gap-4">
@@ -267,12 +268,7 @@ export const PersonalDetailsDialog = ({
                             />
                             <Label
                               htmlFor={`gender-${item.value}`}
-                              className={cn(
-                                "px-4 py-2 rounded-full border cursor-pointer text-sm transition-colors",
-                                field.value === item.value
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : "bg-white text-foreground border-input",
-                              )}
+                              className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
                             >
                               {item.label}
                             </Label>
@@ -305,12 +301,7 @@ export const PersonalDetailsDialog = ({
                             />
                             <Label
                               htmlFor={`marital-${status.value}`}
-                              className={cn(
-                                "px-4 py-2 rounded-full border cursor-pointer text-sm transition-colors",
-                                field.value === status.value
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : "bg-white text-foreground border-input",
-                              )}
+                              className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
                             >
                               {status.label}
                             </Label>
@@ -536,7 +527,7 @@ export const PersonalDetailsDialog = ({
                 </Button>
               </div>
             </form>
-          </div>
+          </ScrollArea>
         </Form>
       </DialogContent>
     </Dialog>

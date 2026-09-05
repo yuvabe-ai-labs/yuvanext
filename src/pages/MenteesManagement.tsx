@@ -1,18 +1,15 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import Pagination from "@/components/Pagination";
 import { Search, Users, ChevronLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useAcceptedCandidatesList } from "@/hooks/useMentees";
+import { useInfiniteAcceptedCandidates } from "@/hooks/useMentees";
 import Navbar from "@/components/Navbar";
+import MenteeCard, { type MenteeCardItem } from "@/components/MenteeCard";
+import InfiniteScrollSentinel from "@/components/InfiniteScrollSentinel";
+import { flattenPages } from "@/lib/infinite-query";
 
 export default function MenteesManagement() {
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const pageSize = 6;
@@ -23,7 +20,6 @@ export default function MenteesManagement() {
 
   const handleSearch = (val: string) => {
     setSearchQuery(val);
-    setPage(1);
 
     if (timerRef.current) clearTimeout(timerRef.current);
 
@@ -39,15 +35,14 @@ export default function MenteesManagement() {
     };
   }, []);
 
-  // Fetch from API with server-side pagination & search
-  const menteesQuery = useAcceptedCandidatesList(
-    page,
-    pageSize,
-    debouncedSearch,
-  );
+  // Fetch from API with infinite scroll & server-side search
+  const menteesQuery = useInfiniteAcceptedCandidates(pageSize, debouncedSearch);
 
-  const items = menteesQuery.data?.data ?? [];
-  const pagination = menteesQuery.data?.pagination;
+  const items = useMemo(
+    () =>
+      flattenPages(menteesQuery.data?.pages, (mentee) => mentee.requestId),
+    [menteesQuery.data],
+  );
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
@@ -56,7 +51,7 @@ export default function MenteesManagement() {
       return items;
     }
 
-    return items.filter((mentee: any) => {
+    return items.filter((mentee: MenteeCardItem) => {
       const candidate = mentee.candidate;
       const application = mentee.application;
 
@@ -119,6 +114,7 @@ export default function MenteesManagement() {
               Loading candidates...
             </div>
           ) : menteesQuery.isFetching &&
+            !menteesQuery.isFetchingNextPage &&
             searchQuery.trim() &&
             filteredItems.length === 0 ? (
             <div className="text-center py-20 text-gray-400 font-medium animate-pulse">
@@ -135,7 +131,9 @@ export default function MenteesManagement() {
             </div>
           ) : (
             <>
-              {menteesQuery.isFetching && searchQuery.trim() ? (
+              {menteesQuery.isFetching &&
+              !menteesQuery.isFetchingNextPage &&
+              searchQuery.trim() ? (
                 <p className="mb-4 text-sm text-gray-400">
                   Updating results...
                 </p>
@@ -143,141 +141,17 @@ export default function MenteesManagement() {
 
               {/* Mentees Grid - CSS Grid handles width automatically now */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {filteredItems.map((mentee: any) => {
-                  const candidate = mentee.candidate;
-                  const application = mentee.application;
-
-                  const skills = Array.isArray(candidate?.skills)
-                    ? candidate.skills
-                    : [];
-                  const profileSummary =
-                    candidate?.profileSummary ||
-                    "No profile summary available.";
-
-                  const profileId =
-                    application?.applicationId || candidate?.userId;
-
-                  return (
-                    <Card
-                      key={mentee.requestId}
-                      // Removed min-w-[350px], added h-full
-                      className="h-full border border-border/50 hover:shadow-lg transition-shadow rounded-3xl flex flex-col"
-                    >
-                      {/* Added flex flex-col flex-1 to fill the card */}
-                      <CardContent className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5 flex flex-col flex-1">
-                        {/* Header */}
-                        <div className="flex items-center gap-3 sm:gap-5">
-                          {/* Avatar */}
-                          <Avatar className="w-16 h-16 sm:w-20 sm:h-20 ring-4 ring-green-500 shrink-0">
-                            <AvatarImage
-                              src={candidate?.avatarUrl ?? undefined}
-                              alt={candidate?.name ?? "Candidate"}
-                              className="object-cover"
-                            />
-                            <AvatarFallback className="font-semibold bg-gray-200 text-gray-700">
-                              {candidate?.name
-                                ?.split(" ")
-                                .map((n: string) => n[0])
-                                .join("")
-                                .toUpperCase() || "C"}
-                            </AvatarFallback>
-                          </Avatar>
-
-                          {/* Info */}
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-base sm:text-lg mb-1 text-gray-900 truncate">
-                              {candidate?.name || "Unknown Candidate"}
-                            </h3>
-
-                            <p className="text-xs sm:text-sm text-gray-700 mb-2 truncate">
-                              {application?.internshipTitle ||
-                                "No active application"}
-                            </p>
-
-                            <span className="text-xs sm:text-sm font-medium">
-                              <span className="text-green-800 capitalize">
-                                {application?.status || ""}
-                              </span>
-                              {application?.unitName && (
-                                <span className="text-gray-700">
-                                  {" "}
-                                  at {application.unitName}
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Profile Summary - flex-1 pushes everything below it down */}
-                        <p className="text-sm sm:text-base text-gray-700 leading-relaxed line-clamp-3 flex-1">
-                          {profileSummary}
-                        </p>
-
-                        {/* Skills */}
-                        <div className="min-h-7">
-                          {skills.length > 0 && (
-                            <div className="flex gap-2 overflow-hidden">
-                              {skills.length > 3 ? (
-                                <>
-                                  {skills
-                                    .slice(0, 3)
-                                    .map((skill: string, i: number) => (
-                                      <Badge
-                                        key={i}
-                                        variant="outline"
-                                        className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                                      >
-                                        {skill}
-                                      </Badge>
-                                    ))}
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                                  >
-                                    +{skills.length - 3}
-                                  </Badge>
-                                </>
-                              ) : (
-                                skills.map((skill: string, i: number) => (
-                                  <Badge
-                                    key={i}
-                                    variant="outline"
-                                    className="text-[10px] text-gray-600 bg-muted/40 rounded-full px-2 py-1 whitespace-nowrap"
-                                  >
-                                    {skill}
-                                  </Badge>
-                                ))
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="border-t border-border/40 my-1"></div>
-
-                        {/* Button - mt-auto locks it to the bottom */}
-                        <Button
-                          variant="outline"
-                          size="lg"
-                          className="w-full mt-auto border-2 border-teal-500 text-teal-600 hover:bg-teal-50 text-sm py-3 rounded-full cursor-pointer"
-                          onClick={() => navigate(`/candidate/${profileId}`)}
-                        >
-                          View Profile
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                {filteredItems.map((mentee: MenteeCardItem) => (
+                  <MenteeCard key={mentee.requestId} mentee={mentee} />
+                ))}
               </div>
 
-              {/* Pagination */}
-              {pagination && pagination.totalPages > 1 && (
-                <Pagination
-                  currentPage={page}
-                  totalPages={pagination.totalPages}
-                  onPageChange={setPage}
-                  className="mt-10"
-                />
-              )}
+              <InfiniteScrollSentinel
+                hasMore={menteesQuery.hasNextPage}
+                isLoading={menteesQuery.isFetchingNextPage}
+                onLoadMore={menteesQuery.fetchNextPage}
+                endMessage="No more mentees to load."
+              />
             </>
           )}
         </div>

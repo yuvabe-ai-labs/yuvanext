@@ -6,6 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Mail, Phone, MapPin, Clock } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { useUnitById } from "@/hooks/useUnits";
+import { useProfile } from "@/hooks/useProfile";
+import { UserRole } from "@/types/profiles.types";
 import { useSession } from "@/lib/auth-client";
 import ApplicationSuccessDialog from "@/components/ApplicationSuccessDialog";
 import ProfileSummaryDialog from "@/components/ProfileSummaryDialog";
@@ -31,7 +33,12 @@ const UnitView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: session } = useSession();
+  const { data: profile } = useProfile();
   const { data: unit, isLoading, error } = useUnitById(id || "");
+
+  // Mentors browse units from /units-management to see where their mentees have
+  // applied — they can't act on a posting, so the per-internship View is hidden.
+  const isMentor = profile?.role === UserRole.Mentor;
 
   const [selectedInternship, setSelectedInternship] =
     useState<Internship | null>(null);
@@ -312,15 +319,17 @@ const UnitView = () => {
                                 </div>
 
                                 {/* View Button */}
-                                <Button
-                                  variant="gradient"
-                                  className="rounded-full text-white invisible md:visible"
-                                  onClick={() =>
-                                    navigate(`/internships/${internship.id}`)
-                                  }
-                                >
-                                  View
-                                </Button>
+                                {!isMentor && (
+                                  <Button
+                                    variant="gradient"
+                                    className="rounded-full text-white invisible md:visible"
+                                    onClick={() =>
+                                      navigate(`/internships/${internship.id}`)
+                                    }
+                                  >
+                                    View
+                                  </Button>
+                                )}
                               </div>
 
                               <p className="text-sm text-gray-400 mb-3 line-clamp-2 lg:pr-[8.56rem]">
@@ -350,15 +359,17 @@ const UnitView = () => {
                               )}
 
                               {/* View Button */}
-                              <Button
-                                variant="gradient"
-                                className="rounded-full bg-clip-text text-transparent border border-orange-600 visible w-full bg-transparent md:hidden mt-4"
-                                onClick={() =>
-                                  navigate(`/internships/${internship.id}`)
-                                }
-                              >
-                                View
-                              </Button>
+                              {!isMentor && (
+                                <Button
+                                  variant="gradient"
+                                  className="rounded-full bg-clip-text text-transparent border border-orange-600 visible w-full bg-transparent md:hidden mt-4"
+                                  onClick={() =>
+                                    navigate(`/internships/${internship.id}`)
+                                  }
+                                >
+                                  View
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </CardContent>

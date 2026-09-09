@@ -7,7 +7,8 @@ import type {
   MentorMeetingsResponse, 
   MentorAcceptedCandidatesResponse,
   MentorHiredCandidatesResponse,
-  MentorStatsApiResponse
+  MentorStatsApiResponse,
+  MenteeGrowthData
 } from "@/types/mentor.types";
 
 interface GetMentorUnitsParams {
@@ -56,6 +57,19 @@ export const getMentorStats = async (): Promise<MentorStatsApiResponse | null> =
   }
 };
 
+
+export const getMenteeGrowth = async (
+  months: number
+): Promise<MenteeGrowthData | null> => {
+  try {
+    const response = await axiosInstance.get("/mentor/mentee-growth", {
+      params: { months },
+    });
+    return handleApiResponse<MenteeGrowthData>(response, null);
+  } catch (error) {
+    return handleApiError(error, "Failed to fetch mentee growth");
+  }
+};
 
 export const getAcceptedCandidates = async (
   params?: GetAcceptedCandidatesParams

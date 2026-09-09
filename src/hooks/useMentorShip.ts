@@ -1,4 +1,10 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { getNextPageParam } from "@/lib/infinite-query";
 import { 
   getIncomingRequests, 
   respondToMentorshipRequest,  
@@ -11,6 +17,21 @@ export const useIncomingRequests = (page: number, limit: number, status = "pendi
     queryKey: ["incoming-mentorship-requests", page, limit, status, search],
     queryFn: () => getIncomingRequests({ page, limit, status, search }),
     placeholderData: (prev) => prev,
+  });
+};
+
+/** Infinite-scroll variant of useIncomingRequests. */
+export const useInfiniteIncomingRequests = (
+  limit: number,
+  status = "pending",
+  search = ""
+) => {
+  return useInfiniteQuery({
+    queryKey: ["incoming-mentorship-requests", "infinite", limit, status, search],
+    queryFn: ({ pageParam }) =>
+      getIncomingRequests({ page: pageParam, limit, status, search }),
+    initialPageParam: 1,
+    getNextPageParam,
   });
 };
 

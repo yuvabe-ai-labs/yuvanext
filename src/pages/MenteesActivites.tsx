@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import Pagination from "@/components/Pagination";
+import InfiniteScrollSentinel from "@/components/InfiniteScrollSentinel";
+import { needsAttention } from "@/lib/internship-attention";
 import { ChevronLeft, Users, MoveUpRight } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -150,9 +151,16 @@ function HiredCandidateCard({ application }: { application: any }) {
 // --- Main Page Component ---
 export default function MenteesActivities() {
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
-  const [filter, setFilter] = useState("all"); // 1. Added filter state
-  const pageSize = 8; 
+  // The dashboard "Activities" tile links here with ?filter=attention so the
+  // list opens showing only the mentees the tile is counting.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [filter, setFilter] = useState(
+    () => searchParams.get("filter") ?? "all",
+  );
+  const pageSize = 8;
+  // This list arrives in full from the API, so "loading more" is a progressive
+  // reveal of rows already in memory rather than another request.
+  const [visibleCount, setVisibleCount] = useState(pageSize);
 
   const { data: allItems = [], isLoading } = useHiredApplicantsList();
 
@@ -160,6 +168,14 @@ export default function MenteesActivities() {
   const filteredItems = useMemo(() => {
     return allItems.filter((application: any) => {
       if (filter === "all") return true;
+
+      // Mentees in the final month of their internship.
+      if (filter === "attention") {
+        return needsAttention({
+          hiredAt: application.hiredAt,
+          internshipDuration: application.internshipDuration,
+        });
+      }
 
       // ⚠️ IMPORTANT: Adjust this logic to match your API's properties!
       // Example A: If your API returns a status string
@@ -178,15 +194,24 @@ export default function MenteesActivities() {
     });
   }, [allItems, filter]);
 
-  // 3. Calculate pagination based on the FILTERED items
+  // 3. Reveal rows incrementally as the user scrolls
   const totalItems = filteredItems.length;
-  const totalPages = Math.ceil(totalItems / pageSize) || 1;
-  const currentItems = filteredItems.slice((page - 1) * pageSize, page * pageSize);
+  const currentItems = filteredItems.slice(0, visibleCount);
+  const hasMore = visibleCount < totalItems;
 
-  // 4. Handle filter changes and reset the page
+  const showMore = useCallback(
+    () => setVisibleCount((count) => count + pageSize),
+    [pageSize],
+  );
+
+  // 4. Handle filter changes and collapse back to the first batch
   const handleFilterChange = (value: string) => {
     setFilter(value);
-    setPage(1); // Crucial: Reset to page 1 so you don't get stuck on an empty page
+    setVisibleCount(pageSize); // Avoid carrying a long reveal into a short list
+    // Keep the URL in step so the view survives a refresh or a shared link.
+    setSearchParams(value === "all" ? {} : { filter: value }, {
+      replace: true,
+    });
   };
 
   return (
@@ -220,6 +245,7 @@ export default function MenteesActivities() {
                 <SelectItem value="all">All Matches</SelectItem>
                 <SelectItem value="active">Active Projects</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="attention">Needs Attention</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -235,9 +261,11 @@ export default function MenteesActivities() {
             <div className="text-center py-20 flex flex-col items-center">
               <Users className="w-16 h-16 text-gray-200 mb-4" />
               <h3 className="text-lg font-semibold text-gray-400">
-                {filter === "all" 
-                  ? "No active mentee activities found" 
-                  : `No ${filter} projects found`}
+                {filter === "all"
+                  ? "No active mentee activities found"
+                  : filter === "attention"
+                    ? "No mentees are in their final internship month"
+                    : `No ${filter} projects found`}
               </h3>
             </div>
           ) : (
@@ -252,16 +280,12 @@ export default function MenteesActivities() {
                 ))}
               </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex justify-center mt-12 mb-6">
-                   <Pagination
-                     currentPage={page}
-                     totalPages={totalPages}
-                     onPageChange={setPage}
-                   />
-                </div>
-              )}
+              <InfiniteScrollSentinel
+                hasMore={hasMore}
+                isLoading={false}
+                onLoadMore={showMore}
+                endMessage="No more activities to load."
+              />
             </>
           )}
         </div>

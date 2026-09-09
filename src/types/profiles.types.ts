@@ -185,7 +185,24 @@ export interface UpdateProfilePayload {
   galleryImages?: string[];
 }
 
+/** One row of the candidate's Application History. */
+export interface ApplicationHistoryEntry {
+  applicationId: string;
+  status:
+    | "applied"
+    | "shortlisted"
+    | "not_shortlisted"
+    | "interviewed"
+    | "hired";
+  internshipTitle: string | null;
+  unitName: string | null;
+  unitLogoUrl: string | null;
+  appliedAt: string | null;
+}
+
 export interface CandidateProfileData {
+  /** Present on the mentor-side candidate endpoint. */
+  applicationHistory?: ApplicationHistoryEntry[];
   application: {
     id: string;
     status:

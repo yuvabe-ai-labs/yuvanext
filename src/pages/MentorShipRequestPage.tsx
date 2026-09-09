@@ -1,21 +1,24 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import Pagination from "@/components/Pagination";
 import { Search, Users, ChevronLeft, Clock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
-import { useIncomingRequests, useRespondToRequest } from "@/hooks/useMentorShip";
+import {
+  useInfiniteIncomingRequests,
+  useRespondToRequest,
+} from "@/hooks/useMentorShip";
 import Navbar from "@/components/Navbar";
+import InfiniteScrollSentinel from "@/components/InfiniteScrollSentinel";
+import { flattenPages } from "@/lib/infinite-query";
 
 export default function MentorshipRequestsPage() {
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const pageSize = 6;
@@ -34,7 +37,6 @@ export default function MentorshipRequestsPage() {
 
     timerRef.current = setTimeout(() => {
       setDebouncedSearch(val);
-      setPage(1); // Reset to page 1 on new search
     }, 500);
   };
 
@@ -44,12 +46,19 @@ export default function MentorshipRequestsPage() {
     };
   }, []);
 
-  // Fetch API
-  const { data: responseData, isLoading } = useIncomingRequests(page, pageSize, "pending", debouncedSearch);
+  // Fetch API with infinite scroll
+  const requestsQuery = useInfiniteIncomingRequests(
+    pageSize,
+    "pending",
+    debouncedSearch,
+  );
+  const { isLoading } = requestsQuery;
   const respondMutation = useRespondToRequest();
 
-  const items = responseData?.data ?? [];
-  const pagination = responseData?.pagination;
+  const items = useMemo(
+    () => flattenPages(requestsQuery.data?.pages, (request) => request.id),
+    [requestsQuery.data],
+  );
 
   // Action Handlers
   const handleActionClick = (request: any, action: "accept" | "reject") => {
@@ -230,15 +239,12 @@ export default function MentorshipRequestsPage() {
                 })}
               </div>
 
-              {/* Pagination */}
-              {pagination && pagination.totalPages > 1 && (
-                <Pagination
-                  currentPage={page}
-                  totalPages={pagination.totalPages}
-                  onPageChange={setPage}
-                  className="mt-10"
-                />
-              )}
+              <InfiniteScrollSentinel
+                hasMore={requestsQuery.hasNextPage}
+                isLoading={requestsQuery.isFetchingNextPage}
+                onLoadMore={requestsQuery.fetchNextPage}
+                endMessage="No more requests to load."
+              />
             </>
           )}
         </div>

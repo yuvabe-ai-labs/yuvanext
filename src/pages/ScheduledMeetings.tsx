@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { UnitIcon } from "@/components/ui/custom-icons";
 import {
   Dialog,
   DialogContent,
@@ -68,6 +69,19 @@ const isSameDay = (a: Date, b: Date) =>
 const toDayKey = (date: Date) => format(date, "yyyy-MM-dd");
 
 const meetingDate = (meeting: Meeting) => new Date(meeting.scheduledAt);
+
+/** Midnight today — meetings before this belong to a day that has completed. */
+const startOfToday = () => {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return start;
+};
+
+/** A meeting stays "upcoming" for the whole of its scheduled day. */
+const isUpcomingMeeting = (meeting: Meeting, dayStart: number) => {
+  const at = meetingDate(meeting).getTime();
+  return !Number.isNaN(at) && at >= dayStart;
+};
 
 const formatMeetingDateLabel = (date: Date) => {
   const today = new Date();
@@ -146,9 +160,14 @@ const ScheduledMeetings = () => {
   const meetingsForBottomSection = useMemo(() => {
     let items = scheduledMeetings;
     if (selectedDayKey) {
+      // Browsing a specific day card — show that day as picked, past or future.
       items = items.filter((meeting) => {
         return toDayKey(meetingDate(meeting)) === selectedDayKey;
       });
+    } else {
+      // Default list is "Upcoming": drop meetings whose day has already ended.
+      const dayStart = startOfToday().getTime();
+      items = items.filter((meeting) => isUpcomingMeeting(meeting, dayStart));
     }
     return [...items].sort(
       (a, b) => meetingDate(a).getTime() - meetingDate(b).getTime(),
@@ -405,8 +424,11 @@ const ScheduledMeetings = () => {
                             <h3 className="text-xl font-semibold text-[#111827]">
                               {candidateName}
                             </h3>
-                            <p className="text-sm text-muted-foreground">
-                              {meeting.candidate?.email || "YuvaNext"}
+                            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                              <UnitIcon className="shrink-0 text-gray-500" />
+                              <span className="truncate">
+                                {meeting.unitName || "YuvaNext"}
+                              </span>
                             </p>
                           </div>
                         </div>

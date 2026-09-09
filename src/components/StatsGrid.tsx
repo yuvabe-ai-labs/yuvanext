@@ -17,6 +17,8 @@ interface StatTileProps {
   label: string;
   value: number | string;
   newThisMonth: number;
+  /** Wording after the count, e.g. "+3 <newLabel>" */
+  newLabel?: string;
   /** Caption shown when there is nothing new this month */
   emptyCaption: string;
   /** Tailwind text colour for the empty caption */
@@ -35,6 +37,7 @@ const StatTile = ({
   label,
   value,
   newThisMonth,
+  newLabel = "new this month",
   emptyCaption,
   emptyTone,
   staticCaption,
@@ -85,7 +88,7 @@ const StatTile = ({
           <span className={staticTone}>{staticCaption}</span>
         ) : newThisMonth > 0 ? (
           <span className="text-emerald-600">
-            +{newThisMonth} new this month
+            +{newThisMonth} {newLabel}
           </span>
         ) : (
           <span className={emptyTone}>{emptyCaption}</span>
@@ -140,9 +143,11 @@ export default function StatsGrid() {
       {
         icon: Handbag,
         label: "Meetings",
-        // Total meetings held/scheduled, with this month's count underneath.
+        // Every meeting the mentor has scheduled, past and future, with the
+        // count scheduled inside this month underneath.
         value: stats?.upcomingMeetings.total ?? 0,
         newThisMonth: stats?.upcomingMeetings.newThisMonth ?? 0,
+        newLabel: "scheduled this month",
         emptyCaption: "Nothing scheduled this month",
         emptyTone: "text-gray-500",
         bgColor: "bg-[#EEF2FF]",

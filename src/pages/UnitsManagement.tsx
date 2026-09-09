@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Pagination from "@/components/Pagination";
-import { Search, Building2, ChevronLeft, Users } from "lucide-react";
+import { Search, Building2, ChevronLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useMentorUnitsList } from "@/hooks/useMentorsUnits"; // Use your new hook
 import type { MentorUnit } from "@/types/mentor.types";
@@ -47,7 +47,8 @@ export default function UnitsManagement() {
     <div className="min-h-screen bg-gray-50">
                   <Navbar />
 
-      <div className="w-full mx-auto px-4 sm:px-12 lg:px-40 py-6 lg:py-10">
+      {/* Padding matches /mentees-management so both grids line up */}
+      <div className="w-full mx-auto px-4 sm:px-8 lg:px-20 xl:px-40 py-6 lg:py-10">
         <div className="relative flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
           {/* Left */}
           <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -77,7 +78,7 @@ export default function UnitsManagement() {
           </div>
         </div>
 
-        <div className="px-0 md:px-20">
+        <div className="px-2">
           {/* Content Area */}
           {unitsQuery.isLoading ? (
             <div className="text-center py-20 text-gray-400 font-medium animate-pulse">
@@ -98,18 +99,29 @@ export default function UnitsManagement() {
                     <Card
                       key={unit.userId}
                       // ADDED cursor-pointer here
-                      className="relative overflow-hidden rounded-[20px] border border-[#C94100] bg-white shadow-sm transition-all duration-300 hover:shadow-md w-full max-w-[360px] h-[300px] p-1.5 mx-auto cursor-pointer"
+                      // Fills its grid column like MenteeCard does — no max-w or
+                      // mx-auto, which would leave big gaps between cards. min-h
+                      // (not a fixed h) keeps the name and description from
+                      // being squashed and clipped mid-line.
+                      className="relative flex h-full w-full flex-col overflow-hidden rounded-[20px] border border-[#C94100] bg-white shadow-sm transition-all duration-300 hover:shadow-md min-h-[300px] p-1.5 cursor-pointer"
                       // ADDED onClick to navigate to the unit details page
                       onClick={() => navigate(`/units/${unit.userId}`)}
                     >
-                      {/* Banner */}
-                      <div className="relative w-full h-[100px] rounded-t-[18px] overflow-visible bg-blue-100">
-                        {/* Note: Your backend doesn't return a bannerUrl right now, so this acts as a nice fallback background */}
-                        <div className="absolute top-2 right-2 bg-white/80 px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 text-gray-700 backdrop-blur-sm shadow-sm z-10">
-                           <Users className="w-3 h-3" />
-                           {unit.applicationCount} App{unit.applicationCount !== 1 ? 's' : ''}
-                        </div>
-                        
+                      {/* Banner — the unit's own image, falling back to the
+                          plain blue ground when it has none. */}
+                      <div className="relative w-full h-[124px] shrink-0 rounded-t-[18px] overflow-visible bg-blue-100">
+                        {unit.bannerUrl && (
+                          <img
+                            src={unit.bannerUrl}
+                            alt=""
+                            className="absolute inset-0 h-full w-full rounded-t-[18px] object-cover"
+                            onError={(e) => {
+                              // Broken link → uncover the blue fallback.
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        )}
+
                         {/* Avatar */}
                         <div className="absolute bottom-0 left-5 translate-y-1/6 w-[56px] h-[56px] flex items-center justify-center z-20 rounded-full bg-black text-white border-2 border-white shadow-md">
                           {unit.avatarUrl ? (
@@ -125,32 +137,32 @@ export default function UnitsManagement() {
                       </div>
 
                       {/* Content */}
-                      <div className="-mt-[28px] bg-white rounded-[18px] pt-[40px] pb-[20px] px-[16px] z-10 relative flex flex-col h-[calc(100%-100px)]">
-                        <h3 className="text-[20px] font-semibold text-black leading-tight text-left truncate">
+                      <div className="-mt-[28px] bg-white rounded-[18px] pt-[40px] pb-[20px] px-[16px] z-10 relative flex flex-1 flex-col">
+                        <h3 className="text-[20px] font-semibold text-black leading-tight text-left truncate shrink-0 py-[2px]">
                           {unit.name}
                         </h3>
-                        
+
                         {unit.industry && (
-                          <span className="text-xs text-blue-600 font-medium mt-1 uppercase tracking-wider text-left">
+                          <span className="text-xs text-blue-600 font-medium mt-1 uppercase tracking-wider text-left shrink-0">
                             {unit.industry}
                           </span>
                         )}
 
-                        <p className="text-[14px] text-gray-600 mt-2 line-clamp-3 text-left flex-grow">
+                        <p className="text-[14px] text-gray-600 mt-2 line-clamp-3 text-left flex-grow shrink-0">
                           {unit.description || "No description provided for this unit."}
                         </p>
-                        
-                        <div className="flex justify-center mt-auto pt-2">
+
+                        <div className="flex justify-center mt-auto pt-2 shrink-0">
                           <Button
                             variant="link"
                             className="text-[#0B5FFF] font-medium p-0 hover:text-blue-700"
                             onClick={(e) => {
                               // This prevents the card's click event from firing when the button is clicked
                               e.stopPropagation();
-                              navigate(`/units/${unit.userId}/candidates`);
+                              navigate(`/units/${unit.userId}`);
                             }}
                           >
-                            View Candidates
+                            View Unit
                           </Button>
                         </div>
                       </div>

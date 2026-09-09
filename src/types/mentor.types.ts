@@ -43,6 +43,7 @@ export interface MentorUnit {
   industry: string | null;
   location: string | null;
   avatarUrl: string | null;
+  bannerUrl: string | null;
   description: string | null;
   isAurovillian: boolean | null;
   applicationCount: number;

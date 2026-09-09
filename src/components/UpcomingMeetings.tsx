@@ -45,11 +45,15 @@ export default function UpcomingMeetings() {
   });
 
   const meetings = useMemo(() => {
-    const now = Date.now();
+    // A meeting stays "upcoming" for the whole of its scheduled day; it drops
+    // off once that day has completed.
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const cutoff = dayStart.getTime();
     return (data?.data ?? [])
       .filter((meeting: Meeting) => {
         const at = new Date(meeting.scheduledAt).getTime();
-        return !Number.isNaN(at) && at >= now;
+        return !Number.isNaN(at) && at >= cutoff;
       })
       .sort(
         (a: Meeting, b: Meeting) =>

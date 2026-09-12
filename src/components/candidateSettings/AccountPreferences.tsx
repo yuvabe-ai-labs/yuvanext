@@ -27,9 +27,16 @@ export default function AccountPreferences() {
   const deactivateMutation = useDeactivateAccount();
   const deleteMutation = useDeleteAccount();
 
+  // Every role has its own profile page — a two-way check sent mentors to
+  // /unit-profile. Mirrors handleProfileClick in Navbar.
   const openProfile = useCallback(() => {
     if (!profile) return;
-    const target = profile.role === "candidate" ? "/profile" : "/unit-profile";
+    const target =
+      profile.role === "unit"
+        ? "/unit-profile"
+        : profile.role === "mentor"
+          ? "/mentor-profile"
+          : "/profile";
     navigate(target);
   }, [profile, navigate]);
 
@@ -60,23 +67,32 @@ export default function AccountPreferences() {
   if (activeSubView === "verification")
     return <VerificationUpload onBack={() => setActiveSubView(null)} />;
 
+  // Admins have no profile page in this app — every row here would open a
+  // candidate or unit page rendered against an admin record. The demographic
+  // row is already candidate-only, so the whole section is hidden for them.
+  const isAdmin = profile?.role === "admin";
+
   return (
     <div className="relative">
-      <h2 className="text-xl text-gray-800 font-medium">
-        Personal Information
-      </h2>
-      <div className="rounded-md overflow-hidden">
-        <PreferenceItem
-          title="Name, Skills and Interests"
-          onClick={openProfile}
-        />
-        {profile?.role === "candidate" && (
-          <PreferenceItem
-            title="Personal Demographic Information"
-            onClick={() => openSubViewWithLoad("demographic")}
-          />
-        )}
-      </div>
+      {!isAdmin && (
+        <>
+          <h2 className="text-xl text-gray-800 font-medium">
+            Personal Information
+          </h2>
+          <div className="rounded-md overflow-hidden">
+            <PreferenceItem
+              title="Name, Skills and Interests"
+              onClick={openProfile}
+            />
+            {profile?.role === "candidate" && (
+              <PreferenceItem
+                title="Personal Demographic Information"
+                onClick={() => openSubViewWithLoad("demographic")}
+              />
+            )}
+          </div>
+        </>
+      )}
 
       <section className="mt-7">
         <h3 className="text-xl font-medium text-gray-800">

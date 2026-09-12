@@ -9,7 +9,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { useCandidateTasks, useHiredApplicantsList } from "@/hooks/useCandidateTasks"; 
-import { calculateOverallTaskProgress } from "@/utils/taskProgress"; 
+import { calculateOverallTaskProgress } from "@/utils/taskProgress";
+import type { Task } from "@/types/candidateTasks.types";
 import Navbar from "@/components/Navbar";
 
 // --- Separated Card Component ---
@@ -177,18 +178,16 @@ export default function MenteesActivities() {
         });
       }
 
-      // ⚠️ IMPORTANT: Adjust this logic to match your API's properties!
-      // Example A: If your API returns a status string
-      if (filter === "active") {
-        return application.status === "active" || application.status === "ongoing";
-      }
-      if (filter === "completed") {
-        return application.status === "completed";
-      }
-
-      // Example B: If your API returns a progress number
-      // if (filter === "active") return application.progress < 100;
-      // if (filter === "completed") return application.progress === 100;
+      // Active vs completed is decided by task progress, not by a status
+      // string — every row here is a "hired" application, so the previous
+      // checks against "active"/"completed" never matched anything.
+      // The list response carries each mentee's tasks, so this is the same
+      // figure the card itself shows.
+      const progress = calculateOverallTaskProgress(
+        (application.tasks ?? []) as Task[],
+      );
+      if (filter === "active") return progress < 100;
+      if (filter === "completed") return progress === 100;
 
       return true;
     });

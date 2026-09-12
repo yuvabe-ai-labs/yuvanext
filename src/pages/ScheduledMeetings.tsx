@@ -408,8 +408,11 @@ const ScheduledMeetings = () => {
                 const date = meetingDate(meeting);
 
                 return (
-                  <Card key={meeting.id} className="rounded-3xl border">
-                    <CardContent className="p-6 space-y-4">
+                  <Card key={meeting.id} className="flex h-full flex-col rounded-3xl border">
+                    {/* gap-4, not space-y-4: space-y sets margin-top on every
+                        child with higher specificity than mt-auto, which would
+                        stop the button row being pushed to the bottom. */}
+                    <CardContent className="flex flex-1 flex-col gap-4 p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
                           <Avatar className="w-12 h-12">
@@ -439,7 +442,7 @@ const ScheduledMeetings = () => {
                         </span>
                       </div>
 
-                      <p className="text-sm text-muted-foreground leading-7">
+                      <p className="line-clamp-3 text-sm text-muted-foreground leading-7">
                         {summary}
                       </p>
 
@@ -459,7 +462,7 @@ const ScheduledMeetings = () => {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="mt-auto grid grid-cols-2 gap-3 pt-1">
                         <Button
                           variant="outline"
                           className="rounded-full border-red-300 text-red-500 hover:text-red-600"

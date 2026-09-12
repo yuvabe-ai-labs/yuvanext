@@ -162,18 +162,36 @@ const Chatbot = () => {
 
   const [isNavigating, setIsNavigating] = useState(false);
   // Fixed handler to avoid flickering and infinite loops
-  const handleExploreDashboard = async () => {
+  // The refetch can resolve without data (cache miss, transient error), and the
+  // role never changes during onboarding anyway — so fall back to the role the
+  // page already holds rather than silently defaulting to the candidate pages.
+  const resolveRole = async () => {
     const { data: updatedProfile } = await refetchProfile();
-    if (updatedProfile?.role === "unit") {
+    return updatedProfile?.role ?? userRole;
+  };
+
+  const handleExploreDashboard = async () => {
+    const role = await resolveRole();
+    if (role === "unit") {
       navigate("/unit-dashboard");
+    } else if (role === "mentor") {
+      navigate("/mentor-dashboard");
     } else {
       navigate("/dashboard");
     }
   };
 
+  // Each role has its own profile page; sending everyone to /profile landed
+  // mentors on the candidate profile.
   const handleUpdateProfile = async () => {
-    await refetchProfile();
-    navigate("/profile");
+    const role = await resolveRole();
+    if (role === "unit") {
+      navigate("/unit-profile");
+    } else if (role === "mentor") {
+      navigate("/mentor-profile");
+    } else {
+      navigate("/profile");
+    }
   };
 
   const getQuestionType = (message: Message) => {
@@ -354,6 +372,9 @@ const Chatbot = () => {
 
   if (isCompleted) {
     const isUnit = userRole === "unit";
+    // The three summary cards below describe internships, units and skill
+    // courses — candidate concerns. Units and mentors do not see them.
+    const showSummaryCards = !isUnit && userRole !== "mentor";
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-white to-[#FFF6EF] py-10 px-4">
         <img src={logo} alt="logo" className="w-20 mb-6" />
@@ -361,7 +382,7 @@ const Chatbot = () => {
         <p className="text-sm text-gray-500 mb-12">
           Here's your personalized Yuvanext Dashboard!
         </p>
-        {!isUnit && (
+        {showSummaryCards && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="flex flex-col items-center text-center bg-white shadow-lg border border-[#C94100] rounded-[15px] p-6 w-[266px] h-[287px]">
               <div className="w-12 h-12 flex items-center justify-center bg-[#FFF4CE] rounded-lg">

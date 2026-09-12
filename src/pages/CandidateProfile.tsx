@@ -9,14 +9,6 @@ import {
   User,
   CopyCheck,
   Ban,
-  Linkedin,
-  Instagram,
-  Facebook,
-  Twitter,
-  Globe,
-  Youtube,
-  Palette,
-  Dribbble,
   Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -54,6 +46,7 @@ import {
 import ScheduleInterviewDialogUnit from "@/components/InterviewScheduleUnit";
 
 import {
+  type ApplicationHistoryEntry,
   type CandidateInternship,
   type CandidateProject,
   type CandidateCourse,
@@ -63,6 +56,7 @@ import {
 } from "@/types/profiles.types";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { getSocialIcon, getSocialLabel } from "@/lib/social-links";
 
 
 const safeParse = <T,>(data: any, fallback: T): T => {
@@ -72,18 +66,6 @@ const safeParse = <T,>(data: any, fallback: T): T => {
   } catch {
     return fallback;
   }
-};
-
-// 1. Define Social Icons Map (Optimization)
-const SOCIAL_ICONS: Record<string, any> = {
-  linkedin: Linkedin,
-  instagram: Instagram,
-  facebook: Facebook,
-  twitter: Twitter,
-  x: Twitter,
-  youtube: Youtube,
-  dribbble: Dribbble,
-  behance: Palette,
 };
 
 const CandidateProfile = () => {
@@ -125,6 +107,21 @@ const CandidateProfile = () => {
     };
     return statusMap[status] || status;
   };
+
+  // Pill colours for the Application History rows.
+  const HISTORY_STATUS_STYLES: Record<string, string> = {
+    applied: "bg-amber-500 text-white",
+    shortlisted: "bg-emerald-500 text-white",
+    not_shortlisted: "bg-red-500 text-white",
+    interviewed: "bg-blue-500 text-white",
+    hired: "bg-teal-600 text-white",
+  };
+
+  const formatStatus = (status: string) =>
+    status
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
 
   const getStatusBg = (status: string) => {
     switch (status) {
@@ -252,6 +249,13 @@ const CandidateProfile = () => {
     candidate?.internship,
     []
   );
+
+  // Applications this candidate has made, newest first (mentor-side endpoint).
+  const applicationHistory: ApplicationHistoryEntry[] = Array.isArray(
+    data?.applicationHistory
+  )
+    ? data.applicationHistory
+    : [];
   const candidateEducation = safeParse<CandidateEducation[]>(
     candidate?.education,
     []
@@ -262,15 +266,6 @@ const CandidateProfile = () => {
 
   const matchScore = application?.profileScore || 0;
   const dialogContent = pendingStatus ? getDialogContent(pendingStatus) : null;
-
-  // 2. Updated Helper function for social icons
-  const getSocialIcon = (platformStr: string, urlStr: string) => {
-    const textToCheck = `${platformStr || ""} ${urlStr || ""}`.toLowerCase();
-    const matchedKey = Object.keys(SOCIAL_ICONS).find((key) =>
-      textToCheck.includes(key)
-    );
-    return matchedKey ? SOCIAL_ICONS[matchedKey] : Globe;
-  };
 
   const handleGeneratePDF = async () => {
     if (!profileRef.current) return;
@@ -596,6 +591,58 @@ const CandidateProfile = () => {
                   )}
                 </CardContent>
               </Card>
+
+              {/* APPLICATION HISTORY */}
+              <Card className="rounded-3xl">
+                <CardContent className="p-6">
+                  <h3 className="text-2xl font-bold mb-4">
+                    Application History
+                  </h3>
+                  {applicationHistory.length > 0 ? (
+                    <ul>
+                      {applicationHistory.map((entry) => (
+                        <li
+                          key={entry.applicationId}
+                          className="flex items-center gap-4 border-b border-gray-100 py-4 last:border-b-0 last:pb-0 first:pt-0"
+                        >
+                          <Avatar className="h-12 w-12 shrink-0">
+                            <AvatarImage
+                              src={entry.unitLogoUrl ?? undefined}
+                              alt={entry.unitName ?? "Unit"}
+                              className="object-cover"
+                            />
+                            <AvatarFallback className="bg-gray-900 font-semibold text-white">
+                              {entry.unitName?.charAt(0).toUpperCase() || "U"}
+                            </AvatarFallback>
+                          </Avatar>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-bold text-gray-900">
+                              {entry.unitName || "Unknown unit"}
+                            </p>
+                            <p className="truncate text-sm text-muted-foreground">
+                              {entry.internshipTitle || "Role not specified"}
+                            </p>
+                          </div>
+
+                          <span
+                            className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-medium ${
+                              HISTORY_STATUS_STYLES[entry.status] ??
+                              "bg-gray-200 text-gray-700"
+                            }`}
+                          >
+                            {formatStatus(entry.status)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-base text-muted-foreground">
+                      No applications yet
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
             </div>
 
             {/* Right Column */}
@@ -813,38 +860,37 @@ const CandidateProfile = () => {
               {/* Links */}
               <Card className="rounded-3xl">
                 <CardContent className="p-6">
-                  <h3 className="text-2xl font-bold mb-4">Links</h3>
-                  <div className="flex flex-wrap gap-3 items-center">
-                    {links.length > 0 ? (
-                      links.map((link, idx) => {
+                  <h3 className="text-2xl font-bold mb-6">Links</h3>
+                  {links.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
+                      {links.map((link, idx) => {
                         const platform = link.platform || "";
                         const url = link.url || "";
                         const Icon = getSocialIcon(platform, url);
+                        const label = getSocialLabel(platform, url);
 
                         return (
-                          <Button
+                          <a
                             key={idx}
-                            variant="outline"
-                            size="icon"
-                            className="rounded-full"
-                            asChild
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={url}
+                            className="flex min-w-0 items-center gap-2.5 text-gray-900 hover:text-primary"
                           >
-                            <a
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <Icon className="w-4 h-4" />
-                            </a>
-                          </Button>
+                            <Icon className="h-4 w-4 shrink-0" />
+                            <span className="truncate text-base font-semibold">
+                              {label}
+                            </span>
+                          </a>
                         );
-                      })
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No links provided
-                      </p>
-                    )}
-                  </div>
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No links provided
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </div>

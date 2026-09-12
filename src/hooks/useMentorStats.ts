@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { MentorStats } from "@/types/mentor.types";
-import { getMentorStats } from "@/services/mentor.service";
+import { getMentorStats, getMenteeGrowth } from "@/services/mentor.service";
 
 /**
  * Fetches all four dashboard stat tiles in a single request:
@@ -20,4 +20,15 @@ export const useMentorStats = () => {
     isLoading,
     isError,
   };
+};
+/**
+ * Monthly count of mentees who joined, for the dashboard performance chart.
+ * The API returns a dense series (months with no joins come back as 0).
+ */
+export const useMenteeGrowth = (months: number) => {
+  return useQuery({
+    queryKey: ["mentor-mentee-growth", months],
+    queryFn: () => getMenteeGrowth(months),
+    placeholderData: (previousData) => previousData,
+  });
 };

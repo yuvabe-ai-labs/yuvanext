@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { UnitIcon } from "@/components/ui/custom-icons";
 import {
   Dialog,
   DialogContent,
@@ -68,6 +69,19 @@ const isSameDay = (a: Date, b: Date) =>
 const toDayKey = (date: Date) => format(date, "yyyy-MM-dd");
 
 const meetingDate = (meeting: Meeting) => new Date(meeting.scheduledAt);
+
+/** Midnight today — meetings before this belong to a day that has completed. */
+const startOfToday = () => {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return start;
+};
+
+/** A meeting stays "upcoming" for the whole of its scheduled day. */
+const isUpcomingMeeting = (meeting: Meeting, dayStart: number) => {
+  const at = meetingDate(meeting).getTime();
+  return !Number.isNaN(at) && at >= dayStart;
+};
 
 const formatMeetingDateLabel = (date: Date) => {
   const today = new Date();
@@ -146,9 +160,14 @@ const ScheduledMeetings = () => {
   const meetingsForBottomSection = useMemo(() => {
     let items = scheduledMeetings;
     if (selectedDayKey) {
+      // Browsing a specific day card — show that day as picked, past or future.
       items = items.filter((meeting) => {
         return toDayKey(meetingDate(meeting)) === selectedDayKey;
       });
+    } else {
+      // Default list is "Upcoming": drop meetings whose day has already ended.
+      const dayStart = startOfToday().getTime();
+      items = items.filter((meeting) => isUpcomingMeeting(meeting, dayStart));
     }
     return [...items].sort(
       (a, b) => meetingDate(a).getTime() - meetingDate(b).getTime(),
@@ -389,8 +408,11 @@ const ScheduledMeetings = () => {
                 const date = meetingDate(meeting);
 
                 return (
-                  <Card key={meeting.id} className="rounded-3xl border">
-                    <CardContent className="p-6 space-y-4">
+                  <Card key={meeting.id} className="flex h-full flex-col rounded-3xl border">
+                    {/* gap-4, not space-y-4: space-y sets margin-top on every
+                        child with higher specificity than mt-auto, which would
+                        stop the button row being pushed to the bottom. */}
+                    <CardContent className="flex flex-1 flex-col gap-4 p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
                           <Avatar className="w-12 h-12">
@@ -405,8 +427,11 @@ const ScheduledMeetings = () => {
                             <h3 className="text-xl font-semibold text-[#111827]">
                               {candidateName}
                             </h3>
-                            <p className="text-sm text-muted-foreground">
-                              {meeting.candidate?.email || "YuvaNext"}
+                            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                              <UnitIcon className="shrink-0 text-gray-500" />
+                              <span className="truncate">
+                                {meeting.unitName || "YuvaNext"}
+                              </span>
                             </p>
                           </div>
                         </div>
@@ -417,7 +442,7 @@ const ScheduledMeetings = () => {
                         </span>
                       </div>
 
-                      <p className="text-sm text-muted-foreground leading-7">
+                      <p className="line-clamp-3 text-sm text-muted-foreground leading-7">
                         {summary}
                       </p>
 
@@ -437,7 +462,7 @@ const ScheduledMeetings = () => {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="mt-auto grid grid-cols-2 gap-3 pt-1">
                         <Button
                           variant="outline"
                           className="rounded-full border-red-300 text-red-500 hover:text-red-600"

@@ -162,11 +162,19 @@ const Chatbot = () => {
 
   const [isNavigating, setIsNavigating] = useState(false);
   // Fixed handler to avoid flickering and infinite loops
-  const handleExploreDashboard = async () => {
+  // The refetch can resolve without data (cache miss, transient error), and the
+  // role never changes during onboarding anyway — so fall back to the role the
+  // page already holds rather than silently defaulting to the candidate pages.
+  const resolveRole = async () => {
     const { data: updatedProfile } = await refetchProfile();
-    if (updatedProfile?.role === "unit") {
+    return updatedProfile?.role ?? userRole;
+  };
+
+  const handleExploreDashboard = async () => {
+    const role = await resolveRole();
+    if (role === "unit") {
       navigate("/unit-dashboard");
-    } else if (updatedProfile?.role === "mentor") {
+    } else if (role === "mentor") {
       navigate("/mentor-dashboard");
     } else {
       navigate("/dashboard");
@@ -176,10 +184,10 @@ const Chatbot = () => {
   // Each role has its own profile page; sending everyone to /profile landed
   // mentors on the candidate profile.
   const handleUpdateProfile = async () => {
-    const { data: updatedProfile } = await refetchProfile();
-    if (updatedProfile?.role === "unit") {
+    const role = await resolveRole();
+    if (role === "unit") {
       navigate("/unit-profile");
-    } else if (updatedProfile?.role === "mentor") {
+    } else if (role === "mentor") {
       navigate("/mentor-profile");
     } else {
       navigate("/profile");

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdateMentorProfile } from "@/hooks/useMentorProfile";
 import { X, Plus, Trash2 } from "lucide-react";
+import { parseTimeWindows } from "@/lib/mentor-availability";
 
 // --- NEW 0. Name & Mentor Type Dialog ---
 export const MentorBasicInfoDialog = ({ session, profileData, children }: { session: any, profileData: any, children: React.ReactNode }) => {
@@ -173,15 +174,9 @@ export const MentorSettingsDialog = ({ profileData, children }: { profileData: a
       setModes(profileData?.communicationModes || []);
       setDays(profileData?.availabilityDays || []);
       
-      // Parse windows correctly
-      let initialWindows = [];
-      const rawWindows = profileData?.availabilityTimeWindows;
-      if (Array.isArray(rawWindows)) {
-        initialWindows = rawWindows;
-      } else if (typeof rawWindows === "string" && rawWindows.trim().startsWith("[")) {
-        try { initialWindows = JSON.parse(rawWindows); } catch(e) {}
-      }
-      setWindows(initialWindows);
+      // Handles arrays, JSON strings and legacy free text ("9 AM - 12 PM"),
+      // so opening the dialog never silently blanks an existing window.
+      setWindows(parseTimeWindows(profileData?.availabilityTimeWindows));
     }
   }, [open, profileData]);
 

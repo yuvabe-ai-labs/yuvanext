@@ -11,6 +11,7 @@ import { formatDistanceToNow } from "date-fns";
 
 // Custom Hooks & Dialogs
 import { useMentorProfile } from "@/hooks/useMentorProfile";
+import { parseTimeWindows } from "@/lib/mentor-availability";
 import { useMentorAvatarOperations } from "@/hooks/useMentorAvatar";
 import {useMentorBannerOperations} from "@/hooks/useMentorBannerOperatons";
 import { 
@@ -46,19 +47,18 @@ const MentorProfile = () => {
   const availabilityDays = mentorData?.availabilityDays ?? [];
   const communicationModes = mentorData?.communicationModes ?? [];
 
+  // Shared with the edit dialog so the card and the dialog can never disagree
+  // about what is stored. A free-text window that cannot be parsed is still
+  // shown verbatim rather than dropped.
   const rawWindows = mentorData?.availabilityTimeWindows as any;
-  let availabilityTimeWindows: any[] = [];
-  let legacyTimeStr = "";
-
-  if (Array.isArray(rawWindows)) {
-    availabilityTimeWindows = rawWindows;
-  } else if (typeof rawWindows === "string") {
-    if (rawWindows.trim().startsWith("[")) {
-      try { availabilityTimeWindows = JSON.parse(rawWindows); } catch(e) {}
-    } else {
-      legacyTimeStr = rawWindows;
-    }
-  }
+  const availabilityTimeWindows = parseTimeWindows(rawWindows);
+  const legacyTimeStr =
+    availabilityTimeWindows.length === 0 &&
+    typeof rawWindows === "string" &&
+    rawWindows.trim() &&
+    !rawWindows.trim().startsWith("[")
+      ? rawWindows
+      : "";
 
   if (isMentorLoading || isBaseLoading) {
     return (

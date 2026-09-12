@@ -11,6 +11,7 @@ import { formatDistanceToNow } from "date-fns";
 
 // Custom Hooks & Dialogs
 import { useMentorProfile } from "@/hooks/useMentorProfile";
+import { parseTimeWindows } from "@/lib/mentor-availability";
 import { useMentorAvatarOperations } from "@/hooks/useMentorAvatar";
 import {useMentorBannerOperations} from "@/hooks/useMentorBannerOperatons";
 import { 
@@ -46,19 +47,18 @@ const MentorProfile = () => {
   const availabilityDays = mentorData?.availabilityDays ?? [];
   const communicationModes = mentorData?.communicationModes ?? [];
 
+  // Shared with the edit dialog so the card and the dialog can never disagree
+  // about what is stored. A free-text window that cannot be parsed is still
+  // shown verbatim rather than dropped.
   const rawWindows = mentorData?.availabilityTimeWindows as any;
-  let availabilityTimeWindows: any[] = [];
-  let legacyTimeStr = "";
-
-  if (Array.isArray(rawWindows)) {
-    availabilityTimeWindows = rawWindows;
-  } else if (typeof rawWindows === "string") {
-    if (rawWindows.trim().startsWith("[")) {
-      try { availabilityTimeWindows = JSON.parse(rawWindows); } catch(e) {}
-    } else {
-      legacyTimeStr = rawWindows;
-    }
-  }
+  const availabilityTimeWindows = parseTimeWindows(rawWindows);
+  const legacyTimeStr =
+    availabilityTimeWindows.length === 0 &&
+    typeof rawWindows === "string" &&
+    rawWindows.trim() &&
+    !rawWindows.trim().startsWith("[")
+      ? rawWindows
+      : "";
 
   if (isMentorLoading || isBaseLoading) {
     return (
@@ -108,7 +108,7 @@ const MentorProfile = () => {
                 <Avatar className="h-24 w-24 border-4 border-white shadow-sm">
                   <AvatarImage src={baseProfile?.avatarUrl || ""} className="object-cover" />
                   <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
-                    {session?.user?.name?.charAt(0).toUpperCase() || "M"}
+                    {(baseProfile?.name || session?.user?.name)?.charAt(0).toUpperCase() || "M"}
                   </AvatarFallback>
                 </Avatar>
                 <button
@@ -122,7 +122,7 @@ const MentorProfile = () => {
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <h1 className="text-3xl font-bold text-gray-900">
-                    {session?.user?.name || baseProfile?.name || "Mentor Name"}
+                    {baseProfile?.name || session?.user?.name || "Mentor Name"}
                   </h1>
                   <MentorBasicInfoDialog session={session} profileData={mentorData}>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full text-gray-400 hover:text-primary hover:bg-blue-50">
@@ -137,7 +137,7 @@ const MentorProfile = () => {
                 </p>
                 <div className="flex items-center gap-2 text-sm text-gray-600 font-medium">
                   <Mail className="w-4 h-4" />
-                  <span>{session?.user?.email}</span>
+                  <span>{baseProfile?.email || session?.user?.email}</span>
                 </div>
                 <p className="text-muted-foreground text-xs text-gray-400 mt-3">
                   {`Last updated - ${mentorData?.updatedAt ? formatDistanceToNow(new Date(mentorData.updatedAt), { addSuffix: true }) : "recently"}`}
@@ -273,7 +273,7 @@ const MentorProfile = () => {
         onClose={() => setIsAvatarDialogOpen(false)}
         currentImageUrl={baseProfile?.avatarUrl}
         userId={mentorData?.userId}
-        userName={session?.user?.name || "Mentor"}
+        userName={baseProfile?.name || session?.user?.name || "Mentor"}
         imageType="avatar"
         entityType="mentor" 
         onSuccess={() => refetchBase()} // Refetch base profile on success
@@ -288,7 +288,7 @@ const MentorProfile = () => {
         onClose={() => setIsBannerDialogOpen(false)}
         currentImageUrl={baseProfile?.bannerUrl}
         userId={mentorData?.userId}
-        userName={session?.user?.name || "Mentor"}
+        userName={baseProfile?.name || session?.user?.name || "Mentor"}
         imageType="banner"
         entityType="mentor" 
         onSuccess={() => refetchBase()} // Refetch base profile on success

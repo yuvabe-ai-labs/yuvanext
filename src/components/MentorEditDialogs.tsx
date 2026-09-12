@@ -7,25 +7,26 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdateMentorProfile } from "@/hooks/useMentorProfile";
 import { X, Plus, Trash2 } from "lucide-react";
+import { parseTimeWindows } from "@/lib/mentor-availability";
 
 // --- NEW 0. Name & Mentor Type Dialog ---
 export const MentorBasicInfoDialog = ({ session, profileData, children }: { session: any, profileData: any, children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState(session?.user?.name || "");
+  const [name, setName] = useState(profileData?.name || session?.user?.name || "");
   const [mentorType, setMentorType] = useState(profileData?.mentorType || "general");
   const { mutateAsync: updateProfile, isPending } = useUpdateMentorProfile();
 
   useEffect(() => {
     if (open) {
-      setName(session?.user?.name || "");
+      setName(profileData?.name || session?.user?.name || "");
       setMentorType(profileData?.mentorType || "general");
     }
   }, [open, session, profileData]);
 
   const handleSave = async () => {
-    // Note: If 'name' belongs to the 'users' table, you might need to call a separate hook 
-    // to update the auth user. Here we're sending it via the same hook just in case your backend handles both.
-    await updateProfile({ name, mentorType }); 
+    // The API splits this payload: name goes to the user table, mentorType to
+    // the mentors table.
+    await updateProfile({ name, mentorType });
     setOpen(false);
   };
 
@@ -152,7 +153,9 @@ export const MentorExpertiseDialog = ({ currentAreas, children }: { currentAreas
 
 // --- 3. Capacity & Comms Dialog ---
 const ALL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const ALL_MODES = ["In-Person Meeting", "Virtual Video Calls"]; 
+// Canonical spellings — must match the chatbot's Q7 options exactly, or the
+// same choice gets stored twice under different casing.
+const ALL_MODES = ["In-person Meetings", "Virtual Video Calls"];
 
 export const MentorSettingsDialog = ({ profileData, children }: { profileData: any, children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
@@ -171,15 +174,9 @@ export const MentorSettingsDialog = ({ profileData, children }: { profileData: a
       setModes(profileData?.communicationModes || []);
       setDays(profileData?.availabilityDays || []);
       
-      // Parse windows correctly
-      let initialWindows = [];
-      const rawWindows = profileData?.availabilityTimeWindows;
-      if (Array.isArray(rawWindows)) {
-        initialWindows = rawWindows;
-      } else if (typeof rawWindows === "string" && rawWindows.trim().startsWith("[")) {
-        try { initialWindows = JSON.parse(rawWindows); } catch(e) {}
-      }
-      setWindows(initialWindows);
+      // Handles arrays, JSON strings and legacy free text ("9 AM - 12 PM"),
+      // so opening the dialog never silently blanks an existing window.
+      setWindows(parseTimeWindows(profileData?.availabilityTimeWindows));
     }
   }, [open, profileData]);
 

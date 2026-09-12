@@ -10,7 +10,9 @@ export const useMentorBannerOperations = () => {
     mutationFn: uploadBanner,
     onSuccess: () => {
       toast({ title: "Success", description: "Banner image updated!" });
-      queryClient.invalidateQueries({ queryKey: ["mentor-profile-data"] }); 
+      queryClient.invalidateQueries({ queryKey: ["mentor-profile-data"] });
+      // The navbar avatar reads the ["profile"] query, so refresh it too.
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
     },
     onError: () =>
       toast({ title: "Error", description: "Failed to upload banner", variant: "destructive" }),
@@ -21,6 +23,7 @@ export const useMentorBannerOperations = () => {
     onSuccess: () => {
       toast({ title: "Success", description: "Banner image removed" });
       queryClient.invalidateQueries({ queryKey: ["mentor-profile-data"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
     },
     onError: () =>
       toast({ title: "Error", description: "Failed to delete banner", variant: "destructive" }),

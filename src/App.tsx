@@ -11,7 +11,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { useSession } from "@/lib/auth-client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { NuqsAdapter } from "nuqs/adapters/react-router";
 import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
@@ -63,9 +63,20 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Whether onboarding was already complete when this page mounted. Completing
+  // it *during* the session must not eject the user from /chatbot: the
+  // "You're All Set!" screen lives there, and its buttons navigate on their
+  // own. Without this, the profile refetch behind those buttons flipped the
+  // flag and this effect redirected to the dashboard, overriding them.
+  const wasCompleteOnMount = useRef<boolean | null>(null);
+
   useEffect(() => {
     // Wait for auth and profile to load
     if (isAuthPending || isProfileLoading || !session || !profile) return;
+
+    if (wasCompleteOnMount.current === null) {
+      wasCompleteOnMount.current = profile.onboardingCompleted === true;
+    }
 
     const currentPath = location.pathname;
     const isOnChatbot = currentPath === "/chatbot";
@@ -73,7 +84,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     // Check onboarding status
     if (profile.onboardingCompleted === true) {
       // Onboarding completed - redirect away from chatbot to dashboard
-      if (isOnChatbot) {
+      if (isOnChatbot && wasCompleteOnMount.current) {
         // Redirect based on role
         if (profile.role === "candidate") {
           navigate("/dashboard", { replace: true });

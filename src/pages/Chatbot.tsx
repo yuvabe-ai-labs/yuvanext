@@ -170,28 +170,35 @@ const Chatbot = () => {
     return updatedProfile?.role ?? userRole;
   };
 
+  // Each role has its own dashboard and profile page; sending everyone to
+  // /dashboard and /profile landed mentors on the candidate pages.
+  const dashboardFor = (role: string) =>
+    role === "unit"
+      ? "/unit-dashboard"
+      : role === "mentor"
+        ? "/mentor-dashboard"
+        : "/dashboard";
+
+  const profileFor = (role: string) =>
+    role === "unit"
+      ? "/unit-profile"
+      : role === "mentor"
+        ? "/mentor-profile"
+        : "/profile";
+
+  // Onboarding is finished, so it must not stay on the history stack — going
+  // back from here should reach the dashboard, never the chatbot again.
   const handleExploreDashboard = async () => {
     const role = await resolveRole();
-    if (role === "unit") {
-      navigate("/unit-dashboard");
-    } else if (role === "mentor") {
-      navigate("/mentor-dashboard");
-    } else {
-      navigate("/dashboard");
-    }
+    navigate(dashboardFor(role), { replace: true });
   };
 
-  // Each role has its own profile page; sending everyone to /profile landed
-  // mentors on the candidate profile.
   const handleUpdateProfile = async () => {
     const role = await resolveRole();
-    if (role === "unit") {
-      navigate("/unit-profile");
-    } else if (role === "mentor") {
-      navigate("/mentor-profile");
-    } else {
-      navigate("/profile");
-    }
+    // Replace /chatbot with the dashboard, then push the profile on top, so
+    // Back from the profile lands on the dashboard rather than onboarding.
+    navigate(dashboardFor(role), { replace: true });
+    navigate(profileFor(role));
   };
 
   const getQuestionType = (message: Message) => {

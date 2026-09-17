@@ -496,7 +496,7 @@ const UnitDashboard = () => {
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs sm:text-sm font-medium">interviewed</p>
+                  <p className="text-xs sm:text-sm font-medium">Interview Scheduled</p>
                   {dashboardLoading ? (
                     <Skeleton className="h-8 sm:h-10 w-12 sm:w-16 my-1" />
                   ) : (

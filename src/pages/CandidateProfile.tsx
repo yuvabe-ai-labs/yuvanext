@@ -77,7 +77,10 @@ const CandidateProfile = () => {
   const { data: profileData, isLoading: profileLoading } = useProfile();
   const profile = profileData;
   const userRole = profile?.role || null;
-  const { data, isLoading, error, refetch } = useCandidateProfile(id || "");
+  const { data, isLoading, error, refetch } = useCandidateProfile(
+    id || "",
+    userRole,
+  );
   const updateStatusMutation = useUpdateApplicationStatus();
 
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
@@ -199,7 +202,7 @@ const CandidateProfile = () => {
   };
 
   // --- Loading State ---
-  if (isLoading) {
+  if (isLoading || profileLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -592,7 +595,8 @@ const CandidateProfile = () => {
                 </CardContent>
               </Card>
 
-              {/* APPLICATION HISTORY */}
+              {/* APPLICATION HISTORY (only the mentor endpoint returns it) */}
+              {userRole === UserRole.Mentor && (
               <Card className="rounded-3xl">
                 <CardContent className="p-6">
                   <h3 className="text-2xl font-bold mb-4">
@@ -643,6 +647,7 @@ const CandidateProfile = () => {
                   )}
                 </CardContent>
               </Card>
+              )}
             </div>
 
             {/* Right Column */}

@@ -6,11 +6,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { UpdateApplicationStatusPayload } from "@/types/profiles.types";
 
-export const useCandidateProfile = (candidateId: string) => {
+/**
+ * @param id  Candidate user ID for mentors, application ID for units/admins.
+ * @param role  Viewer's role; the query waits until it is known.
+ */
+export const useCandidateProfile = (id: string, role: string | null) => {
   return useQuery({
-    queryKey: ["candidateProfile", candidateId],
-    queryFn: () => getCandidateProfile(candidateId),
-    enabled: !!candidateId,
+    queryKey: ["candidateProfile", role, id],
+    queryFn: () => getCandidateProfile(id, role as string),
+    enabled: !!id && !!role,
     retry: 1,
   });
 };

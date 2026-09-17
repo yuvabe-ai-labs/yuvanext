@@ -36,13 +36,18 @@ export const updateUnitProfile = async (
   }
 };
 
-// Get Candidate Profile by Application ID
+// Get Candidate Profile.
+// Mentors open a profile by the candidate's user ID; units (and admins) open it
+// from an application, so the ID is an application ID.
 export const getCandidateProfile = async (
-  candidateId: string,
+  id: string,
+  role: string,
 ): Promise<CandidateProfileData> => {
   try {
     const response = await axiosInstance.get(
-      `/mentor/candidates/${candidateId}`,
+      role === "mentor"
+        ? `/mentor/candidates/${id}`
+        : `/unit/applications/${id}`,
     );
     return handleApiResponse<CandidateProfileData>(
       response,

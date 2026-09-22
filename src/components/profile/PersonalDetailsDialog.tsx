@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -32,9 +32,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { X } from "lucide-react";
 import { Profile, Language, Gender, MaritalStatus, UpdateProfilePayload } from "@/types/profiles.types";
-import { useUpdateProfile, useProfile } from "@/hooks/useProfile";
+import { useUpdateProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { personalDetailsSchema } from "@/lib/schemas";
+import { cn } from "@/lib/utils";
 
 type PersonalDetailsForm = z.infer<typeof personalDetailsSchema>;
 
@@ -64,7 +65,6 @@ export const PersonalDetailsDialog = ({
 }: PersonalDetailsDialogProps) => {
   const [open, setOpen] = useState(false);
   const { mutateAsync: updateProfileMutation, isPending } = useUpdateProfile();
-  const { refetch } = useProfile();
   const { toast } = useToast();
 
   const form = useForm<PersonalDetailsForm>({
@@ -86,33 +86,34 @@ export const PersonalDetailsDialog = ({
     },
   });
 
-  useEffect(() => {
-    if (open && profile) {
+  // Populate the form before the dialog renders, so it doesn't open empty and then re-render
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen && profile) {
       const nameParts = profile.name?.split(" ") ?? [""];
       const dateOfBirthObj = profile.dateOfBirth ? new Date(profile.dateOfBirth) : null;
-      
+
       form.reset({
         first_name: nameParts[0] || "",
         last_name: nameParts.slice(1).join(" ") || "",
         email: profile.email ?? "",
         phone: profile.phone ?? "",
-        location: profile.location ?? "",
-        gender: profile.gender as Gender,
-        marital_status: profile.maritalStatus as MaritalStatus,
+        location: profile.location?.toLowerCase() ?? "",
+        gender: (profile.gender as Gender) ?? undefined,
+        marital_status: (profile.maritalStatus as MaritalStatus) ?? undefined,
         birth_date: dateOfBirthObj ? String(dateOfBirthObj.getDate()) : "",
         birth_month: dateOfBirthObj ? String(dateOfBirthObj.getMonth() + 1) : "",
         birth_year: dateOfBirthObj ? String(dateOfBirthObj.getFullYear()) : "",
         is_differently_abled: profile.isDifferentlyAbled ?? false,
         has_career_break: profile.hasCareerBreak ?? false,
-        language: (profile.language ?? []).map(l => ({
-          name: l.name,
-          read: !!l.read,
-          write: !!l.write,
-          speak: !!l.speak,
-        })),
+        language: (profile.language ?? []).map((l) =>
+          typeof l === "string"
+            ? { name: l, read: false, write: false, speak: false }
+            : { name: l.name ?? "", read: !!l.read, write: !!l.write, speak: !!l.speak },
+        ),
       });
     }
-  }, [open, profile, form]);
+    setOpen(nextOpen);
+  };
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -122,8 +123,8 @@ export const PersonalDetailsDialog = ({
   const onSubmit = async (data: PersonalDetailsForm) => {
     try {
       const fullName = `${data.first_name} ${data.last_name || ""}`.trim();
-      let dateOfBirth: string | null = null;
-      
+      let dateOfBirth: string | undefined;
+
       if (data.birth_date && data.birth_month && data.birth_year) {
         const date = new Date(
           parseInt(data.birth_year),
@@ -133,30 +134,34 @@ export const PersonalDetailsDialog = ({
         dateOfBirth = date.toISOString();
       }
 
+      // The API rejects null for these fields, so send undefined (omitted) instead
       const payload: UpdateProfilePayload = {
         name: fullName,
-        phone: data.phone || null,
-        location: data.location || null,
+        phone: data.phone || undefined,
+        location: data.location || undefined,
         gender: data.gender,
         maritalStatus: data.marital_status,
-        dateOfBirth: dateOfBirth,
+        dateOfBirth,
         isDifferentlyAbled: data.is_differently_abled,
         hasCareerBreak: data.has_career_break,
         language: data.language as Language[],
       };
 
       await updateProfileMutation(payload);
-      await refetch();
       onUpdate();
       setOpen(false);
       toast({ title: "Success", description: "Personal details updated successfully" });
     } catch (error) {
-      toast({ title: "Error", description: "Failed to update", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update",
+        variant: "destructive",
+      });
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-[700px] h-[90vh] overflow-hidden flex flex-col rounded-3xl p-0">
         <DialogHeader className="p-6 pb-2">
@@ -268,7 +273,12 @@ export const PersonalDetailsDialog = ({
                             />
                             <Label
                               htmlFor={`gender-${item.value}`}
-                              className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
+                              className={cn(
+                                "px-4 py-2 rounded-full border cursor-pointer text-sm transition-colors",
+                                field.value === item.value
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-white text-foreground border-input",
+                              )}
                             >
                               {item.label}
                             </Label>
@@ -301,7 +311,12 @@ export const PersonalDetailsDialog = ({
                             />
                             <Label
                               htmlFor={`marital-${status.value}`}
-                              className="px-4 py-2 rounded-full border cursor-pointer peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground text-sm transition-colors"
+                              className={cn(
+                                "px-4 py-2 rounded-full border cursor-pointer text-sm transition-colors",
+                                field.value === status.value
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-white text-foreground border-input",
+                              )}
                             >
                               {status.label}
                             </Label>

@@ -390,7 +390,7 @@ const EditInternshipDialog: React.FC<EditInternshipDialogProps> = ({
       <DialogContent className="max-w-3xl max-h-[90vh] p-0">
         <DialogHeader className="px-6 py-3">
           <DialogTitle className="text-xl font-semibold">
-            Edit Job Description
+            Edit Internship Description
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground mt-1">
             Update the information about this Job/Internship

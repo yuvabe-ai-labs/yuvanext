@@ -354,7 +354,7 @@ const UnitDashboard = () => {
         );
       } catch (err: unknown) {
         console.error("Error activating job:", err);
-        alert("Failed to activate job description");
+        alert("Failed to activate internship description");
         setActivatingInternship(null);
         setEditingInternship(null);
       }
@@ -470,7 +470,7 @@ const UnitDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs sm:text-sm font-medium">
-                    Total Job Descriptions
+                    Total Internship Descriptions
                   </p>
                   {dashboardLoading ? (
                     <Skeleton className="h-8 sm:h-10 w-12 sm:w-16 my-1" />
@@ -557,7 +557,7 @@ const UnitDashboard = () => {
             <TabsList className="grid w-full min-w-max sm:min-w-0 grid-cols-4 bg-gray-100/70 backdrop-blur-sm rounded-3xl shadow-inner border border-gray-200 h-12 sm:h-16">
               {[
                 "applications",
-                "job-descriptions",
+                "internship-descriptions",
                 "candidates",
                 "reports",
               ].map((tab) => (
@@ -764,15 +764,15 @@ const UnitDashboard = () => {
             )}
           </TabsContent>
 
-          {/* TAB 2: JOB DESCRIPTIONS */}
+          {/* TAB 2: INTERNSHIP DESCRIPTIONS */}
           <TabsContent
-            value="job-descriptions"
+            value="internship-descriptions"
             className="px-0 sm:px-4 lg:px-10 py-2"
           >
-            {/* ... (Job descriptions content unchanged) ... */}
+            {/* ... (Internship descriptions content unchanged) ... */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <h2 className="text-xl sm:text-2xl font-semibold">
-                Job Descriptions
+                Internship Descriptions
               </h2>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <Select value={jobFilter} onValueChange={setJobFilter}>
@@ -789,7 +789,7 @@ const UnitDashboard = () => {
                   className="bg-teal-600 hover:bg-teal-700 rounded-full w-full sm:w-auto"
                   onClick={() => setShowCreateDialog(true)}
                 >
-                  <Plus className="w-4 h-4 mr-2" /> Create New JD
+                  <Plus className="w-4 h-4 mr-2" /> Create New Internship Description
                 </Button>
               </div>
             </div>
@@ -809,10 +809,10 @@ const UnitDashboard = () => {
               <div className="text-center py-12">
                 <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                 <h3 className="text-lg font-medium mb-2">
-                  No Job Descriptions
+                  No Internship Descriptions
                 </h3>
                 <p className="text-muted-foreground text-sm px-4">
-                  Create your first job posting to start receiving applications.
+                  Create your first internship posting to start receiving applications.
                 </p>
               </div>
             ) : (
@@ -863,7 +863,7 @@ const UnitDashboard = () => {
                               <DropdownMenuItem
                                 onClick={() => handleAddComments(internship.id)}
                               >
-                                <Pencil className="w-4 h-4 mr-2" /> Edit JD
+                                <Pencil className="w-4 h-4 mr-2" /> Edit Internship Description
                               </DropdownMenuItem>
                               {internship.status !== "active" ? (
                                 <DropdownMenuItem
@@ -871,7 +871,7 @@ const UnitDashboard = () => {
                                 >
                                   <span className="flex items-center text-green-500">
                                     <CheckCircle className="w-4 h-4 mr-2" />{" "}
-                                    Activate JD
+                                    Activate Internship Description
                                   </span>
                                 </DropdownMenuItem>
                               ) : (
@@ -880,7 +880,7 @@ const UnitDashboard = () => {
                                 >
                                   <span className="flex items-center text-red-500">
                                     <XCircle className="w-4 h-4 mr-2" /> Close
-                                    JD
+                                    Internship Description
                                   </span>
                                 </DropdownMenuItem>
                               )}
@@ -888,7 +888,7 @@ const UnitDashboard = () => {
                                 onClick={() => handleDeleteClick(internship)}
                                 className="text-red-600 focus:text-red-600"
                               >
-                                <Trash2 className="w-4 h-4 mr-2" /> Delete JD
+                                <Trash2 className="w-4 h-4 mr-2" /> Delete Internship Description
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

@@ -16,6 +16,9 @@ export default function ApplicationStatusCard({
   const formatted = formatDistanceToNow(new Date(date), { addSuffix: true });
 
   const MAIN_FLOW = ["applied", "shortlisted", "interviewed", "hired"];
+  const STEP_LABELS: Record<string, string> = {
+    interviewed: "Interview Scheduled",
+  };
   const currentStepIndex = MAIN_FLOW.indexOf(application.status);
 
   const isRejected =
@@ -117,7 +120,7 @@ export default function ApplicationStatusCard({
               <p
                 className={`text-sm mt-2 text-center capitalize ${labelClass}`}
               >
-                {isRejected && isLastStep ? "rejected" : step}
+                {isRejected && isLastStep ? "rejected" : STEP_LABELS[step] ?? step}
               </p>
             </div>
           );

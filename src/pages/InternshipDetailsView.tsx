@@ -99,7 +99,7 @@ const InternshipDetailsView = ({
           </Button>
           <div className="flex gap-2">
             <Button variant="outline" size="sm">
-              Edit JD
+              Edit Internship Description
             </Button>
             <Button
               variant="outline"
@@ -112,7 +112,7 @@ const InternshipDetailsView = ({
           </div>
         </div>
 
-        {/* Job Description Content in Card */}
+        {/* Internship Description Content in Card */}
         <div className="bg-card rounded-lg shadow-sm border p-8">
           {/* Header */}
           <div className="flex justify-between items-start mb-8">

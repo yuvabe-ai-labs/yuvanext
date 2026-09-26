@@ -1,5 +1,10 @@
-import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/components/ui/use-toast";
 import signupIllustrate from "@/assets/signinillustion.png";
@@ -12,6 +17,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SignInFormValues, signInSchema } from "@/lib/authentication";
 import { useQueryClient } from "@tanstack/react-query";
+import GoogleAuthButton from "@/components/GoogleAuthButton";
+import { googleAuthErrorMessage } from "@/lib/google-auth-errors";
 
 const SignIn = () => {
   const { role } = useParams<{ role: string }>(); // "unit", "candidate", or "mentor"
@@ -22,6 +29,26 @@ const SignIn = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [keepLoggedIn, setKeepLoggedIn] = useState(false);
+
+  // A failed Google round-trip comes back here with Better Auth's reason code.
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const message = googleAuthErrorMessage(searchParams.get("error"));
+    if (!message) return;
+
+    toast({
+      title: "Google sign-in failed",
+      description: message,
+      variant: "destructive",
+    });
+
+    // Drop the param so a refresh doesn't show the toast again.
+    const next = new URLSearchParams(searchParams);
+    next.delete("error");
+    next.delete("error_description");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, toast]);
 
   const {
     register,
@@ -304,6 +331,12 @@ const SignIn = () => {
                 {loading ? "Signing in..." : "Sign In"}
               </button>
             </form>
+
+            <GoogleAuthButton
+              role={role || "candidate"}
+              mode="signin"
+              disabled={loading}
+            />
 
             <div className="text-center mt-6">
               <span className="text-[13px]" style={{ color: "#9CA3AF" }}>

@@ -211,7 +211,7 @@ export const useDeleteInternship = () => {
     onSuccess: () => {
       toast({
         title: "Deleted",
-        description: "Job description removed successfully",
+        description: "Internship description removed successfully",
       });
       // Forces the "internships" query to refetch, updating the UI list automatically
       queryClient.invalidateQueries({ queryKey: ["internships"] });

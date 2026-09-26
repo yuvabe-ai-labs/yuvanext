@@ -30,14 +30,14 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
   const { mutate: applyToInternship, isPending: isSubmitting } =
     useApplyToInternship();
 
-  // Checkbox states - first 6 are disabled and checked, last 2 are optional
+  // Checkbox states - first 5 are disabled and checked, last 3 are optional
   const [sections, setSections] = useState({
     personal_details: true,
     profile_summary: true,
-    courses: true,
     skills: true,
     education: true,
     interests: true,
+    courses: false,
     projects: false,
     internship: false,
   });
@@ -145,7 +145,6 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
     return (
       sectionValidation.personal_details &&
       sectionValidation.profile_summary &&
-      sectionValidation.courses &&
       sectionValidation.key_skills &&
       sectionValidation.education &&
       sectionValidation.interests
@@ -212,21 +211,6 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
               </div>
               <div className="flex items-center gap-3">
                 <Checkbox
-                  checked={sections.courses}
-                  disabled
-                  className="data-[state=checked]:bg-gray-400 data-[state=checked]:border-gray-400"
-                />
-                <span className="text-gray-700 font-medium flex w-full justify-between items-center gap-2">
-                  Courses
-                  {!sectionValidation.courses && (
-                    <span title="Please update Courses before sending">
-                      <TriangleAlert className="h-4 w-4 text-red-500" />
-                    </span>
-                  )}
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Checkbox
                   checked={sections.skills}
                   disabled
                   className="data-[state=checked]:bg-gray-400 data-[state=checked]:border-gray-400"
@@ -265,6 +249,25 @@ const ProfileSummaryDialog: React.FC<ProfileSummaryDialogProps> = ({
                   Interests
                   {!sectionValidation.interests && (
                     <span title="Please update Interests before sending">
+                      <TriangleAlert className="h-4 w-4 text-red-500" />
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  checked={sections.courses}
+                  onCheckedChange={(checked) =>
+                    setSections((prev) => ({
+                      ...prev,
+                      courses: checked === true,
+                    }))
+                  }
+                />
+                <span className="text-gray-700 font-medium flex w-full justify-between items-center gap-2">
+                  Courses
+                  {!sectionValidation.courses && (
+                    <span title="Please update Courses before sending">
                       <TriangleAlert className="h-4 w-4 text-red-500" />
                     </span>
                   )}

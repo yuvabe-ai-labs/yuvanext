@@ -1,5 +1,10 @@
-import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/components/ui/use-toast";
 import { CheckCircle, Eye, EyeOff } from "lucide-react";
@@ -10,6 +15,8 @@ import unitIllustration from "@/assets/unit_illstration.png";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SignUpFormValues, signUpSchema } from "@/lib/authentication";
+import GoogleAuthButton from "@/components/GoogleAuthButton";
+import { googleAuthErrorMessage } from "@/lib/google-auth-errors";
 
 const SignUp = () => {
   const { role } = useParams<{ role: string }>(); // "unit", "candidate", or "mentor"
@@ -18,6 +25,26 @@ const SignUp = () => {
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // A failed Google round-trip comes back here with Better Auth's reason code.
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const message = googleAuthErrorMessage(searchParams.get("error"));
+    if (!message) return;
+
+    toast({
+      title: "Google sign-up failed",
+      description: message,
+      variant: "destructive",
+    });
+
+    // Drop the param so a refresh doesn't show the toast again.
+    const next = new URLSearchParams(searchParams);
+    next.delete("error");
+    next.delete("error_description");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, toast]);
 
   // Helper booleans
   const isUnitRole = role === "unit";
@@ -40,6 +67,11 @@ const SignUp = () => {
   });
 
   const passwordValue = watch("password") || "";
+  // Units must name the company before using Google — Google only gives us the
+  // person's account name, which is not the unit's name.
+  const companyNameValue = watch("fullName") || "";
+  const companyWebsiteValue = watch("companyWebsite") || "";
+  const needsCompanyName = isUnitRole && !companyNameValue.trim();
 
   const passwordRules = [
     { test: (p: string) => /[a-z]/.test(p), label: "one lowercase character" },
@@ -256,7 +288,7 @@ const SignUp = () => {
                       fontFamily: "'Neue Haas Grotesk Text Pro', sans-serif",
                     }}
                   >
-                    Company Website
+                    Company Website (optional)
                   </label>
                   <div
                     className={`border rounded-lg h-8 px-4 py-4 flex items-center ${
@@ -387,6 +419,19 @@ const SignUp = () => {
                 {loading ? "Creating account..." : "Sign up"}
               </button>
             </form>
+
+            <GoogleAuthButton
+              role={role || "candidate"}
+              mode="signup"
+              disabled={loading || needsCompanyName}
+              companyName={isUnitRole ? companyNameValue : undefined}
+              companyWebsite={isUnitRole ? companyWebsiteValue : undefined}
+              hint={
+                needsCompanyName
+                  ? "Enter your company name above to continue with Google"
+                  : undefined
+              }
+            />
 
             <div className="text-center mt-6">
               <span

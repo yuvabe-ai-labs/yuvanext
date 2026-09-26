@@ -52,6 +52,7 @@ import MentorDetailsPage from "./pages/MentorDetailsPage";
 import UnitCandidatesPage from "./pages/UnitCandidatePages";
 import ScheduledMeetings from "./pages/ScheduledMeetings";
 import MentorProfile from "./pages/MentorProfile";
+import GoogleComplete from "./pages/GoogleComplete";
 
 const queryClient = new QueryClient();
 
@@ -69,6 +70,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
     const currentPath = location.pathname;
     const isOnChatbot = currentPath === "/chatbot";
+
+    // A social sign-up that never finished role selection has a session but no
+    // profile row. The API's leftJoin reports that as null — strictly null, not
+    // false, and never undefined — so send them back to finish instead of
+    // looping on /chatbot forever.
+    if (profile.onboardingCompleted === null) {
+      if (currentPath !== "/auth/google/complete") {
+        navigate("/auth/google/complete", { replace: true });
+      }
+      return;
+    }
 
     // Check onboarding status
     if (profile.onboardingCompleted === true) {
@@ -137,6 +149,9 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth/:role/signin" element={<SignIn />} />
             <Route path="/auth/:role/signup" element={<SignUp />} />
+            {/* Public on purpose: the user has a session but no profile row
+                yet, so ProtectedRoute must not wrap this. */}
+            <Route path="/auth/google/complete" element={<GoogleComplete />} />
             <Route
               path="/auth/accept-invitation/:id"
               element={<AcceptInvitation />}

@@ -330,7 +330,7 @@ const CreateInternshipDialog: React.FC<CreateInternshipDialogProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <DialogTitle className="text-xl font-semibold">
-                  Create new Job Description
+                  Create new Internship Description
                 </DialogTitle>
                 <DialogDescription className="text-sm text-muted-foreground mt-1">
                   This information is important for candidates to know better

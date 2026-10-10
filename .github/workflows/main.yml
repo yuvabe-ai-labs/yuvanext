@@ -6,6 +6,7 @@ on:
       - development
       - staging
       - main
+      - yuvabe-atr
 
 # --------------------
 # Global environment
@@ -46,6 +47,14 @@ jobs:
             echo "VITE_FRONTEND_URL=${{ secrets.FRONTEND_URL_STG }}" >> $GITHUB_ENV
             echo "S3_BUCKET_NAME=${{ secrets.BUCKET_NAME_STG }}" >> $GITHUB_ENV
             echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.CF_DISTRIBUTION_STG }}" >> $GITHUB_ENV
+
+          elif [ "${{ github.ref }}" == "refs/heads/yuvabe-atr" ]; then
+            # VITE_STAGE_TYPE only accepts development|staging|production (src/env.ts)
+            echo "VITE_STAGE_TYPE=staging" >> $GITHUB_ENV
+            echo "VITE_API_URL=${{ secrets.BACKEND_URL_ATR }}" >> $GITHUB_ENV
+            echo "VITE_FRONTEND_URL=${{ secrets.FRONTEND_URL_ATR }}" >> $GITHUB_ENV
+            echo "S3_BUCKET_NAME=${{ secrets.BUCKET_NAME_ATR }}" >> $GITHUB_ENV
+            echo "CLOUDFRONT_DISTRIBUTION_ID=${{ secrets.CF_DISTRIBUTION_ATR }}" >> $GITHUB_ENV
 
           else
             echo "VITE_STAGE_TYPE=development" >> $GITHUB_ENV

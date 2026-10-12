@@ -58,6 +58,28 @@ export const updateInternship = async (
   }
 };
 
+// Public (no session) endpoints for the job board
+
+export const getPublicInternships = async (): Promise<Internship[]> => {
+  try {
+    const response = await axiosInstance.get("/public/internships");
+    return handleApiResponse<Internship[]>(response, []);
+  } catch (error) {
+    return handleApiError(error, "Failed to fetch internships");
+  }
+};
+
+export const getPublicInternshipById = async (
+  id: string
+): Promise<Internship> => {
+  try {
+    const response = await axiosInstance.get(`/public/internships/${id}`);
+    return handleApiResponse<Internship>(response, {} as Internship);
+  } catch (error) {
+    return handleApiError(error, `Failed to fetch internship ${id}`);
+  }
+};
+
 // Get internship by id
 
 export const getInternshipById = async (id: string): Promise<Internship> => {

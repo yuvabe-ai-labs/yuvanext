@@ -8,7 +8,6 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -19,17 +18,11 @@ import {
   ChevronLeft,
   CalendarIcon,
   Search,
-  Clock,
   Filter,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import InternshipCard from "@/components/InternshipCard";
 import { useInternship } from "@/hooks/useInternships";
-import {
-  differenceInDays,
-  differenceInHours,
-  differenceInMinutes,
-  formatDistanceToNow,
-} from "date-fns";
 
 const Internship = () => {
   const navigate = useNavigate();
@@ -165,18 +158,6 @@ const Internship = () => {
 
     return true;
   });
-
-  const getInternshipGradient = (i: number) => {
-    const g = [
-      "bg-gradient-to-br from-purple-600 to-blue-600",
-      "bg-gradient-to-br from-teal-600 to-green-600",
-      "bg-gradient-to-br from-orange-600 to-red-600",
-      "bg-gradient-to-br from-blue-600 to-cyan-500",
-      "bg-gradient-to-br from-pink-600 to-purple-600",
-      "bg-gradient-to-br from-gray-700 to-gray-900",
-    ];
-    return g[i % g.length];
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -337,78 +318,13 @@ const Internship = () => {
             ) : (
               <>
                 <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                  {filteredInternships.map((internship, index) => {
-                    const gradient = getInternshipGradient(index);
-                    const dateToUse = internship.updatedAt;
-
-                    const getShortTimeAgo = (date: string | Date) => {
-                      const now = new Date();
-                      const past = new Date(date);
-
-                      const days = differenceInDays(now, past);
-                      if (days > 0) return `${days}d`;
-
-                      const hours = differenceInHours(now, past);
-                      if (hours > 0) return `${hours}h`;
-
-                      const minutes = differenceInMinutes(now, past);
-                      if (minutes > 0) return `${minutes}m`;
-
-                      return "just now";
-                    };
-
-                    const timeAgo = getShortTimeAgo(dateToUse);
-
-                    return (
-                      <Card
-                        key={internship.id}
-                        className="px-5 py-4 hover:shadow-lg transition-all cursor-pointer rounded-xl border border-gray-300"
-                        onClick={() =>
-                          navigate(`/internships/${internship.id}`)
-                        }
-                      >
-                        <div className="space-y-2">
-                          <div className="flex items-start justify-between">
-                            <div className="w-8 h-8 bg-foreground rounded-full flex items-center justify-center text-background font-bold">
-                              {internship.createdBy?.avatarUrl ? (
-                                <img
-                                  src={internship.createdBy.avatarUrl}
-                                  alt={internship.createdBy.name}
-                                  className="w-full h-full rounded-full object-cover"
-                                />
-                              ) : (
-                                internship.createdBy?.name?.charAt(0) || "C"
-                              )}
-                            </div>
-                            <Badge className="bg-primary text-primary-foreground">{`Posted ${timeAgo} ago`}</Badge>
-                          </div>
-
-                          {internship.title ? (
-                            <h3 className="text-4 font-semibold text-gray-900 line-clamp-2">
-                              {internship.title.length > 20
-                                ? `${internship.title.slice(0, 21)}...`
-                                : internship.title}
-                            </h3>
-                          ) : (
-                            "Title"
-                          )}
-
-                          <p className="text-sm text-gray-500 line-clamp-3">
-                            {internship.description ||
-                              "No description available"}
-                          </p>
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              <span>
-                                {internship.duration || "Not specified"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
+                  {filteredInternships.map((internship) => (
+                    <InternshipCard
+                      key={internship.id}
+                      internship={internship}
+                      onClick={() => navigate(`/internships/${internship.id}`)}
+                    />
+                  ))}
                 </div>
 
                 {!internshipsLoading && filteredInternships.length === 0 && (

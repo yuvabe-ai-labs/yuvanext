@@ -34,7 +34,7 @@ const InternshipCard = ({ internship, onClick }: InternshipCardProps) => {
 
   return (
     <Card
-      className="px-5 py-4 hover:shadow-lg transition-all cursor-pointer rounded-xl border border-gray-300"
+      className="min-w-0 px-5 py-4 hover:shadow-lg transition-all cursor-pointer rounded-xl border border-gray-300"
       onClick={onClick}
     >
       <div className="space-y-2">
@@ -54,10 +54,12 @@ const InternshipCard = ({ internship, onClick }: InternshipCardProps) => {
         </div>
 
         {internship.title ? (
-          <h3 className="text-4 font-semibold text-gray-900 line-clamp-2">
-            {internship.title.length > 20
-              ? `${internship.title.slice(0, 21)}...`
-              : internship.title}
+          // Single line; the ellipsis appears only when the title overflows the card
+          <h3
+            className="text-4 font-semibold text-gray-900 truncate"
+            title={internship.title}
+          >
+            {internship.title}
           </h3>
         ) : (
           "Title"

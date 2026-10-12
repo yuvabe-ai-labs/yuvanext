@@ -9,6 +9,7 @@ import {
   Navigate,
   useLocation,
   useNavigate,
+  useParams,
 } from "react-router-dom";
 import { useSession } from "@/lib/auth-client";
 import { useEffect } from "react";
@@ -53,6 +54,7 @@ import UnitCandidatesPage from "./pages/UnitCandidatePages";
 import ScheduledMeetings from "./pages/ScheduledMeetings";
 import MentorProfile from "./pages/MentorProfile";
 import GoogleComplete from "./pages/GoogleComplete";
+import { env } from "@/env";
 
 const queryClient = new QueryClient();
 
@@ -125,6 +127,47 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return session ? <>{children}</> : <Navigate to="/" replace />;
 };
 
+// Public job detail from the landing job board. Signed-in users get the
+// regular (protected) internship page instead.
+const PublicJobRoute = () => {
+  const { id } = useParams<{ id: string }>();
+  const { data: session, isPending } = useSession();
+
+  if (isPending) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-muted flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return session ? (
+    <Navigate to={`/internships/${id}`} replace />
+  ) : (
+    <InternshipDetail guest />
+  );
+};
+
+// Public company page from the job board; signed-in users get /units/:id.
+const PublicCompanyRoute = () => {
+  const { id } = useParams<{ id: string }>();
+  const { data: session, isPending } = useSession();
+
+  if (isPending) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-muted flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return session ? (
+    <Navigate to={`/units/${id}`} replace />
+  ) : (
+    <UnitView guest />
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -146,7 +189,12 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route path="/" element={<Landing />} />
+            {env.VITE_PUBLIC_JOB_BOARD && (
+              <>
+                <Route path="/jobs/:id" element={<PublicJobRoute />} />
+                <Route path="/company/:id" element={<PublicCompanyRoute />} />
+              </>
+            )}
             <Route path="/auth/:role/signin" element={<SignIn />} />
             <Route path="/auth/:role/signup" element={<SignUp />} />
             {/* Public on purpose: the user has a session but no profile row

@@ -7,10 +7,11 @@ import {
 } from "@/services/profile.service";
 import { UpdateProfilePayload } from "@/types/profiles.types";
 
-export const useProfile = () => {
+export const useProfile = (enabled = true) => {
   return useQuery({
     queryKey: ["profile"],
     queryFn: getProfile,
+    enabled,
   });
 };
 

@@ -7,7 +7,7 @@ import {
 /**
  * Hook to check if a specific internship is saved
  */
-export const useIsSaved = (internshipId: string) => {
+export const useIsSaved = (internshipId: string, enabled = true) => {
   const {
     data: savedInternships,
     isLoading,
@@ -15,7 +15,7 @@ export const useIsSaved = (internshipId: string) => {
   } = useQuery({
     queryKey: ["savedInternships"],
     queryFn: getSavedInternships,
-    enabled: !!internshipId,
+    enabled: enabled && !!internshipId,
   });
 
   const isSaved =
@@ -32,7 +32,7 @@ export const useIsSaved = (internshipId: string) => {
 /**
  * Hook to check if a specific internship has been applied to
  */
-export const useIsApplied = (internshipId: string) => {
+export const useIsApplied = (internshipId: string, enabled = true) => {
   const {
     data: appliedInternships,
     isLoading,
@@ -40,7 +40,7 @@ export const useIsApplied = (internshipId: string) => {
   } = useQuery({
     queryKey: ["appliedInternships"],
     queryFn: getAppliedInternships,
-    enabled: !!internshipId,
+    enabled: enabled && !!internshipId,
   });
 
   const isApplied =
@@ -64,9 +64,9 @@ export const useIsApplied = (internshipId: string) => {
 /**
  * Combined hook to check both saved and applied status
  */
-export const useInternshipStatus = (internshipId: string) => {
-  const savedStatus = useIsSaved(internshipId);
-  const appliedStatus = useIsApplied(internshipId);
+export const useInternshipStatus = (internshipId: string, enabled = true) => {
+  const savedStatus = useIsSaved(internshipId, enabled);
+  const appliedStatus = useIsApplied(internshipId, enabled);
 
   return {
     isSaved: savedStatus.isSaved,

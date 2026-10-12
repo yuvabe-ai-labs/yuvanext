@@ -23,3 +23,14 @@ export const getUnitById = async (id: string): Promise<UnitById> => {
     return handleApiError(error, `Failed to fetch unit ${id}`);
   }
 };
+
+// Get unit by id without a session (public job board)
+
+export const getPublicUnitById = async (id: string): Promise<UnitById> => {
+  try {
+    const response = await axiosInstance.get(`/public/units/${id}`);
+    return handleApiResponse<UnitById>(response, {} as UnitById);
+  } catch (error) {
+    return handleApiError(error, `Failed to fetch unit ${id}`);
+  }
+};

@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Mail, Phone, MapPin, Clock } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { useUnitById } from "@/hooks/useUnits";
+import PublicHeader from "@/components/PublicHeader";
+import { useUnitById, usePublicUnitById } from "@/hooks/useUnits";
 import { useProfile } from "@/hooks/useProfile";
 import { UserRole } from "@/types/profiles.types";
 import { useSession } from "@/lib/auth-client";
@@ -29,12 +30,24 @@ const safeParse = (data: any, fallback: any) => {
   }
 };
 
-const UnitView = () => {
+interface UnitViewProps {
+  // Signed-out visitor from the public job board: only public endpoints are
+  // called, and internship links lead to the public job pages.
+  guest?: boolean;
+}
+
+const UnitView = ({ guest = false }: UnitViewProps) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: session } = useSession();
-  const { data: profile } = useProfile();
-  const { data: unit, isLoading, error } = useUnitById(id || "");
+  const { data: profile } = useProfile(!guest);
+  const memberQuery = useUnitById(guest ? "" : id || "");
+  const guestQuery = usePublicUnitById(guest ? id || "" : "");
+  const { data: unit, isLoading, error } = guest ? guestQuery : memberQuery;
+
+  const header = guest ? <PublicHeader /> : <Navbar />;
+  const internshipPath = (internshipId: string) =>
+    guest ? `/jobs/${internshipId}` : `/internships/${internshipId}`;
 
   // Mentors browse units from /units-management to see where their mentees have
   // applied — they can't act on a posting, so the per-internship View is hidden.
@@ -53,7 +66,7 @@ const UnitView = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
+        {header}
         <div className="max-w-7xl mx-auto px-6 py-8">
           <Skeleton className="h-64 w-full rounded-2xl mb-8" />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -73,7 +86,7 @@ const UnitView = () => {
   if (error || !unit) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
+        {header}
         <div className="max-w-7xl mx-auto px-6 py-8 text-center">
           <h1 className="text-2xl font-bold text-foreground mb-4">
             Unit Not Found
@@ -83,7 +96,9 @@ const UnitView = () => {
               ? error.message
               : "The unit you are looking for does not exist."}
           </p>
-          <Button onClick={() => navigate("/units")}>Back to Units</Button>
+          <Button onClick={() => navigate(guest ? "/" : "/units")}>
+            {guest ? "Back to Jobs" : "Back to Units"}
+          </Button>
         </div>
       </div>
     );
@@ -94,7 +109,7 @@ const UnitView = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      {header}
 
       <div className="relative h-[17.625rem] bg-gradient-to-r from-primary/10 via-secondary/10 to-accent/10">
         {unit.bannerUrl && (
@@ -324,7 +339,7 @@ const UnitView = () => {
                                     variant="gradient"
                                     className="rounded-full text-white invisible md:visible"
                                     onClick={() =>
-                                      navigate(`/internships/${internship.id}`)
+                                      navigate(internshipPath(internship.id))
                                     }
                                   >
                                     View
@@ -364,7 +379,7 @@ const UnitView = () => {
                                   variant="gradient"
                                   className="rounded-full bg-clip-text text-transparent border border-orange-600 visible w-full bg-transparent md:hidden mt-4"
                                   onClick={() =>
-                                    navigate(`/internships/${internship.id}`)
+                                    navigate(internshipPath(internship.id))
                                   }
                                 >
                                   View

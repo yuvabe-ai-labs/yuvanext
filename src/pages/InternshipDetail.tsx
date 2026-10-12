@@ -19,20 +19,35 @@ import { useSession } from "@/lib/auth-client";
 import { useInternshipStatus } from "@/hooks/useSavedInternships";
 import {
   useInternshipById,
+  usePublicInternshipById,
   useSaveInternship,
   useRemoveSavedInternship,
 } from "@/hooks/useInternships";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
+import PublicHeader from "@/components/PublicHeader";
 
-const InternshipDetail = () => {
+interface InternshipDetailProps {
+  // Signed-out visitor from the public job board: only public endpoints are
+  // called, save/share are hidden, apply leads to sign-in, and the company
+  // link stays public.
+  guest?: boolean;
+}
+
+const InternshipDetail = ({ guest = false }: InternshipDetailProps) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: session } = useSession();
 
   // Fetch internship data
-  const { data: internship, isLoading, error } = useInternshipById(id || "");
+  const memberQuery = useInternshipById(guest ? "" : id || "");
+  const guestQuery = usePublicInternshipById(guest ? id || "" : "");
+  const {
+    data: internship,
+    isLoading,
+    error,
+  } = guest ? guestQuery : memberQuery;
 
   // Get saved and applied status for this internship
   const {
@@ -42,7 +57,7 @@ const InternshipDetail = () => {
     isLoading: isCheckingStatus,
     refetchSaved,
     refetchApplied,
-  } = useInternshipStatus(id || "");
+  } = useInternshipStatus(id || "", !guest);
 
   // Mutations for save/unsave
   const { mutate: saveInternship, isPending: isSaving } = useSaveInternship();
@@ -54,6 +69,16 @@ const InternshipDetail = () => {
   const [showShareDialog, setShowShareDialog] = useState(false);
 
   const savingInternship = isSaving || isRemoving;
+
+  const goToSignIn = () => navigate("/auth/candidate/signin");
+
+  const handleApplyClick = () => {
+    if (guest) {
+      goToSignIn();
+      return;
+    }
+    setShowApplicationDialog(true);
+  };
 
   const handleSaveInternship = async () => {
     if (!id) return;
@@ -132,7 +157,7 @@ const InternshipDetail = () => {
               ? error.message
               : "The internship you are looking for does not exist."}
           </p>
-          <Button onClick={() => navigate("/internships")}>
+          <Button onClick={() => navigate(guest ? "/" : "/internships")}>
             Back to Internships
           </Button>
         </div>
@@ -148,7 +173,7 @@ const InternshipDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      {guest ? <PublicHeader /> : <Navbar />}
       {/* Main Content */}
       <div className="container px-4 py-4 md:px-8 lg:px-[7.5rem] lg:py-10 overflow-hidden">
         {/* Mobile Header */}
@@ -160,27 +185,34 @@ const InternshipDetail = () => {
 
           {/* Save & Share Icons */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleSaveInternship}
-              disabled={savingInternship || isCheckingStatus}
-              className="p-2"
-            >
-              <Bookmark
-                size={22}
-                className={`${
-                  isSaved ? "text-teal-500 fill-teal-500" : "text-gray-700"
-                }`}
-              />
-            </button>
+            {!guest && (
+              <>
+                <button
+                  onClick={handleSaveInternship}
+                  disabled={savingInternship || isCheckingStatus}
+                  className="p-2"
+                >
+                  <Bookmark
+                    size={22}
+                    className={`${
+                      isSaved ? "text-teal-500 fill-teal-500" : "text-gray-700"
+                    }`}
+                  />
+                </button>
 
-            <button onClick={() => setShowShareDialog(true)} className="p-2">
-              <Share2 size={22} className="text-gray-700" />
-            </button>
+                <button
+                  onClick={() => setShowShareDialog(true)}
+                  className="p-2"
+                >
+                  <Share2 size={22} className="text-gray-700" />
+                </button>
+              </>
+            )}
             <Button
               variant="gradient"
               className="rounded-full text-white"
               disabled={isApplied || isCheckingStatus}
-              onClick={() => setShowApplicationDialog(true)}
+              onClick={handleApplyClick}
             >
               {isApplied ? "Applied" : "Apply Now"}
             </Button>
@@ -355,34 +387,38 @@ const InternshipDetail = () => {
 
                 {/* Right Side - Action Buttons */}
                 <div className="lg:flex gap-2 hidden items-start">
-                  <Button
-                    size="sm"
-                    className={`flex items-center ${
-                      isSaved
-                        ? "text-gray-400 bg-white"
-                        : "text-gray-600 bg-white"
-                    }`}
-                    onClick={handleSaveInternship}
-                    disabled={savingInternship || isCheckingStatus}
-                  >
-                    <Bookmark
-                      className={`w-4 h-4 ${isSaved ? "fill-current" : ""}`}
-                    />
-                    <span>{isSaved ? "Saved" : "Save"}</span>
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="flex items-center text-gray-700 bg-white"
-                    onClick={() => setShowShareDialog(true)}
-                  >
-                    <Share2 className="w-4 h-4" />
-                    <span>Share</span>
-                  </Button>
+                  {!guest && (
+                    <>
+                      <Button
+                        size="sm"
+                        className={`flex items-center ${
+                          isSaved
+                            ? "text-gray-400 bg-white"
+                            : "text-gray-600 bg-white"
+                        }`}
+                        onClick={handleSaveInternship}
+                        disabled={savingInternship || isCheckingStatus}
+                      >
+                        <Bookmark
+                          className={`w-4 h-4 ${isSaved ? "fill-current" : ""}`}
+                        />
+                        <span>{isSaved ? "Saved" : "Save"}</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex items-center text-gray-700 bg-white"
+                        onClick={() => setShowShareDialog(true)}
+                      >
+                        <Share2 className="w-4 h-4" />
+                        <span>Share</span>
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="gradient"
                     className="rounded-full text-white"
                     disabled={isApplied || isCheckingStatus}
-                    onClick={() => setShowApplicationDialog(true)}
+                    onClick={handleApplyClick}
                   >
                     {isApplied ? "Applied" : "Apply Now"}
                   </Button>
@@ -422,7 +458,11 @@ const InternshipDetail = () => {
                     className="border-none bg-orange-500 hover:bg-orange-600 text-white rounded-full px-8"
                     onClick={() => {
                       if (unit.userId) {
-                        navigate(`/units/${unit.userId}`);
+                        navigate(
+                          guest
+                            ? `/company/${unit.userId}`
+                            : `/units/${unit.userId}`,
+                        );
                       } else {
                         toast({
                           title: "Not Available",
@@ -530,7 +570,7 @@ const InternshipDetail = () => {
                     variant="gradient"
                     className="text-white rounded-full"
                     disabled={isApplied || isCheckingStatus}
-                    onClick={() => setShowApplicationDialog(true)}
+                    onClick={handleApplyClick}
                   >
                     {isApplied ? "Applied" : "Apply Now"}
                   </Button>
@@ -588,7 +628,11 @@ const InternshipDetail = () => {
                   className="border-none bg-orange-500 hover:bg-orange-600 text-white rounded-full px-8"
                   onClick={() => {
                     if (unit?.userId) {
-                      navigate(`/units/${unit.userId}`);
+                      navigate(
+                        guest
+                          ? `/company/${unit.userId}`
+                          : `/units/${unit.userId}`,
+                      );
                     } else {
                       toast({
                         title: "Not Available",
@@ -618,8 +662,8 @@ const InternshipDetail = () => {
         </div>
       </div>
 
-      {/* Application Dialog */}
-      {internship && (
+      {/* Application Dialog (calls useProfile, so never mount it for guests) */}
+      {internship && !guest && (
         <ProfileSummaryDialog
           isOpen={showApplicationDialog}
           onClose={() => setShowApplicationDialog(false)}

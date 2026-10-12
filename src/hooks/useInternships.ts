@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getInternships,
   getInternshipById,
+  getPublicInternships,
+  getPublicInternshipById,
   getRemommendedInternships,
   getSavedInternships,
   getAppliedInternships,
@@ -35,6 +37,21 @@ export const useInternshipById = (id: string) => {
   return useQuery({
     queryKey: ["internship", id],
     queryFn: () => getInternshipById(id),
+    enabled: !!id,
+  });
+};
+
+export const usePublicInternships = () => {
+  return useQuery({
+    queryKey: ["publicInternships"],
+    queryFn: getPublicInternships,
+  });
+};
+
+export const usePublicInternshipById = (id: string) => {
+  return useQuery({
+    queryKey: ["publicInternship", id],
+    queryFn: () => getPublicInternshipById(id),
     enabled: !!id,
   });
 };

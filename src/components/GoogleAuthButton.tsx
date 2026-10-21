@@ -49,6 +49,10 @@ const GoogleAuthButton = ({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  if (env.VITE_HIDE_GOOGLE_AUTH) {
+    return null;
+  }
+
   const handleGoogle = async () => {
     setLoading(true);
 

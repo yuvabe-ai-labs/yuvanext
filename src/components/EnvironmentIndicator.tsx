@@ -3,7 +3,11 @@ import { env } from "@/env";
 const EnvironmentIndicator = () => {
   const isLocalhost = window.location.hostname === "localhost";
 
-  if (env.VITE_STAGE_TYPE === "production" || isLocalhost) {
+  if (
+    env.VITE_STAGE_TYPE === "production" ||
+    env.VITE_HIDE_ENV_RIBBON ||
+    isLocalhost
+  ) {
     return null;
   }
 

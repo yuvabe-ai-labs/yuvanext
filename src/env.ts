@@ -11,6 +11,11 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
+  // Hides the environment ribbon — only enabled for the ATR deployment
+  VITE_HIDE_ENV_RIBBON: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
 });
 
 const _env = envSchema.safeParse(import.meta.env);

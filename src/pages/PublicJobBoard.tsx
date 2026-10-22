@@ -109,6 +109,7 @@ const PublicJobBoard = () => {
                 key={internship.id}
                 internship={internship}
                 onClick={() => navigate(`/jobs/${internship.id}`)}
+                showUnitName
               />
             ))}
           </div>

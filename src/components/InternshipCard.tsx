@@ -27,9 +27,15 @@ const getShortTimeAgo = (date: string | Date) => {
 interface InternshipCardProps {
   internship: Internship;
   onClick: () => void;
+  /** Shows the posting unit's name under the title (public job board). */
+  showUnitName?: boolean;
 }
 
-const InternshipCard = ({ internship, onClick }: InternshipCardProps) => {
+const InternshipCard = ({
+  internship,
+  onClick,
+  showUnitName,
+}: InternshipCardProps) => {
   const timeAgo = getShortTimeAgo(internship.updatedAt);
 
   return (
@@ -63,6 +69,15 @@ const InternshipCard = ({ internship, onClick }: InternshipCardProps) => {
           </h3>
         ) : (
           "Title"
+        )}
+
+        {showUnitName && internship.createdBy?.name && (
+          <p
+            className="text-sm font-medium text-gray-600 truncate -mt-1"
+            title={internship.createdBy.name}
+          >
+            {internship.createdBy.name}
+          </p>
         )}
 
         <p className="text-sm text-gray-500 line-clamp-3">
